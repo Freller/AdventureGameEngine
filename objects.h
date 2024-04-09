@@ -1019,6 +1019,8 @@ class adventureUI {
     textbox* talkingText = 0;
     textbox* responseText = 0;
     textbox* escText = 0;
+    textbox* levelTimeText = 0;
+    textbox* levelHitsText = 0;
     textbox* inputText = 0;
 
     string keyboardPrompt = "";
@@ -1039,6 +1041,9 @@ class adventureUI {
     int sleepingMS = 0; //MS to sleep cutscene/script
     bool sleepflag = 0; //true for one frame after starting a sleep
     bool mobilize = 0; //used to allow the player to move during /sleep calls
+
+    ui* emotion = 0;
+
 
     ui* inventoryA = 0; //big box, which has all of the items that the player has
     ui* inventoryB = 0; //small box, which will let the player quit or close the inventory
@@ -1829,7 +1834,8 @@ public:
   bool hidden = 0; //levels can be hidden so it is impossible to return to them (?)
   
   //dungeon data
-  int dungeonFloors = 0; //set this to one to make it a dungeon
+  int dungeonFloors = 0; //if >0, this counts as a dungeon for many things
+  int dungeonGoldMs = -1; //get a gold color for the level by getting a time under this
   vector<string> behemoths; //which behemoths can spawn here
   int firstActiveFloor = 7; //garanteed behemoth encounter here
   int avgRestSequence = 5; //what is a typical gap between encounters
@@ -1853,7 +1859,9 @@ public:
   string music;
   string chasemusic;
 
-  levelNode(string p3, string p4, string p5, SDL_Renderer * renderer, int fmouthStyle, int ffloors, vector<string> fbehemoths, int ffirstfloor, int frestlen, int fchaselen, string fmusic, string fchasemusic);
+  int darkness = 0;
+
+  levelNode(string p3, string p4, string p5, SDL_Renderer * renderer, int fmouthStyle, int ffloors, int fgoldMs, vector<string> fbehemoths, int ffirstfloor, int frestlen, int fchaselen, string fmusic, string fchasemusic, int fdarkness);
 
   ~levelNode(); 
 

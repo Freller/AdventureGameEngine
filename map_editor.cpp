@@ -672,6 +672,29 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
           break;
         }
         case 1: { //outcurve
+          if(i->type == 1) {
+
+            int step = g_TiltResolution;
+            for (int j = 0; j < 64; j += step)
+            {
+              child = new mapObject(renderer, "resources/engine/OCCLUSION.qoi", "&", i->x2 + j, i->y1 + 35 - (((pow(pow(64, 2) - pow(j, 2), 0.5))) * XtoY) - 0.5 - 32, i->layer * 64, step, 34, 0, (((pow(pow(64, 2) - pow(j, 2), 0.5))) * XtoY));
+              child->parent = i;
+              i->children.push_back(child);
+            }
+
+          } else {
+
+            int step = g_TiltResolution;
+            for (int j = 0; j < 64; j += step)
+            {
+              child = new mapObject(renderer, "resources/engine/OCCLUSION.qoi", "&", i->x2 - j, i->y1 + 35 - (((pow(pow(64, 2) - pow(j, 2), 0.5))) * XtoY) - 0.5 - 32, i->layer * 64, step, 34, 0, (((pow(pow(64, 2) - pow(j, 2), 0.5))) * XtoY));
+              child->parent = i;
+              i->children.push_back(child);
+            }
+
+          }
+          break;
+        
         }
 
         case 2: { //incurve
@@ -985,7 +1008,7 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
               }
               else
               {
-
+                //style is 1 and type is 1
                 if (triangle->capped)
                 {
                   int step = g_platformResolution;
@@ -4297,6 +4320,7 @@ void write_map(entity *mapent)
             SDL_SetTextureAlphaMod(g_shade, 255 - ( ( fbrightness/100.0 ) * 255));
             g_brightness = brightness;
           }
+          break;
         }
 
         if (word == "objective" || word == "obj")

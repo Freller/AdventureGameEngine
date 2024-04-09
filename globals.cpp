@@ -169,6 +169,7 @@ float p_ratio = 1.151;
 float g_brightness_setting = 100;		 // from 0 to 100, 0 is what is normal to me
 float g_brightness_map_factor = 0; // this is meant to be set in the mapeditor so some maps can be darker
 SDL_Texture* g_shade = 0;  //drawn to darken the frame uniformally
+int g_dungeonDarkness = 0;
 bool g_vsync = true;
 float g_background_darkness = 0; // 0 - show bg, 1 - show black
 SDL_Texture *background = 0;
@@ -387,6 +388,7 @@ const float g_hotbarX = 0.45; //don't change this, to move it horizontally chang
 
 int g_backpackIndex = 0; //set to 1 if the player is holding down the button
 int g_selectingUsable = 0;
+
 //the hotbar widens when the inventory button is held
 float g_hotbarWidth = 0.1;
 float g_hotbarWidth_inventoryOpen = 0.3;
@@ -658,21 +660,6 @@ entity *g_currentMusicPlayingEntity = 0;
 
 vector<std::pair<Mix_Chunk*,string>> g_preloadedSounds;
 Mix_Chunk *g_ui_voice;
-Mix_Chunk *g_menu_open_sound;
-Mix_Chunk *g_menu_close_sound;
-Mix_Chunk *g_menu_manip_sound;
-Mix_Chunk *g_pelletCollectSound;
-Mix_Chunk *g_spiketrapSound;
-Mix_Chunk *g_bladetrapSound;
-Mix_Chunk *g_smarttrapSound;
-Mix_Chunk *g_trainReadySound;
-
-Mix_Chunk *g_land;
-Mix_Chunk *g_footstep_a;
-Mix_Chunk *g_footstep_b;
-Mix_Chunk *g_bonk;
-
-Mix_Chunk *g_deathsound;
 musicNode *g_closestMusicNode;
 musicNode *newClosest;
 
@@ -684,12 +671,7 @@ int musicFadeTimer = 0;
 bool fadeFlag = 0; // for waiting between fading music in and out
 bool entFadeFlag = 0;
 int musicUpdateTimer = 0;
-Mix_Chunk *g_bulletdestroySound;
-Mix_Chunk *g_cannonfireSound;
-Mix_Chunk *g_playerdamage;
-Mix_Chunk *g_enemydamage;
-Mix_Chunk *g_npcdamage;
-Mix_Chunk *g_s_playerdeath;
+vector<Mix_Chunk*> g_staticSounds;
 
 std::map<string, Mix_Chunk> g_static_sounds = {};
 
@@ -745,6 +727,7 @@ vector<float> g_alphabet_upper_widths;
 int g_keyboardInputLength = 12;
 string g_keyboardSaveToField = ""; //the save-field to write keyboard input to, when ready
 SDL_Color g_textcolor = { 155, 115, 115 };
+SDL_Color g_goldcolor = { 156, 127, 11 };
 SDL_Color g_healthtextcolor = { 220, 203, 25 };
 SDL_Color g_healthtextlowcolor = { 25, 25, 220 };
 

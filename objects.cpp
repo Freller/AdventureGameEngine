@@ -1719,7 +1719,6 @@ void projectile::update(float elapsed) {
   if(!gun->snake) {
     for(auto n : g_boxs[layer]) {
       if(RectOverlap(bounds, n->bounds)) {
-        playSound(0, g_bulletdestroySound, 0);
         lifetime = 0;
         return;
       }
@@ -2507,7 +2506,7 @@ int fancybox::reveal() {
   {
     Mix_HaltChannel(6);
     Mix_VolumeChunk(adventureUIManager->blip, 20);
-    playSound(6, adventureUIManager->blip, 0);
+    //playSound(6, adventureUIManager->blip, 0);
   }
 
   if(wordProgress < words.size()) {
@@ -2605,7 +2604,7 @@ void worldsound::update(float elapsed) {
 
   if(cooldown < 0) {
     //change volume
-    playSound(-1, blip, 0);
+    //playSound(-1, blip, 0);
     cooldown = rand() % (int)maxWait + minWait;
   } else {
     cooldown -= elapsed;
@@ -3129,6 +3128,8 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
     } else {
       txtfilename = "resources/static/scripts/" + boardingScriptName + ".txt";
     }
+    D(name);
+    D(txtfilename);
 
     boardingScript = loadText(txtfilename);
     parseScriptForLabels(boardingScript);
@@ -4301,9 +4302,9 @@ door* entity::update(vector<door*> doors, float elapsed) {
             if(footstep_reset && grounded) {
               footstep_reset = 0;
               if(1 - sin(animtime * animspeed) < 0.04) {
-                playSound(-1, g_footstep_a, 0);
+                //playSound(-1, g_footstep_a, 0);
               } else {
-                playSound(-1, g_footstep_b, 0);
+                //playSound(-1, g_footstep_b, 0);
               }
 
 
@@ -5187,7 +5188,6 @@ door* entity::update(vector<door*> doors, float elapsed) {
             timeToLiveMs = -1;
             usingTimeToLive = 1;
           }
-          //playSound(-1, g_bonk, 0);
 
           //detect stuckness
           stuckTime++;
@@ -5555,7 +5555,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
             }
 
             //play landing sound
-            playSound(-1, g_land, 0);
+            //playSound(-1, g_land, 0);
 
             if(!storedJump) {
               //penalize the player for not bhopping
@@ -5666,12 +5666,12 @@ door* entity::update(vector<door*> doors, float elapsed) {
                 this->hp -= x->gun->damage;
                 this->flashingMS = g_flashtime;
                 if(this->faction != 0) {
-                  playSound(1, g_enemydamage, 0);
+                  //playSound(1, g_enemydamage, 0);
                 } else {
                   if(this == protag) {
-                    playSound(2, g_playerdamage, 0);
+                    //playSound(2, g_playerdamage, 0);
                   } else {
-                    playSound(3, g_npcdamage, 0);
+                    //playSound(3, g_npcdamage, 0);
                   }
                 }
               }
@@ -6847,13 +6847,14 @@ vector<entity*> gatherEntities(string fname) {
   return ret;
 }
 
-levelNode::levelNode(string p3, string p4, string p5, SDL_Renderer * renderer, int fmouthStyle, int ffloors, vector<string> fbehemoths, int ffirstfloor, int frestlen, int fchaselen, string fmusic, string fchasemusic) {
+levelNode::levelNode(string p3, string p4, string p5, SDL_Renderer * renderer, int fmouthStyle, int ffloors, int fgoldMs, vector<string> fbehemoths, int ffirstfloor, int frestlen, int fchaselen, string fmusic, string fchasemusic, int fdarkness) {
   name = p3;
   mapfilename = p4;
   waypointname = p5;
   mouthStyle = fmouthStyle;
 
   dungeonFloors = ffloors;
+  dungeonGoldMs = fgoldMs;
   behemoths = fbehemoths;
   firstActiveFloor = ffirstfloor;
   avgRestSequence = frestlen;
@@ -6861,6 +6862,8 @@ levelNode::levelNode(string p3, string p4, string p5, SDL_Renderer * renderer, i
 
   music = fmusic;
   chasemusic = fchasemusic;
+
+  darkness = fdarkness;
 
   //load graphic
   string lowerName = name;
@@ -6960,6 +6963,10 @@ void levelSequence::addLevels(string filename) {
     int dungeonFloors = stoi(temp);
 
     getline(file, temp);
+    int dungeonGoldMs = stoi(temp);
+    D(dungeonGoldMs);
+
+    getline(file, temp);
     vector<string> behemoths = splitString(temp, ' ');
 
     behemoths.back().pop_back(); // this is a newline char
@@ -6981,11 +6988,14 @@ void levelSequence::addLevels(string filename) {
     string chasemusic = temp;
     chasemusic.pop_back();
 
+    getline(file,temp);
+    int darkness = stoi(temp);
+
     map_name = "resources/maps/" + map_name;
 
     if(file.eof()) {break;}
 
-    levelNode* newLevelNode = new levelNode(level_name, map_name, way_name, renderer, special, dungeonFloors, behemoths, firstActiveFloor, avgRestSequence, avgChaseSequence, music, chasemusic);
+    levelNode* newLevelNode = new levelNode(level_name, map_name, way_name, renderer, special, dungeonFloors, dungeonGoldMs, behemoths, firstActiveFloor, avgRestSequence, avgChaseSequence, music, chasemusic, darkness);
     i++;
     levelNodes.push_back(newLevelNode);
     getline(file,temp);
@@ -9323,6 +9333,8 @@ void adventureUI::showInventoryUI()
     inventoryA->show = 1;
     inventoryB->show = 1;
     escText->show = 1;
+    levelTimeText->show = 1;
+    levelHitsText->show = 1;
     inputText->show = 1;
   }
 }
@@ -9333,7 +9345,11 @@ void adventureUI::hideInventoryUI()
     inventoryA->show = 0;
     inventoryB->show = 0;
     escText->show = 0;
+    levelTimeText->show = 0;
+    levelHitsText->show = 0;
     escText->updateText("",-1,1);
+    levelTimeText->updateText("",-1,1);
+    levelHitsText->updateText("",-1,1);
     inputText->show = 0;
     inputText->updateText("", -1, 0.9);
   }
@@ -9521,6 +9537,28 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     escText->align = 2;
     escText->dropshadow = 1; 
 
+    levelHitsText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
+
+    levelHitsText->boxX = 0.1;
+    levelHitsText->boxY = 0.83;
+    levelHitsText->boxWidth = 0.98;
+    levelHitsText->boxHeight = 0.25 - 0.02;
+    levelHitsText->worldspace = 0;
+    levelHitsText->show = 1;
+    levelHitsText->align = 0;
+    levelHitsText->dropshadow = 1; 
+
+    levelTimeText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
+
+    levelTimeText->boxX = 0.9;
+    levelTimeText->boxY = 0.83;
+    levelTimeText->boxWidth = 0.98;
+    levelTimeText->boxHeight = 0.25 - 0.02;
+    levelTimeText->worldspace = 0;
+    levelTimeText->show = 1;
+    levelTimeText->align = 1;
+    levelTimeText->dropshadow = 1; 
+
     inputText = new textbox(renderer, "", 1700 * g_fontsize * 1.4, 0, 0, 0.9);
 
     inputText->boxX = 0.5;
@@ -9544,6 +9582,8 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
 }
 
 void adventureUI::initFullUI() {
+
+
 
 //    tastePicture = new ui(renderer, "resources/static/ui/taste.qoi", 0.2 + 0.01, 1-0.1, 0.05, 1, -15);
 //    tastePicture->persistent = 1;
@@ -9585,6 +9625,14 @@ void adventureUI::initFullUI() {
 //  healthPicture->glideSpeed = 0.1;
 //  healthPicture->widthGlideSpeed = 0.1;
 //  healthPicture->priority = -10; //health is behind everything
+
+  emotion = new ui(renderer, "resources/static/ui/emoticons.qoi", 0, 0, 0.05, 0.05, -15);
+  emotion->persistent = 1;
+  emotion->heightFromWidthFactor = 1;
+  emotion->show = 0;
+  emotion->framewidth = 64;
+  emotion->frameheight = 64;
+  emotion->priority = 0;
 
   hotbar = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", g_hotbarX + g_backpackHorizontalOffset, 0.84, 0.1, 0.1, 1);
   hotbar->is9patch = true;
@@ -9846,7 +9894,7 @@ void adventureUI::updateText()
     {
       Mix_HaltChannel(6);
       Mix_VolumeChunk(blip, 20);
-      playSound(6, blip, 0);
+      //playSound(6, blip, 0);
     }
   }
   else
@@ -10642,7 +10690,7 @@ I("s");
     {
       response = "";
       response_index = 0;
-      playSound(-1, confirm_noise, 0);
+      //playSound(-1, confirm_noise, 0);
       dialogue_index = jump - 3;
       this->continueDialogue();
     }
@@ -12059,15 +12107,10 @@ I("s");
     vector<string> split = splitString(s, ' ');
     string loadstring = "resources/static/sounds/" + split[1] + ".wav";
     D(loadstring);
-
+    
+    float volume = stof(split[2]);
 
     Mix_Chunk *a = nullptr;
-    //before we load it, let's see if it's preloaded 
-    for(auto x : g_preloadedSounds) {
-      if(x.second == loadstring) {
-        a = x.first;
-      }
-    }
 
     if(a == nullptr) {
       a = loadWav(loadstring.c_str());
@@ -12075,7 +12118,9 @@ I("s");
 
     if (!g_mute && a != nullptr)
     {
+      Mix_Volume(0, volume * g_sfx_volume * 128);
       Mix_PlayChannel(0, a, 0);
+      Mix_Volume(0, g_sfx_volume * 128);
     }
 
     //if the sound is longer than 15 seconds, just place it in the level and call it from the script
@@ -12172,12 +12217,12 @@ I("s");
       hopeful->hp -= tangiblestate;
       hopeful->flashingMS = g_flashtime;
       if(hopeful->faction != 0) {
-        playSound(1, g_enemydamage, 0);
+        //playSound(1, g_enemydamage, 0);
       } else {
         if(hopeful == protag) {
-          playSound(2, g_playerdamage, 0);
+          //playSound(2, g_playerdamage, 0);
         } else {
-          playSound(3, g_npcdamage, 0);
+          //playSound(3, g_npcdamage, 0);
         }
       }
     }
@@ -12236,7 +12281,6 @@ I("s");
   // /unlock twistland
   if (scriptToUse->at(dialogue_index + 1).substr(0, 12) == "/unlocklevel")
   {
-    breakpoint();
     M("unlocklevel interpreter");
     string s = scriptToUse->at(dialogue_index + 1);
     vector<string> x = splitString(s, ' ');

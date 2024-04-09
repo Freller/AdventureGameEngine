@@ -312,6 +312,7 @@ extern float p_ratio;
 extern float g_brightness_setting;
 extern float g_brightness_map_factor;
 extern SDL_Texture* g_shade;
+extern int g_dungeonDarkness;
 extern bool g_vsync;
 extern float g_background_darkness;
 extern SDL_Texture *background;
@@ -626,14 +627,6 @@ extern bool g_mute;
 
 extern vector<std::pair<Mix_Chunk*,string>> g_preloadedSounds;
 extern Mix_Chunk *g_ui_voice;
-extern Mix_Chunk *g_menu_open_sound;
-extern Mix_Chunk *g_menu_close_sound;
-extern Mix_Chunk *g_menu_manip_sound;
-extern Mix_Chunk *g_pelletCollectSound;
-extern Mix_Chunk *g_spiketrapSound;
-extern Mix_Chunk *g_bladetrapSound;
-extern Mix_Chunk *g_smarttrapSound;
-extern Mix_Chunk *g_trainReadySound;
 
 extern Mix_Chunk *g_land;
 extern Mix_Chunk *g_footstep_a;
@@ -652,12 +645,7 @@ extern int musicFadeTimer;
 extern bool fadeFlag;
 extern bool entFadeFlag;
 extern int musicUpdateTimer;
-extern Mix_Chunk *g_bulletdestroySound;
-extern Mix_Chunk *g_cannonfireSound;
-extern Mix_Chunk *g_playerdamage;
-extern Mix_Chunk *g_enemydamage;
-extern Mix_Chunk *g_npcdamage;
-extern Mix_Chunk *g_s_playerdeath;
+extern vector<Mix_Chunk*> g_staticSounds;
 
 extern std::map<string, Mix_Chunk> g_static_sounds;
 
@@ -709,6 +697,7 @@ extern vector<float> g_alphabet_upper_widths;
 extern int g_keyboardInputLength;
 extern string g_keyboardSaveToField;
 extern SDL_Color g_textcolor;
+extern SDL_Color g_goldcolor;
 extern SDL_Color g_healthtextcolor;
 extern SDL_Color g_healthtextlowcolor;
 

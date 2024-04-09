@@ -298,15 +298,10 @@ int WinMain()
 
   // init static resources
 
-  g_menu_manip_sound = loadWav("resources/static/sounds/manip-menu.wav");
+  { //init static sounds
+    //g_staticSounds.push_back(loadWav("resources/static/sounds/....wav"));
+  }
 
-  g_pelletCollectSound = loadWav("resources/static/sounds/pellet.wav");
-
-  g_spiketrapSound = loadWav("resources/static/sounds/spiketrap.wav");
-
-  g_bladetrapSound = loadWav("resources/static/sounds/bladetrap.wav");
-
-  g_smarttrapSound = loadWav("resources/static/sounds/smarttrap.wav");
 
   g_spurl_entity = new entity(renderer, "common/spurl");
   g_spurl_entity->msPerFrame = 75;
@@ -1001,7 +996,7 @@ int WinMain()
     // if we die don't worry about not being able to switch because we can't shoot yet
     if (protag->hp <= 0)
     {
-      playSound(4, g_s_playerdeath, 0);
+      //playSound(4, g_s_playerdeath, 0);
       protag->cooldown = 0;
     }
 
@@ -3067,11 +3062,54 @@ int WinMain()
   
               if(g_levelSequence->levelNodes[i]->locked) {
                 adventureUIManager->escText->updateText("Locked", -1, 0.9);
+                adventureUIManager->levelTimeText->show = 0;
+                adventureUIManager->levelHitsText->show = 0;
               } else {
                 string dispText = g_levelSequence->levelNodes[i]->name;
                 std::replace(dispText.begin(), dispText.end(),'_',' ');
                 adventureUIManager->escText->updateText(g_levelSequence->levelNodes[i]->name, -1, 0.9);
-  
+                if(g_levelSequence->levelNodes[i]->dungeonFloors > 0) {
+                  string field = g_levelSequence->levelNodes[i]->name + "-time";
+                  int ms = checkSaveField(field);
+      
+                  int sec = (ms / 1000) % 60;
+                  int min = ms / 60000;
+                  string secstr = to_string(sec);
+                  if(secstr.size() < 2) {secstr = "0" + secstr;}
+                  string minstr = to_string(min);
+                  if(minstr.size() < 2) {minstr = "0" + minstr;}
+      
+                  string levelTimeStr = minstr + ":" + secstr;
+
+                  field = g_levelSequence->levelNodes[i]->name + "-hits";
+                  int levelHits = checkSaveField(field);
+                  string levelHitsStr = to_string(levelHits);
+
+                  if(ms == -1) {levelTimeStr = "--";}
+                  if(levelHits == -1) { levelHitsStr = "--"; }
+
+                  SDL_Color timeColor = g_textcolor;
+                  SDL_Color hitsColor = g_textcolor;
+                  
+                  if(ms < g_levelSequence->levelNodes[i]->dungeonGoldMs && ms != -1) {
+                    timeColor = g_goldcolor;
+                  }
+                  
+                  if(levelHits == 0) {
+                    hitsColor = g_goldcolor;
+                  }
+
+                  adventureUIManager->levelTimeText->updateText(levelTimeStr, -1, 0, timeColor);
+                  adventureUIManager->levelHitsText->updateText(levelHitsStr, -1, 0, hitsColor);
+                  adventureUIManager->levelTimeText->show = 1;
+                  adventureUIManager->levelHitsText->show = 1;
+                } else {
+                  adventureUIManager->levelTimeText->show = 0;
+                  adventureUIManager->levelHitsText->show = 0;
+
+                }
+
+                
               }
   
               // this item should have the marker
@@ -3273,7 +3311,7 @@ int WinMain()
 
     g_dungeonDarkEffect += g_dungeonDarkEffectDelta;
     if(g_dungeonDarkEffect > 255) { g_dungeonDarkEffect = 255;}
-    if(g_dungeonDarkEffect < 0) { g_dungeonDarkEffect = 0;}
+    if(g_dungeonDarkEffect < g_dungeonDarkness) { g_dungeonDarkEffect = g_dungeonDarkness;}
     if(g_dungeonDarkEffect == 255) {
       dungeonFlash();
     }
@@ -3455,7 +3493,7 @@ int WinMain()
             adventureUIManager->tungShakeDurationMs = 0;
             
             
-            playSound(4, g_pelletCollectSound, 0);
+            //playSound(4, g_pelletCollectSound, 0);
             x->usingTimeToLive = 1;
             x->timeToLiveMs = -1;
             x->shadow->size = 0;
@@ -3635,7 +3673,7 @@ int WinMain()
     // did the protag die?
     if (protag->hp <= 0 && protag->essential)
     {
-      playSound(-1, g_deathsound, 0);
+      //playSound(-1, g_deathsound, 0);
 
       if (!canSwitchOffDevMode)
       {
@@ -5056,6 +5094,7 @@ void getInput(float &elapsed)
           clear_map(g_camera);
           //load_map(renderer, "resources/maps/base/g.map", "a");
           //instead of loading the base, open the level-select menu
+          g_dungeonDarkness = 0;
           g_inventoryUiIsLevelSelect = 1;
           g_inventoryUiIsKeyboard = 0;
           g_inventoryUiIsLoadout = 0;
@@ -5236,7 +5275,7 @@ void getInput(float &elapsed)
 
         //if this is the inventory screen, close it
         if(g_inventoryUiIsLevelSelect == 0) {
-          playSound(-1, g_menu_close_sound, 0);
+          //playSound(-1, g_menu_close_sound, 0);
           inPauseMenu = 0;
           elapsed = 16;
           adventureUIManager->hideInventoryUI();
@@ -5248,7 +5287,7 @@ void getInput(float &elapsed)
         protagMakesNoise();
         usable* thisUsable = g_backpack.at(g_backpackIndex); 
         thisUsable->cooldownMs = thisUsable->maxCooldownMs;
-        playSound(-1, g_menu_open_sound, 0);
+        //playSound(-1, g_menu_open_sound, 0);
         g_inventoryUiIsLevelSelect = 0;
         g_inventoryUiIsLoadout = 0;
         g_inventoryUiIsKeyboard = 0;
@@ -5311,7 +5350,7 @@ void getInput(float &elapsed)
     
     //if this is the inventory screen, close it
     if(g_inventoryUiIsLevelSelect == 0) {
-      playSound(-1, g_menu_close_sound, 0);
+      //playSound(-1, g_menu_close_sound, 0);
       inPauseMenu = 0;
       elapsed = 16;
       adventureUIManager->hideInventoryUI();
@@ -5538,6 +5577,8 @@ void getInput(float &elapsed)
         adventureUIManager->showScoreUI();
         string scorePrint = "0/" + to_string(numFloors);
         adventureUIManager->scoreText->updateText(scorePrint, 34, 34);
+
+        g_dungeonDarkness = g_levelSequence->levelNodes[inventorySelection]->darkness;
 
         //generate the DUNGEON ( :DD )
 
@@ -6207,6 +6248,9 @@ void dungeonFlash() {
       //delete x.ptr;
       x.ptr->persistentGeneral = 0;
       x.ptr->hisweapon->persistent = 0;
+      x.ptr->current = nullptr;
+      x.ptr->dest = nullptr;
+      x.ptr->Destination = nullptr;
       for(auto &y : x.ptr->spawnlist) {
         y->persistentGeneral = 0;
       }
@@ -6288,10 +6332,18 @@ void dungeonFlash() {
     g_levelFlashing = 1;
     clear_map(g_camera);
     transition = 1;
-    load_map(renderer, "resources/maps/" + g_mapdir + "/" + g_dungeon.at(g_dungeonIndex).map, "a");
+    M("Does this cause a problem?");
+    D(g_dungeonIndex);
+    if(g_dungeonIndex == -1) {
+      load_map(renderer, "resources/maps/" + g_mapdir + "/start.map", "a");
+    } else {
+      load_map(renderer, "resources/maps/" + g_mapdir + "/" + g_dungeon.at(g_dungeonIndex).map, "a");
+    }
     transition = 0;
     protag_is_talking = 0;
     protag_can_move = 1;
+    protag->zvel = 0;
+    protag->z = 0;
     g_levelFlashing = 0;
     adventureUIManager->showHUD();
 
