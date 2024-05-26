@@ -4322,6 +4322,12 @@ void getInput(float &elapsed)
     staticInput[4] = 0;
   }
 
+  //triangle toggle from keyboard
+  if(keystate[SDL_SCANCODE_W])
+  {
+    devinput[10] = 1;
+  } 
+
 
   if (keystate[bindings[9]])
   {
@@ -5839,6 +5845,7 @@ void getInput(float &elapsed)
   if (keystate[SDL_SCANCODE_B] && devMode)
   {
     // this is make-trigger
+    //
     devinput[0] = 1;
   }
   if (keystate[SDL_SCANCODE_N] && devMode)

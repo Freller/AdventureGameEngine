@@ -141,8 +141,10 @@ vector<string> loadText(string fileaddress)
 
   } else {
     E("FNF: " + fileaddress);
-    breakpoint();
-    abort();
+    if(!devMode) {
+      breakpoint();
+      abort();
+    }
     return {};
   }
 

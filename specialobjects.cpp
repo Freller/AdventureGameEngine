@@ -301,12 +301,15 @@ void specialObjectsInit(entity* a) {
     }
     case 28:
     {
+      //crushing crate
+      a->flagA = 0; //search for crate
       
 
       break;
     }
     case 29:
     {
+      //crushable
       a->data[0] = 0;
       a->flagA = 0; //search for crate
       a->cooldownA = a->bounds.width;
@@ -322,6 +325,12 @@ void specialObjectsInit(entity* a) {
       a->scriptedAnimation = 0;
       a->animation = 0;
       a->loopAnimation = 0;
+      break;
+    }
+    case 31:
+    {
+      //father washing dishes
+      a->flagA = 5000;
       break;
     }
 
@@ -371,7 +380,6 @@ void specialObjectsBump(entity* a, bool xcollide, bool ycollide) {
     {
       //bladetrap
       if(xcollide || ycollide) {
-        playSoundAtPosition(7, g_bladetrapSound, 0, a->getOriginX(), a->getOriginY(), 0.5);
         float offset = 50;
         if(!a->flagA) {
           offset = -50;
@@ -431,7 +439,6 @@ void specialObjectsUpdate(entity* a, float elapsed) {
             entry->reverseAnimation = 0;
             entry->visible = 1;
           }
-          playSoundAtPosition(5, g_spiketrapSound, 0, a->getOriginX(), a->getOriginY(), 0.3);
           a->flagA = 2;
           a->flagB = 0;
           a->cooldownA = 0;
@@ -506,7 +513,6 @@ void specialObjectsUpdate(entity* a, float elapsed) {
         if(cannonToggleEvent == 1 || cannonToggleEvent == 3) {
           blackSmokeEffect->happen(a->getOriginX() + xoff, a->getOriginY() + yoff, a->z + 40, a->steeringAngle);
         }
-        playSoundAtPosition(6, g_cannonfireSound, 0, a->getOriginX(), a->getOriginY(), 0.6);
       }
       break;
     } 
@@ -999,7 +1005,6 @@ void specialObjectsUpdate(entity* a, float elapsed) {
           entry->reverseAnimation = 0;
           entry->visible = 1;
         }
-        playSoundAtPosition(5, g_spiketrapSound, 0, a->getOriginX(), a->getOriginY(), 0.3);
       }
 
       if(lastShortSpikesState == 1) {
@@ -1107,6 +1112,14 @@ void specialObjectsUpdate(entity* a, float elapsed) {
     case 28:
     {
       //pushable heavy crate
+      if(a->flagA == 0) {
+        for(auto &x : g_entities) {
+          if(x->identity == 29) {
+            a->spawnlist.push_back(x);
+            a->flagA = 1;
+          }
+        }
+      }
       
       //left box
       rect bounds = a->getMovedBounds();
@@ -1145,8 +1158,25 @@ void specialObjectsUpdate(entity* a, float elapsed) {
       if(RectOverlap3d(protag->getMovedBounds(), down)) {
         vy = 1;
       }
-      vx *= 10;
-      vy *= 10;
+      float mag = 20;
+
+      if(a->flagA) {
+        //is a crushable ent in our way?
+        rect forw = bounds;
+        forw.x + vx * 2;
+        forw.y + vy * 2;
+        if(RectOverlap3d(a->spawnlist[0]->getMovedBounds(), forw)) {
+          float rat = a->spawnlist[0]->orbitRange;
+
+          if(rat != 0 && a->spawnlist[0]->tangible) {
+            mag *= 1.8 - (rat*1.5);
+          }
+        }
+      }
+
+      vx *= mag;
+      vy *= mag;
+
       a->xvel += vx;
       a->yvel += vy;
       break;
@@ -1227,6 +1257,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
           a->spawnlist[0]->curwidth = 0;
           a->spawnlist[0]->curheight = 0;
         }
+        a->orbitRange = min(xshmush, yshmush);
 
         xshmush *= a->width;
         yshmush *= a->height;
@@ -1241,8 +1272,31 @@ void specialObjectsUpdate(entity* a, float elapsed) {
     case 30:
     {
       //corpse explosion | common/blood.ent
-
+      break;
     }
+    case 31:
+    {
+      //father washing dishes
+      a->animate = 0;
+      a->cooldownA -= elapsed;
+      if(a->cooldownA < 0) {
+        a->cooldownA = rng(3000, 1100);
+        a->msPerFrame = 150;
+        a->scriptedAnimation = 1;
+        a->animation = 0;
+      }
+
+      if(a->msPerFrame > 0 && a->frameInAnimation == 0) {
+        if(rng(0,1) == 0) {
+          a->loopAnimation = 1;
+        } else {
+          a->loopAnimation = 0;
+        }
+      }
+
+      break;
+    }
+
    
     case 100: 
     {
@@ -1867,21 +1921,27 @@ void specialObjectsOncePerFrame(float elapsed)
 }
 
 void usableItemCode(usable* a) {
-  //1 - spin
-  //2 - inventory
-  //3 - mechanism
   switch(a->specialAction) {
     case 3:
-      {
-        //radio
-        protag->forwardsPushVelocity = 1900;
-        protag->forwardsPushAngle = protag->steeringAngle;
-        littleSmokeEffect->happen(protag->getOriginX(), protag->getOriginY(), protag->z, 0);
-        g_lastParticleCreated->accelerationz = 0;
-        g_lastParticleCreated->velocityz = 0;
+    {
+      //mechanism
+      protag->forwardsPushVelocity = 3900;
+      protag->forwardsPushAngle = protag->steeringAngle;
+      littleSmokeEffect->happen(protag->getOriginX(), protag->getOriginY(), protag->z, 0);
+      g_lastParticleCreated->accelerationz = 0;
+      g_lastParticleCreated->velocityz = 0;
 
-        break;
+      break;
+    }
+    case 4:
+    {
+      //rewinder
+      if(g_dungeonSystemOn) {
+        g_dungeonDoorActivated = 1;
+        g_dungeonIndex--;
+        g_dungeonRedo = 1;
       }
+    }
   }
 }
 
