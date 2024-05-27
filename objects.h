@@ -1308,6 +1308,8 @@ class entity:public actor {
 
     bool cachedOriginValsAreGood = 0;
 
+    int isFogSlate = 0;
+
     //sounds
     Mix_Chunk* footstep;
     Mix_Chunk* footstep2;

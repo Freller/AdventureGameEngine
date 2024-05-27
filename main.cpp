@@ -590,6 +590,7 @@ int WinMain()
     s->shadow->width = 0;
     s->dynamic = 0;
     s->sortingOffset = 130; // -35 then 130
+    s->isFogSlate = 1;
   }
 
   for (size_t i = 0; i < 19; i++)
@@ -611,6 +612,7 @@ int WinMain()
     s->dynamic = 0;
     s->sortingOffset = 165; // -65 55
     //s->width = 0;
+    s->isFogSlate = 1;
   }
 
   for (size_t i = 0; i < 19; i++)
@@ -631,6 +633,7 @@ int WinMain()
     s->dynamic = 0;
     s->sortingOffset = 45000; // !!! might need to be bigger
     //s->width = 0;
+    s->isFogSlate = 1;
   }
 
   SDL_DestroyTexture(s->texture);

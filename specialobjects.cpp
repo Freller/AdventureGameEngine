@@ -61,7 +61,7 @@ void specialObjectsInit(entity* a) {
     case 6:
     {
       //smarttrap
-      a->poiIndex = 6;
+      a->poiIndex = 10;
       break;
     }
     case 8:
@@ -401,7 +401,13 @@ void specialObjectsBump(entity* a, bool xcollide, bool ycollide) {
       //bouncetrap
       
       if((xcollide || ycollide) && a->cooldownA < 0) {
-        a->targetSteeringAngle += M_PI/2;
+        if(a->flagA) {
+          a->targetSteeringAngle -= M_PI/2;
+        } else {
+          a->targetSteeringAngle += M_PI/2;
+        }
+        a->flagA = !a->flagA;
+
         a->targetSteeringAngle = wrapAngle(a->targetSteeringAngle);
         a->steeringAngle = a->targetSteeringAngle;
         a->cooldownA = 1000;
@@ -923,9 +929,10 @@ void specialObjectsUpdate(entity* a, float elapsed) {
       //bouncetrap
       //a->forwardsVelocity = a->xmaxspeed;
       a->cooldownA -= elapsed;
+      D(a->cooldownA);
       if(CylinderOverlap(a->getMovedBounds(), protag->getMovedBounds()))
       {
-        a->cooldownA = 0;
+        //a->cooldownA = 0;
         hurtProtag(1);
     
       }

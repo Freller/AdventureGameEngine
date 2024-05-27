@@ -30,7 +30,9 @@ SDL_Texture* loadTexture(SDL_Renderer* renderer, string fileaddress)
   } else {
     E("FNF: " + fileaddress);
     breakpoint();
-    abort();
+    if(!devMode) {
+      abort();
+    }
     return nullptr;
   }
 }
@@ -141,8 +143,8 @@ vector<string> loadText(string fileaddress)
 
   } else {
     E("FNF: " + fileaddress);
+    breakpoint();
     if(!devMode) {
-      breakpoint();
       abort();
     }
     return {};
@@ -186,7 +188,7 @@ string loadTextAsString(string fileaddress)
       i++;
     }
     breakpoint();
-    abort();
+//    abort();
     return {};
   }
 }

@@ -1697,12 +1697,15 @@ bool mapeditor_save_map(string word)
       else
       {
         //some ents have one frame but i still wanna set angle
-        g_entities[i]->animation = convertAngleToFrame(g_entities[i]->steeringAngle);
+        if(g_entities[i]->yframes == 1) {
+          g_entities[i]->animation = convertAngleToFrame(g_entities[i]->steeringAngle);
+        }
         if(g_entities[i]->name == "common/pellet") {
           g_entities[i]->animation = rand() % g_entities[i]->yframes;
         }
 
         ofile << "entity " << g_entities[i]->name << " " << to_string(g_entities[i]->x) << " " << to_string(g_entities[i]->y) << " " << to_string(g_entities[i]->z) << " " << g_entities[i]->animation << " " << (g_entities[i]->flip == SDL_FLIP_HORIZONTAL) << endl;
+        D(g_entities[i]->animation);
       }
     }
   }
@@ -1848,6 +1851,7 @@ void write_map(entity *mapent)
       {
         continue;
       }
+      if(g_entities[i]->isFogSlate) { continue; }
       drect.x = (g_entities[i]->bounds.x + g_entities[i]->x - g_camera.x) * g_camera.zoom;
       drect.y = (g_entities[i]->bounds.y + g_entities[i]->y - g_camera.y - g_entities[i]->z * XtoZ) * g_camera.zoom;
       drect.w = g_entities[i]->bounds.width * g_camera.zoom;
