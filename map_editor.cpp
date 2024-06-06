@@ -4069,7 +4069,7 @@ void write_map(entity *mapent)
         }
       }
 
-      if (word == "reload")
+      if (word == "reload" || word == "r")
       {
 
         if (g_map != "")
@@ -5086,7 +5086,7 @@ void write_map(entity *mapent)
         break;
       }
 
-      if(word == "whichmap" || word == "map") {
+      if(word == "whichmap" || word == "map" || word == "which") {
         M("Map: " + g_mapdir + "/" + g_map);
       }
 
@@ -5224,7 +5224,7 @@ void write_map(entity *mapent)
           solidifyMe->unsolidify();
         }
       }
-      if (word == "entity" || word == "ent")
+      if (word == "entity" || word == "ent" || word == "e")
       {
 
         line >> entstring;

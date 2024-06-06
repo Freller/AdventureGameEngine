@@ -132,10 +132,17 @@ vector<string> loadText(string fileaddress)
     }
 
     vector<string> x = splitString(myString, '\n');
-    x.pop_back();
 
-    for(int i = 0; i < x.size(); i++) {
-      x[i].pop_back();
+    //this is needed for windows text files
+    {
+      if(x.back()[0] == '\r') { 
+        x.pop_back();
+      }
+      for(int i = 0; i < x.size(); i++) {
+        if(x[i].back() == '\r') {
+          x[i].pop_back();
+        }
+      }
     }
 
     delete[] buf;

@@ -307,6 +307,13 @@ std::vector<entity *> g_fogslates;
 std::vector<entity *> g_fogslatesA;
 std::vector<entity *> g_fogslatesB;
 
+//for the stutter/punishment effect
+//"don't do that"
+//stutter the game to punish the player for misbehaving
+float punishValue = 0;
+float punishValueDegrade = -0.1; //make a punishment last longer
+float basePunishValueDegrade = -0.1;
+
 // for having items bounce
 vector<float> g_itemsines;
 
@@ -843,9 +850,9 @@ float mapeditorNavNodeTraceRadius = 150;        // for choosing the radius of th
 vector<string> consolehistory;
 int consolehistoryindex = 0;
 
-string captex = "resources/static/diffuse/mapeditor/cap.bmp";
-string walltex = "resources/static/diffuse/mapeditor/wall.bmp";
-string floortex = "resources/static/diffuse/mapeditor/floor.bmp";
+string captex = "resources/static/diffuse/mapeditor/cap.qoi";
+string walltex = "resources/static/diffuse/mapeditor/wall.qoi";
+string floortex = "resources/static/diffuse/mapeditor/floor.qoi";
 string masktex = "&";
 // vector of strings to be filled with each texture in the user's texture directory, for easier selection
 vector<string> texstrs;

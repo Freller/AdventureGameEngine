@@ -126,6 +126,7 @@ int WinMain()
 
   // font
   g_font = "resources/engine/fonts/Rubik-Bold.ttf";
+  //g_font = "resources/engine/fonts/BeVietnamPro-Bold.ttf";
   g_ttf_font = loadFont(g_font, 60);
 
   // setup UI
@@ -3049,10 +3050,10 @@ int WinMain()
               SDL_RenderCopy(renderer, g_locked_level_texture, NULL, &drect);
 
               //render the face
-              SDL_RenderCopy(renderer, tn->mouthTexture, NULL, &drect);
+              //SDL_RenderCopy(renderer, tn->mouthTexture, NULL, &drect);
 
               SDL_Rect srect = tn->getEyeRect();
-              SDL_RenderCopy(renderer, tn->eyeTexture, &srect, &drect);
+              //SDL_RenderCopy(renderer, tn->eyeTexture, &srect, &drect);
               g_levelSequence->levelNodes[j]->blinkCooldownMS -= 16;
               if(tn->blinkCooldownMS < 0) { tn->blinkCooldownMS = rng(tn->minBlinkCooldownMS, tn->maxBlinkCooldownMS); }
             } else {
@@ -3510,6 +3511,26 @@ int WinMain()
             x->identity = 0;
             i--;
             g_currentPelletsCollected++;
+
+            if(g_backpack.size() > 0) {
+//              int indexToReduceCooldown = g_backpackIndex;
+//              int initialIndex = g_backpackIndex;
+//              while(g_backpack.at(indexToReduceCooldown)->cooldownMs <= 0 || g_backpack.at(indexToReduceCooldown)->specialAction == 1) {
+//                indexToReduceCooldown ++;
+//                if(indexToReduceCooldown > g_backpack.size()) {
+//                  indexToReduceCooldown = 0;
+//                }
+//  
+//                if(indexToReduceCooldown == initialIndex) {
+//                  break;
+//                }
+//              }
+  
+              g_backpack.at(g_backpackIndex)->cooldownMs -= 1000;
+              if(g_backpack.at(g_backpackIndex)->cooldownMs < 0) {
+                g_backpack.at(g_backpackIndex)->cooldownMs = 0;
+              }
+            }
   
             collected = 1;
             
@@ -3967,6 +3988,20 @@ int WinMain()
 
     //shade
     SDL_RenderCopy(renderer, g_shade, NULL, NULL);
+
+    //PUNISHMENT!
+    punishValue += punishValueDegrade;
+    punishValueDegrade = (punishValueDegrade*0.9 + basePunishValueDegrade*0.1);
+
+    if(punishValue > 1) {
+      SDL_GL_SetSwapInterval(0);
+      if(rng(0,1) == 1) {
+        SDL_Delay(pow(rng(1,punishValue),2));
+      }
+    } else {
+      SDL_GL_SetSwapInterval(1);
+    }
+
     
     SDL_RenderPresent(renderer);
   }
@@ -5584,7 +5619,7 @@ void getInput(float &elapsed)
         int numFloors = g_levelSequence->levelNodes[inventorySelection]->dungeonFloors;
 
         adventureUIManager->showScoreUI();
-        string scorePrint = "0/" + to_string(numFloors);
+        string scorePrint = "1/" + to_string(numFloors);
         adventureUIManager->scoreText->updateText(scorePrint, 34, 34);
 
         g_dungeonDarkness = g_levelSequence->levelNodes[inventorySelection]->darkness;
@@ -5617,7 +5652,7 @@ void getInput(float &elapsed)
            */
 
           g_dungeon.clear();
-          g_dungeonIndex = -1;
+          g_dungeonIndex = 0;
           g_dungeonBehemoths.clear();
           g_dungeonCommonFloors.clear();
           g_dungeonUncommonFloors.clear();
@@ -6224,6 +6259,11 @@ void protagMakesNoise() {
 
 
 void dungeonFlash() {
+  protag_is_talking = 2;
+  adventureUIManager->executingScript = 0;
+  adventureUIManager->mobilize = 0;
+  adventureUIManager->hideTalkingUI();
+
   g_dungeonDoorActivated = 0;
   //oddly, if I put g_dungeon.size() - 1 in the conditional directly it seems to fail inexplicably
   int size = g_dungeon.size();
@@ -6261,6 +6301,17 @@ void dungeonFlash() {
       x.ptr->current = nullptr;
       x.ptr->dest = nullptr;
       x.ptr->Destination = nullptr;
+      
+//      x.ptr->cooldownA = 0;
+//      x.ptr->flagA = 0;
+//      x.ptr->cooldownB = 0;
+//      x.ptr->flagB = 0;
+//      x.ptr->cooldownC = 0;
+//      x.ptr->flagC = 0;
+//      x.ptr->cooldownD = 0;
+//      x.ptr->flagD = 0;
+
+
       for(auto &y : x.ptr->spawnlist) {
         y->persistentGeneral = 0;
       }
@@ -6319,9 +6370,11 @@ void dungeonFlash() {
         } else {
           x.waitFloors -= 1;
           if(x.waitFloors < 1) {
+            //spawn dungeon behemoth
             //activate this behemoth
             x.active = 1;
             x.floorsRemaining = g_levelSequence->levelNodes[g_levelSequenceIndex]->avgChaseSequence * rng(0.6,1.4);
+
             M("New behemoth active for:");
             D(x.floorsRemaining);
 
@@ -6344,7 +6397,7 @@ void dungeonFlash() {
     transition = 1;
     M("Does this cause a problem?");
     D(g_dungeonIndex);
-    if(g_dungeonIndex == -1) {
+    if(g_dungeonIndex == 0) {
       load_map(renderer, "resources/maps/" + g_mapdir + "/start.map", "a");
     } else {
       load_map(renderer, "resources/maps/" + g_mapdir + "/" + g_dungeon.at(g_dungeonIndex).map, "a");
@@ -6363,9 +6416,6 @@ void dungeonFlash() {
     //probably not a big deal
     for(auto x : g_entities) {
       if(!x->isAI) {continue;}
-      x->cooldownA = 0;
-      x->cooldownB = 0;
-      x->cooldownC = 0;
       if(x->aiIndex == 0) {
         g_behemoth0 = x;
         g_behemoths.push_back(x);
@@ -6389,14 +6439,20 @@ void dungeonFlash() {
         
         for (auto &y : x.ptr->spawnlist) {
           y->tangible = 1;
+          y->visible = 0;
+        }
+
+        for(int i = 0; i < x.ptr->myAbilities.size(); i++) {
+          x.ptr->myAbilities[i].ready = 0;
+          x.ptr->myAbilities[i].cooldownMS = x.ptr->myAbilities[i].upperCooldownBound;
         }
 
         //D(x.ptr->name);
         x.ptr->tangible = 1;
         x.ptr->semisolid = 0;
         if(g_waypoints.size() > 0) {
-          x.ptr->setOriginX(g_waypoints.at(0)->x);
-          x.ptr->setOriginY(g_waypoints.at(0)->y);
+          x.ptr->setOriginX(g_waypoints.at(g_waypoints.size()-1)->x);
+          x.ptr->setOriginY(g_waypoints.at(g_waypoints.size()-1)->y);
           x.ptr->opacity = -350;
           x.ptr->opacity_delta = 5;
           x.ptr->agrod = 1;

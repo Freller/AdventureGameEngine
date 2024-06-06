@@ -10870,6 +10870,26 @@ I("s");
     return;
   }
 
+  //set opacity of entity
+  if (scriptToUse->at(dialogue_index + 1).substr(0, 8) == "/opacity")
+  {
+    M("opacity interpreter");
+    string s = scriptToUse->at(dialogue_index + 1);
+    vector<string> x = splitString(s, ' ');
+
+    D(x[1]);
+    entity* hopeful = searchEntities(x[1], talker);
+    if(hopeful != nullptr) {
+      D(stoi(x[2]));
+      hopeful->opacity = stoi(x[2]);
+    }
+
+
+    dialogue_index++;
+    this->continueDialogue();
+    return;
+  }
+
 
 
   // set entity's ttl in ms

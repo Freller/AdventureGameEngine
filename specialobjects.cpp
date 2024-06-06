@@ -240,13 +240,17 @@ void specialObjectsInit(entity* a) {
       
       a->spawnlist[0]->visible = 0;
 
+      //start by facing protag
+      float angleToProtag = atan2(protag->getOriginX() - a->getOriginX(), protag->getOriginY() - a->getOriginY()) - M_PI/2;
+      angleToProtag = wrapAngle(angleToProtag);
+      a->steeringAngle = angleToProtag - M_PI/2 - g_ft_p/2;
+
       break;
     }
     case 19:
     {
-      //bouncetrap
-      a->steeringAngle = M_PI/4;
-      a->targetSteeringAngle = M_PI/4;
+      //fast smart firetrap
+
       break;
     }
     case 20:
@@ -332,6 +336,19 @@ void specialObjectsInit(entity* a) {
       //father washing dishes
       a->flagA = 5000;
       break;
+    }
+    case 32:
+    {
+      //flamering-alt
+      for(auto x : a->spawnlist) {
+        x->msPerFrame = 70;
+        x->loopAnimation = 1;
+        x->scriptedAnimation = 1;
+        x->visible = 1;
+        x->animation = 0;
+      }
+      break;
+
     }
 
     case 100:
@@ -816,7 +833,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
     case 17:
     {
       //double firetrap
-      a->steeringAngle -= 0.01;
+      a->steeringAngle -= 0.02;
       a->animation = 0;
 
       float angleToUse = fmod(a->steeringAngle, M_PI);
@@ -1049,8 +1066,8 @@ void specialObjectsUpdate(entity* a, float elapsed) {
     }
     case 23:
     {
-      //firering
-      a->steeringAngle += 0.02;
+      //firering flamering
+      a->steeringAngle += 0.01;
 
       const int dist = 160;
 
@@ -1234,6 +1251,9 @@ void specialObjectsUpdate(entity* a, float elapsed) {
         //how should he respond to the crate?
         if(rat > 0.1) {
           a->data[0] = 1;
+          //punishment
+          punishValue = 6;
+          punishValueDegrade = -0.1;
           if(xrat < yrat) {
             a->bounds.width -= 1;
           } else {
@@ -1256,6 +1276,10 @@ void specialObjectsUpdate(entity* a, float elapsed) {
         yshmush /= a->cooldownB;
 
         if(xshmush < 0.7 || yshmush < 0.7) {
+          //punishment
+          punishValue = 24;
+          punishValueDegrade = -0.01;
+
           a->tangible = 0;
           a->spawnlist[0]->frameInAnimation = 0;
           a->spawnlist[0]->msPerFrame = 50;
@@ -1264,6 +1288,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
           a->spawnlist[0]->curwidth = 0;
           a->spawnlist[0]->curheight = 0;
         }
+
         a->orbitRange = min(xshmush, yshmush);
 
         xshmush *= a->width;
@@ -1303,6 +1328,27 @@ void specialObjectsUpdate(entity* a, float elapsed) {
 
       break;
     }
+    case 32:
+    {
+      // flamering-alt
+      a->steeringAngle += 0.02;
+
+      const int dist = 160;
+
+      float angleToUse = a->steeringAngle;
+
+      for(auto x : a->spawnlist) {
+        angleToUse += M_PI / 2;
+        angleToUse = wrapAngle(angleToUse);
+        float offset = dist;
+        float yoff = -offset * sin(angleToUse);
+        float xoff = offset * cos(angleToUse);
+  
+        x->setOriginX(a->getOriginX() + (xoff));
+        x->setOriginY(a->getOriginY() + (yoff));
+      }
+      break;
+    }
 
    
     case 100: 
@@ -1310,9 +1356,10 @@ void specialObjectsUpdate(entity* a, float elapsed) {
 
       if(a->stunned) {break;}
       //zombie
-      a->cooldownA += elapsed;
-      if(a->flagA && a->cooldownA > a->maxCooldownA) {
-        a->cooldownA = 0;
+      a->cooldownA -= elapsed;
+      if(a->flagA && a->cooldownA < 0 ) {
+        M("A");
+        a->cooldownA = a->maxCooldownA;
         a->flagA = 0;
         a->msPerFrame = 0;
         a->cooldownB = 300;
@@ -1320,6 +1367,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
       }
     
       if(a->flagB) {
+        M("B");
         a->cooldownB -= elapsed;
         if(a->cooldownB < 0) {
           a->frameInAnimation = 0;
@@ -1328,6 +1376,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
       }
     
       if(a->flagC) {
+        M("C");
         a->cooldownC -= elapsed;
         if(a->cooldownC < 0) {
           a->flagC = 0;
@@ -1343,6 +1392,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
       }
     
       if(a->flagD) {
+        M("D");
         a->cooldownD -= elapsed;
         if(a->cooldownD < 0) {
           a->spawnlist[0]->visible = 0;
@@ -1399,7 +1449,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
               }
     
     
-              a->cooldownA = 0;
+              a->cooldownA = a->maxCooldownA;
               a->flagA = 1;
     
               a->cooldownC = 200;
@@ -1440,6 +1490,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
       }
     
       for(int i = 0; i < a->myAbilities.size(); i++) {
+        if(a->opacity < 255) { a->myAbilities[i].ready = 0;}
         if(a->myAbilities[i].ready) {
           a->myAbilities[i].ready = 0;
           a->myAbilities[i].cooldownMS = rng(a->myAbilities[i].lowerCooldownBound, a->myAbilities[i].upperCooldownBound);
@@ -1447,7 +1498,6 @@ void specialObjectsUpdate(entity* a, float elapsed) {
           case 0:
             {
               {
-                
                 float offset = 50;
                 float yoff = -offset * sin(a->steeringAngle);
                 float xoff = offset * cos(a->steeringAngle);

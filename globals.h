@@ -395,6 +395,13 @@ extern std::vector<entity *> g_fogslates;
 extern std::vector<entity *> g_fogslatesA;
 extern std::vector<entity *> g_fogslatesB;
 
+//for the stutter/punishment effect
+//"don't do that"
+//stutter the game to punish the player for misbehaving
+extern float punishValue;
+extern float punishValueDegrade;
+extern float basePunishValueDegrade;
+
 // for having items bounce
 extern vector<float> g_itemsines;
 
