@@ -1,6 +1,6 @@
 A game-engine written in C++ with Autofs.
 
-Features a robust AI system, a scripting system, dialog system, save system, baked lighting and other stuff.
+Features a robust AI system, a scripting system, dialog system, save system, baked lighting, tile-based fog and other stuff.
 
 ![image](https://github.com/user-attachments/assets/5cba6e6a-fcd0-4749-aa88-e3979d7da631)
 
