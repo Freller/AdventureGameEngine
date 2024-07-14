@@ -1,4 +1,11 @@
-64b Win 11, powershell:
+A game-engine written in C++ with Autofs.
+
+Features a robust AI system, a scripting system, dialog system, save system, baked lighting and other stuff.
+
+![image](https://github.com/user-attachments/assets/5cba6e6a-fcd0-4749-aa88-e3979d7da631)
+
+
+64b Win 11, powershell build with:
 
 g++ objects.cpp -std=c++17 -c -Wno-narrowing -LC:\Users\Vrickt\OneDrive\Documents\dev\lib\x64\SDL2  -IC:\Users\Vrickt\OneDrive\Documents\dev\include -lSDL2 -lSDL2_mixer -lSDL2_image -lSDL2_ttf -g -fmax-errors=1; [console]::beep(500,300);
 g++ map_editor.cpp -std=c++17 -c -Wno-narrowing -LC:\Users\Vrickt\OneDrive\Documents\dev\lib\x64\SDL2  -IC:\Users\Vrickt\OneDrive\Documents\dev\include -lSDL2 -lSDL2_mixer -lSDL2_image -lSDL2_ttf -g -fmax-errors=1; [console]::beep(500,300);
