@@ -342,8 +342,6 @@ bool g_protagIsBeingDetectedBySmell = 0; //used for when the protag is too close
 bool g_protagIsBeingDetectedBySight = 0;
 bool g_protagIsInHearingRange = 0;
 
-float oldSummationXVel = 0;
-float oldSummationYVel = 0;
 float summationXVel = 0;
 float summationYVel = 0;
 float effectiveSummationXVel = 0;
@@ -795,6 +793,7 @@ float g_jump_afterslow_seconds = 0; //make it so that the longer you bhop the lo
 
 bool g_spin_enabled = 1;
 entity* g_spin_entity = nullptr;
+//entity* g_protag_s_ent = nullptr;
 float g_spin_cooldown = 400;
 float g_spin_max_cooldown = 100; //100, for spinning at will
 float g_spinning_duration = 0;
@@ -1340,7 +1339,7 @@ int rng(int min, int max) {
 
 float frng(float min, float max) {
   if(max == min) {return min;}
-  return static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(max-min)));
+  return min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(max-min)));
 }
 
 void hurtProtag(int dmg) {

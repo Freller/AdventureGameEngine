@@ -7066,7 +7066,6 @@ int loadSave() {
   string line;
 
   string address = "user/saves/" + g_saveName + ".save";
-  D(address);
   const char* plik = address.c_str();
   file.open(plik);
 
@@ -7075,8 +7074,6 @@ int loadSave() {
   //load save fields
   while(getline(file, line)) {
     if(line == "&") { break;}
-    D(line == "&");
-    D(line.size());
     field = line.substr(0, line.find(' '));
     value = line.substr(line.find(" "), line.length()-1);
 
@@ -7160,7 +7157,14 @@ int loadSave() {
     g_spin_entity->msPerFrame = 50;
     g_spin_entity->loopAnimation = 1;
     g_spin_entity->canFight = 0;
+
   }
+
+//  if(g_protag_s_ent == nullptr) {
+//    string shadowEntFilename = "common/fomm-shadow";
+//    g_protag_s_ent = new entity(renderer, shadowEntFilename);
+//  }
+
 
 
   int indexItemsSize = g_indexItems.size();
@@ -7182,18 +7186,22 @@ int loadSave() {
 
 
   //load which levels are unlocked, as a list of lowercase names
-  //M("LETS UNLOCK LEVELS");
+  M("LETS UNLOCK LEVELS");
   //
   //unlocked levels should have '-' instead of ' ' in the name, for parsing reasons
   //
+
+  for(int i = 0; i < g_levelSequence->levelNodes.size(); i++) {
+    g_levelSequence->levelNodes[i]->locked = 1;
+  }
   while(getline(file, line)) {
     if(line == "&") { break;}
+    D(line);
     for(int i = 0; i < g_levelSequence->levelNodes.size(); i++) {
       string lowerName = g_levelSequence->levelNodes[i]->name;
       std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),  [](unsigned char c) { if(c == ' ') {int e = '-'; return e;} else {return std::tolower(c);}  } );
       if (lowerName == line) {
         g_levelSequence->levelNodes[i]->locked = 0;
-        //M("UNLOCKED A LEVEL");
       }
     }
 
@@ -7311,7 +7319,6 @@ int writeSave() {
   //write protag's usables
   for(auto x : g_chest) {
     file << x->internalName << endl;
-    D(x->internalName);
   }
   
   file << "&" << endl; //token to stop writing usables
@@ -12327,7 +12334,6 @@ I("s");
   // /levelselect
   if (scriptToUse->at(dialogue_index + 1).substr(0, 12) == "/levelselect")
   {
-    M("level select interp");
     g_inventoryUiIsLevelSelect = 1;
     g_inventoryUiIsKeyboard = 0;
     g_inventoryUiIsLoadout = 0;
@@ -12335,28 +12341,22 @@ I("s");
     inPauseMenu = 1;
     g_firstFrameOfPauseMenu = 1;
     
-    M("level select interp A");
-    //clear_map(g_camera);
     adventureUIManager->escText->updateText("", -1, 0.9);
     adventureUIManager->positionInventory();
     adventureUIManager->showInventoryUI();
     adventureUIManager->hideHUD();
-    M("level select interp B");
+    adventureUIManager->hideTalkingUI();
+    g_fancybox->words.clear();
+
 
     // this is the stuff we do when we read '#' (end scripting)
-    if (playersUI)
-    {
-      protag_is_talking = 2;
-    }
+    protag_is_talking = 0;
     executingScript = 0;
-    M("level select interp C");
 
     mobilize = 0;
     if(this == adventureUIManager) {
       adventureUIManager->hideTalkingUI();
     }
-    M("level select interp D");
-
     return;
   }
 
@@ -12393,7 +12393,7 @@ I("s");
 
     //make sure we haven't already unlocked it
     int good = 1;
-    for(auto x: g_backpack) {
+    for(auto x: g_chest) {
       if(x->internalName == nameOfUsable) {
         good = 0;
         break;
@@ -12402,9 +12402,7 @@ I("s");
 
     if(good == 1) {
       usable* newUsable = new usable(nameOfUsable);
-      //!!! temporary for debugging
-      g_backpack.push_back(newUsable);
-      //adventureUIManager->showBackpackUI();
+      g_chest.push_back(newUsable);
     }
 
     dialogue_index++;

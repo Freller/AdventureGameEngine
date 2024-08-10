@@ -17,6 +17,8 @@
 #include "globals.h"
 #include "utils.h"
 
+void dungeonFlash();
+
 using namespace std;
 
 // for sorting ui on mapload
@@ -80,6 +82,7 @@ void populateMapWithEntities()
 
 void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
 {
+  breakpoint();
   M("Loading map: " + filename);
   transition = 1;
   debugClock = clock();
@@ -1289,29 +1292,26 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
       protag->x = g_waypoints[i]->x - protag->width / 2;
       protag->y = g_waypoints[i]->y + protag->bounds.height;
       protag->z = g_waypoints[i]->z;
-      protag->steeringAngle = convertFrameToAngle(g_waypoints[i]->angle, 0);
-      protag->animation = convertAngleToFrame(protag->steeringAngle);
+      protag->steeringAngle = convertFrameToAngleNew(g_waypoints[i]->angle, 0);
+      protag->animation = g_waypoints[i]->angle;
+      D(g_waypoints[i]->angle);
       protag->flip = SDL_FLIP_NONE;
-      if(protag->yframes < 8) {
-        if(protag->animation == 5) {
-          protag->animation = 3;
-          protag->flip = SDL_FLIP_HORIZONTAL;
-        } else if(protag->animation == 6) {
-          protag->animation = 2;
-          protag->flip = SDL_FLIP_HORIZONTAL;
-        } else if(protag->animation == 7) {
-          protag->animation = 1;
-          protag->flip = SDL_FLIP_HORIZONTAL;
-        }
-  
-        if(protag->animation > 5 || protag->animation < 0) {
-          protag->animation = 0;
-        }
+      if(protag->animation == 5) {
+        protag->animation = 3;
+        protag->flip = SDL_FLIP_HORIZONTAL;
+      } else if(protag->animation == 6) {
+        protag->animation = 2;
+        protag->flip = SDL_FLIP_HORIZONTAL;
+        M("Gotta flip the protag");
+      } else if(protag->animation == 7) {
+        protag->animation = 1;
+        protag->flip = SDL_FLIP_HORIZONTAL;
       }
-
-      if(protag->yframes < 2) {
+  
+      if(protag->animation > 5 || protag->animation < 0) {
         protag->animation = 0;
       }
+
     }
   }
 
@@ -4154,7 +4154,17 @@ void write_map(entity *mapent)
           break;
         }
       }
-      if(word == "play") //load a map in game-mode
+      if(word == "test" || word == "play" || word == "dtest")
+      {
+        //set the map as next and do a dungeonflash
+        if (line >> word)
+        {
+          g_dungeon.at(g_dungeonIndex+1).map = word + ".map";
+          g_dungeonDoorActivated = 1;
+        }
+
+      }
+      if(word == "gload") //load a map in game-mode
                          //this probably breaks lots of stuff
       {
         if (line >> word)
@@ -4684,7 +4694,7 @@ void write_map(entity *mapent)
         }
       }
 
-      if(word =="fuckoff")
+      if(word =="goaway")
       {
         for(auto x : g_entities) {
           if(x->dynamic && x->targetFaction == protag->faction) {

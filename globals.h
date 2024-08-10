@@ -758,6 +758,7 @@ extern float g_jump_afterslow_seconds;
 
 extern bool g_spin_enabled;
 extern entity* g_spin_entity;
+//extern entity* g_protag_s_ent;
 extern float g_spin_cooldown;
 extern float g_spin_max_cooldown;
 extern float g_spinning_duration;

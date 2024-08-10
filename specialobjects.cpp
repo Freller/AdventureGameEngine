@@ -350,6 +350,12 @@ void specialObjectsInit(entity* a) {
       break;
 
     }
+    case 33:
+    {
+      //natural's door, the shine ent
+
+      break;
+    }
 
     case 100:
     {
@@ -917,6 +923,9 @@ void specialObjectsUpdate(entity* a, float elapsed) {
         entity *copy = new entity(renderer, a->spawnlist[0]);
         copy->z = a->z + 10;
         copy->dontSave = 1;
+        copy->xmaxspeed = 150;
+        copy->baseMaxSpeed = 150;
+        copy->xagil = 150;
         copy->usingTimeToLive = 1;
         copy->timeToLiveMs = 8000;
         copy->steeringAngle = a->steeringAngle + M_PI/2 + g_ft_p/2;
@@ -1349,6 +1358,15 @@ void specialObjectsUpdate(entity* a, float elapsed) {
       }
       break;
     }
+    case 33:
+    {
+      a->animate = 0;
+      a->msPerFrame = 32;
+      a->scriptedAnimation = 1;
+      a->animation = 0;
+      break;
+
+    }
 
    
     case 100: 
@@ -1358,7 +1376,6 @@ void specialObjectsUpdate(entity* a, float elapsed) {
       //zombie
       a->cooldownA -= elapsed;
       if(a->flagA && a->cooldownA < 0 ) {
-        M("A");
         a->cooldownA = a->maxCooldownA;
         a->flagA = 0;
         a->msPerFrame = 0;
@@ -1367,7 +1384,6 @@ void specialObjectsUpdate(entity* a, float elapsed) {
       }
     
       if(a->flagB) {
-        M("B");
         a->cooldownB -= elapsed;
         if(a->cooldownB < 0) {
           a->frameInAnimation = 0;
@@ -1376,7 +1392,6 @@ void specialObjectsUpdate(entity* a, float elapsed) {
       }
     
       if(a->flagC) {
-        M("C");
         a->cooldownC -= elapsed;
         if(a->cooldownC < 0) {
           a->flagC = 0;
@@ -1392,7 +1407,6 @@ void specialObjectsUpdate(entity* a, float elapsed) {
       }
     
       if(a->flagD) {
-        M("D");
         a->cooldownD -= elapsed;
         if(a->cooldownD < 0) {
           a->spawnlist[0]->visible = 0;
@@ -1616,7 +1630,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
                 float xoff = offset * cos(a->steeringAngle);
                 
                 { //only attack if it would hit
-                  
+                  M("A");
       
                   rect prediction(a->getOriginX() + xoff -96, a->getOriginY() + yoff - 96, a->z + 20, 192, 192, 128);
       
@@ -1630,18 +1644,19 @@ void specialObjectsUpdate(entity* a, float elapsed) {
                   }
                 }
 
-                { // only attack if she is active
-                  if(a->activeState != 1) {
-                    a->myAbilities[i].ready = 1;
-                    break;
-                  }
-                }
+//                { // only attack if she is active
+//                  if(a->activeState != 1) {
+//                    a->myAbilities[i].ready = 1;
+//                    break;
+//                  }
+//                }
 
                 a->specialState = 1;
                 a->spawnlist[0]->frameInAnimation = 0;
                 a->spawnlist[0]->scriptedAnimation = 1;
                 a->spawnlist[0]->msPerFrame = 60;
                 a->spawnlist[0]->loopAnimation = 0;
+                M("Hitting");
 
                 { //create hitbox
                   hitbox* h = new hitbox();
@@ -1923,6 +1938,28 @@ void specialObjectsInteract(entity* a) {
       }
       
       break;
+    }
+    case 33: 
+    {
+      //shine, the dungeon door for natural
+      if(g_dungeonSystemOn) {
+        g_dungeonDoorActivated = 1;
+      } else {
+        clear_map(g_camera);
+        g_inventoryUiIsLevelSelect = 1;
+        g_inventoryUiIsKeyboard = 0;
+        g_inventoryUiIsLoadout = 0;
+        inventorySelection = 0;
+        inPauseMenu = 1;
+        g_firstFrameOfPauseMenu = 1;
+        old_z_value = 1;
+        adventureUIManager->escText->updateText("", -1, 0.9);
+        adventureUIManager->positionInventory();
+        adventureUIManager->showInventoryUI();
+        adventureUIManager->hideHUD();
+      }
+      break;
+
     }
   }
 }

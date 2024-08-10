@@ -303,6 +303,8 @@ int WinMain()
     //g_staticSounds.push_back(loadWav("resources/static/sounds/....wav"));
   }
 
+  g_ui_voice = loadWav("resources/static/sounds/voice-normal.wav");
+
 
   g_spurl_entity = new entity(renderer, "common/spurl");
   g_spurl_entity->msPerFrame = 75;
@@ -932,6 +934,7 @@ int WinMain()
       }
 
     }
+
 
     // spring
     if ((input[8] && !oldinput[8] && protag->grounded && protag_can_move) || (input[8] && storedJump && protag->grounded && protag_can_move && !g_selectingUsable))
@@ -2259,6 +2262,16 @@ int WinMain()
 
     }
 
+    //move shadow to feet
+//    g_protag_s_ent->x = protag->x;
+//    g_protag_s_ent->y = protag->y;
+//    g_protag_s_ent->z = protag->z;
+//    g_protag_s_ent->xvel = protag->xvel;
+//    g_protag_s_ent->yvel = protag->yvel;
+//    g_protag_s_ent->xaccel = protag->xaccel;
+//    g_protag_s_ent->yaccel = protag->yaccel;
+
+
     // sort
     sort_by_y(g_actors);
     for (long long unsigned int i = 0; i < g_actors.size(); i++)
@@ -3214,6 +3227,7 @@ int WinMain()
     }
 
 
+
     // ENTITY MOVEMENT (ENTITY UPDATE)
     // dont update movement while transitioning
     if (1/*!transition*/)
@@ -3304,6 +3318,7 @@ int WinMain()
 
       }
     }
+
 
     //dungeon door flash
     for(auto x : g_dungeonDoors) {
@@ -3526,9 +3541,11 @@ int WinMain()
 //                }
 //              }
   
-              g_backpack.at(g_backpackIndex)->cooldownMs -= 1000;
-              if(g_backpack.at(g_backpackIndex)->cooldownMs < 0) {
-                g_backpack.at(g_backpackIndex)->cooldownMs = 0;
+              for(auto x : g_backpack) {
+                x->cooldownMs -= 1000;
+                if(x->cooldownMs < 0) {
+                  x->cooldownMs = 0;
+                }
               }
             }
   
@@ -4262,7 +4279,8 @@ int interact(float elapsed, entity *protag)
 
         protagMakesNoise();
 
-        adventureUIManager->blip = g_entities[i]->voice;
+        //adventureUIManager->blip = g_entities[i]->voice;
+        adventureUIManager->blip = g_ui_voice;
         //adventureUIManager->sayings = &g_entities[i]->sayings;
         adventureUIManager->talker = g_entities[i];
         
@@ -5780,8 +5798,9 @@ void getInput(float &elapsed)
           if(!setFirst) { 
             n.waitFloors = g_levelSequence->levelNodes[inventorySelection]->firstActiveFloor; 
           } else {
-            n.waitFloors = g_levelSequence->levelNodes[inventorySelection]->firstActiveFloor + g_levelSequence->levelNodes[g_levelSequenceIndex]->avgRestSequence * rng(0.6,1.4); 
-
+            float waitFloors = g_levelSequence->levelNodes[inventorySelection]->firstActiveFloor + g_levelSequence->levelNodes[g_levelSequenceIndex]->avgRestSequence * frng(0.6,1.4);
+            D(waitFloors);
+            n.waitFloors = waitFloors; 
           }
           setFirst = 1;
 
@@ -6292,25 +6311,11 @@ void dungeonFlash() {
  
     //clear all behemoths
     for(auto &x : g_dungeonBehemoths) {
-//      for(auto &y : x.ptr->spawnlist) {
-//        delete y;
-//      }
-      //delete x.ptr;
       x.ptr->persistentGeneral = 0;
       x.ptr->hisweapon->persistent = 0;
       x.ptr->current = nullptr;
       x.ptr->dest = nullptr;
       x.ptr->Destination = nullptr;
-      
-//      x.ptr->cooldownA = 0;
-//      x.ptr->flagA = 0;
-//      x.ptr->cooldownB = 0;
-//      x.ptr->flagB = 0;
-//      x.ptr->cooldownC = 0;
-//      x.ptr->flagC = 0;
-//      x.ptr->cooldownD = 0;
-//      x.ptr->flagD = 0;
-
 
       for(auto &y : x.ptr->spawnlist) {
         y->persistentGeneral = 0;
@@ -6319,7 +6324,6 @@ void dungeonFlash() {
     g_dungeonBehemoths.clear();
 
     adventureUIManager->hideScoreUI();
-    breakpoint(); //screen is black
 
     //this dungeon is finished, play the beaten script to probably unlock a level, save the game, and open
     //the menu select, but it might be to initiate a credits sequence or play a cutscene or something cool
@@ -6355,6 +6359,7 @@ void dungeonFlash() {
     string scorePrint = to_string(g_dungeonIndex+2) + "/" + to_string(g_dungeon.size());
     adventureUIManager->scoreText->updateText(scorePrint, 34, 34);
 
+    int numberOfActiveBehemoths = 0;
 
     if(!g_dungeonRedo) {
       //decide if we will end any chases
@@ -6364,7 +6369,10 @@ void dungeonFlash() {
           if(x.floorsRemaining < 1) {
             //deactivate this behemoth
             x.active = 0;
-            x.waitFloors = g_levelSequence->levelNodes[g_levelSequenceIndex]->avgRestSequence * rng(0.6,1.4);
+            x.waitFloors = g_levelSequence->levelNodes[g_levelSequenceIndex]->avgRestSequence * frng(0.6,1.4);
+            x.floorsRemaining = 0;
+//            M("Behemoth sleeps for:");
+//            D(x.waitFloors);
           }
   
         } else {
@@ -6373,10 +6381,9 @@ void dungeonFlash() {
             //spawn dungeon behemoth
             //activate this behemoth
             x.active = 1;
-            x.floorsRemaining = g_levelSequence->levelNodes[g_levelSequenceIndex]->avgChaseSequence * rng(0.6,1.4);
-
-            M("New behemoth active for:");
-            D(x.floorsRemaining);
+            x.floorsRemaining = g_levelSequence->levelNodes[g_levelSequenceIndex]->avgChaseSequence * frng(0.6,1.4);
+//            M("Behemoth active for:");
+//            D(x.floorsRemaining);
 
           }
   
@@ -6385,7 +6392,12 @@ void dungeonFlash() {
   
       }
     } else {
-      M("Redo floor, not affecting behemoths");
+      //M("Redo floor, not affecting behemoths");
+    }
+
+    for(auto x : g_dungeonBehemoths) {
+      if(x.active) { numberOfActiveBehemoths++; }
+
     }
 
     g_dungeonRedo = 0;
@@ -6395,12 +6407,21 @@ void dungeonFlash() {
     g_levelFlashing = 1;
     clear_map(g_camera);
     transition = 1;
-    M("Does this cause a problem?");
-    D(g_dungeonIndex);
     if(g_dungeonIndex == 0) {
       load_map(renderer, "resources/maps/" + g_mapdir + "/start.map", "a");
     } else {
-      load_map(renderer, "resources/maps/" + g_mapdir + "/" + g_dungeon.at(g_dungeonIndex).map, "a");
+      bool randomCheck = rng(1,20) > 19;
+      D(randomCheck);
+      if(g_dungeonSpecialFloors.size() > 0 && numberOfActiveBehemoths == 0 && randomCheck && g_dungeonIndex < g_dungeon.size()-1) {
+        M("Replace the floor with a special floor");
+        D(g_dungeonSpecialFloors.size());
+        int randomIndex = rng(0, g_dungeonSpecialFloors.size() - 1);
+        load_map(renderer, "resources/maps/" + g_mapdir + "/" + g_dungeonSpecialFloors[randomIndex], "a");
+
+      } else {
+
+        load_map(renderer, "resources/maps/" + g_mapdir + "/" + g_dungeon.at(g_dungeonIndex).map, "a");
+      }
     }
     transition = 0;
     protag_is_talking = 0;
@@ -6433,8 +6454,10 @@ void dungeonFlash() {
 
 
     //M(" -- Active behemoths:");
+    //try to spawn the second behemoth at waypoint b, and third at c, etc.
+    int index = 0;
     for(auto &x : g_dungeonBehemoths) {
-      if(x.active) {
+      if(g_dungeonBehemoths[0].active) {
         x.ptr->frameInAnimation = 0;
         
         for (auto &y : x.ptr->spawnlist) {
@@ -6450,16 +6473,55 @@ void dungeonFlash() {
         //D(x.ptr->name);
         x.ptr->tangible = 1;
         x.ptr->semisolid = 0;
-        if(g_waypoints.size() > 0) {
-          x.ptr->setOriginX(g_waypoints.at(g_waypoints.size()-1)->x);
-          x.ptr->setOriginY(g_waypoints.at(g_waypoints.size()-1)->y);
-          x.ptr->opacity = -350;
-          x.ptr->opacity_delta = 5;
-          x.ptr->agrod = 1;
-          x.ptr->target = protag;
-          x.ptr->shadow->alphamod = -350;
-          x.ptr->hisStatusComponent.stunned.addStatus(2000, 1);
+        if(index == 3) {
+          if(g_waypoints.size()>3) {
+            x.ptr->setOriginX(g_waypoints.at(3)->x);
+            x.ptr->setOriginY(g_waypoints.at(3)->y);
+          } else {
+            x.ptr->tangible = 0;
+            x.ptr->x = 0;
+            x.ptr->y = 0;
+          }
         }
+
+        if(index == 2) {
+          if(g_waypoints.size()>2) {
+            x.ptr->setOriginX(g_waypoints.at(2)->x);
+            x.ptr->setOriginY(g_waypoints.at(2)->y);
+          } else {
+            x.ptr->tangible = 0;
+            x.ptr->x = 0;
+            x.ptr->y = 0;
+          }
+        }
+
+        if(index == 1) {
+          if(g_waypoints.size()>1) {
+            x.ptr->setOriginX(g_waypoints.at(1)->x);
+            x.ptr->setOriginY(g_waypoints.at(1)->y);
+          } else {
+            x.ptr->tangible = 0;
+            x.ptr->x = 0;
+            x.ptr->y = 0;
+          }
+        }
+        if(index == 0) {
+          if(g_waypoints.size()>0) {
+            x.ptr->setOriginX(g_waypoints.at(0)->x);
+            x.ptr->setOriginY(g_waypoints.at(0)->y);
+          } else {
+            x.ptr->tangible = 0;
+            x.ptr->x = 0;
+            x.ptr->y = 0;
+          }
+        }
+
+        x.ptr->opacity = -350;
+        x.ptr->opacity_delta = 5;
+        x.ptr->agrod = 1;
+        x.ptr->target = protag;
+        x.ptr->shadow->alphamod = -350;
+        x.ptr->hisStatusComponent.stunned.addStatus(2000, 1);
       } else {
         x.ptr->tangible = 0;
         x.ptr->x = 0;
@@ -6470,7 +6532,7 @@ void dungeonFlash() {
         }
 
       }
-
+      index++;
     }
     
   
