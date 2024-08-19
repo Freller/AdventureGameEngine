@@ -500,6 +500,10 @@ int WinMain()
     SDL_ShowCursor(0);
     loadSave();
     g_inTitleScreen = 1;
+    load_map(renderer, "resources/maps/base/start.map","a"); //lol
+    g_levelFlashing = 1;
+    clear_map(g_camera); 
+    g_levelFlashing = 0;
     load_map(renderer, "resources/maps/base/start.map","a");
     //load_map(renderer, "resources/maps/sp-title/g.map","a");
 //    adventureUIManager->hideBackpackUI();
@@ -877,6 +881,8 @@ int WinMain()
     g_jumpGaranteedAccelMs -= elapsed;
     g_boardingCooldownMs -= elapsed;
     g_usableWaitToCycleTime -= elapsed;
+    g_protagBonusSpeedMS -= elapsed;
+    if(g_protagBonusSpeedMS < 0) {protag->bonusSpeed = 0;}
     if(g_protagIsWithinBoardable) { 
       g_msSinceBoarding += elapsed;
     
@@ -1210,15 +1216,6 @@ int WinMain()
       }
     }
 
-    adventureUIManager->thisUsableIcon->texture = adventureUIManager->noIconTexture;
-    adventureUIManager->nextUsableIcon->texture = adventureUIManager->noIconTexture;
-    adventureUIManager->prevUsableIcon->texture = adventureUIManager->noIconTexture;
-    //update hotbar + graphics
-    if(g_backpack.size() > 0) {
-      adventureUIManager->thisUsableIcon->texture = g_backpack.at(g_backpackIndex)->texture;
-      adventureUIManager->nextUsableIcon->texture = g_backpack.at(g_backpackIndex)->texture;
-      adventureUIManager->prevUsableIcon->texture = g_backpack.at(g_backpackIndex)->texture;
-    }
 
     if(adventureUIManager->shiftingMs > 0) {
       adventureUIManager->shiftingMs -= elapsed;
@@ -1232,7 +1229,7 @@ int WinMain()
         x->targety = adventureUIManager->hotbarPositions[i].second;
         
         if(g_backpack.size() > 0) {
-          int index = g_backpackIndex - i - 1;
+          int index = g_backpackIndex - i + 3 + g_backpack.size();
           index = index % g_backpack.size();
           x->texture = g_backpack.at(index)->texture;
         }
@@ -1254,14 +1251,10 @@ int WinMain()
     adventureUIManager->hotbar->width = g_hotbarWidth;
     adventureUIManager->hotbar->height = 0.1/g_hotbarWidth; //maintain height despite using heightFromWidthFactor
     //next/prev icons should move with hotbar
-    adventureUIManager->nextUsableIcon->x = g_hotbarX + (g_hotbarWidth - 0.1)/2;
-    adventureUIManager->prevUsableIcon->x = g_hotbarX - (g_hotbarWidth - 0.1)/2;
    
     adventureUIManager->hotbarPositions[4].first = g_hotbarX - (g_hotbarWidth - 0.1)/2 + g_backpackHorizontalOffset;
     adventureUIManager->hotbarPositions[2].first = g_hotbarX + (g_hotbarWidth - 0.1)/2 + g_backpackHorizontalOffset;
 
-    adventureUIManager->nextUsableIcon->opacity = g_hotbarNextPrevOpacity;
-    adventureUIManager->prevUsableIcon->opacity = g_hotbarNextPrevOpacity;
     
     adventureUIManager->t1->opacity = g_hotbarNextPrevOpacity;
     adventureUIManager->t2->opacity = g_hotbarNextPrevOpacity;
@@ -1269,7 +1262,6 @@ int WinMain()
     adventureUIManager->t4->opacity = g_hotbarNextPrevOpacity;
     adventureUIManager->t5->opacity = g_hotbarNextPrevOpacity;
 
-    adventureUIManager->thisUsableIcon->opacity = 25500;
     
     adventureUIManager->hotbar->x = 0.65 - g_hotbarWidth + g_backpackHorizontalOffset;
     adventureUIManager->hotbarPositions[3].first = 0.1 + (g_hotbarX - (g_hotbarWidth - 0.1)/2 + g_backpackHorizontalOffset);
@@ -1277,19 +1269,7 @@ int WinMain()
     adventureUIManager->hotbarMutedXIcon->x = adventureUIManager->hotbarFocus->x;
     adventureUIManager->cooldownIndicator->x = adventureUIManager->hotbarPositions[3].first;
 
-    //adventureUIManager->thisUsableIcon->show = 0;
 
-    if(g_backpack.size() > 1) {
-      int nextUsableIndex = g_backpackIndex + 1; 
-      
-      if(nextUsableIndex >= g_backpack.size()) { nextUsableIndex = 0;}
-      adventureUIManager->nextUsableIcon->texture = g_backpack.at(nextUsableIndex)->texture;
-      
-      int prevUsableIndex = g_backpackIndex - 1; 
-      if(prevUsableIndex < 0) { prevUsableIndex = g_backpack.size()-1;}
-      
-      adventureUIManager->prevUsableIcon->texture = g_backpack.at(prevUsableIndex)->texture;
-    }
 
     
 
@@ -2657,6 +2637,9 @@ int WinMain()
 //    adventureUIManager->healthText->boxY = protagHealthbarA->y - 0.005;
 
     //bottom-most layer of ui
+    if(g_backpack.size() > 0) {
+      breakpoint();
+    }
     for (long long unsigned int i = 0; i < g_ui.size(); i++)
     {
       if(g_ui[i]->layer0) {
@@ -3063,10 +3046,10 @@ int WinMain()
               SDL_RenderCopy(renderer, g_locked_level_texture, NULL, &drect);
 
               //render the face
-              //SDL_RenderCopy(renderer, tn->mouthTexture, NULL, &drect);
+              SDL_RenderCopy(renderer, tn->mouthTexture, NULL, &drect);
 
               SDL_Rect srect = tn->getEyeRect();
-              //SDL_RenderCopy(renderer, tn->eyeTexture, &srect, &drect);
+              SDL_RenderCopy(renderer, tn->eyeTexture, &srect, &drect);
               g_levelSequence->levelNodes[j]->blinkCooldownMS -= 16;
               if(tn->blinkCooldownMS < 0) { tn->blinkCooldownMS = rng(tn->minBlinkCooldownMS, tn->maxBlinkCooldownMS); }
             } else {
@@ -4019,7 +4002,6 @@ int WinMain()
       SDL_GL_SetSwapInterval(1);
     }
 
-    
     SDL_RenderPresent(renderer);
   }
 
@@ -4582,7 +4564,7 @@ void getInput(float &elapsed)
             x->x = adventureUIManager->hotbarPositions[i].first;
             x->y = adventureUIManager->hotbarPositions[i].second;
             if(g_backpack.size() > 0) {
-              int index = g_backpackIndex - i - 0;
+              int index = g_backpackIndex - i + 4 + g_backpack.size();
               index = index % g_backpack.size();
               x->texture = g_backpack.at(index)->texture;
             }
@@ -4643,11 +4625,11 @@ void getInput(float &elapsed)
             x->x = adventureUIManager->hotbarPositions[i].first;
             x->y = adventureUIManager->hotbarPositions[i].second;
             if(g_backpack.size() > 0) {
-              int index = g_backpackIndex - i - 2;
+              int index = g_backpackIndex - i + 2 + g_backpack.size();
               index = index % g_backpack.size();
               x->texture = g_backpack.at(index)->texture;
-              i++;
             }
+            i++;
           }
           adventureUIManager->shiftingMs = adventureUIManager->maxShiftingMs;
         }
@@ -5389,9 +5371,6 @@ void getInput(float &elapsed)
 
     //if that was the chest/loadout screen, update g_backpack
     if(g_inventoryUiIsLoadout) {
-      adventureUIManager->nextUsableIcon->texture = adventureUIManager->noIconTexture;
-      adventureUIManager->thisUsableIcon->texture = adventureUIManager->noIconTexture;
-      adventureUIManager->prevUsableIcon->texture = adventureUIManager->noIconTexture;
       
       for(auto x : adventureUIManager->hotbarTransitionIcons) {
         x->texture = adventureUIManager->noIconTexture;

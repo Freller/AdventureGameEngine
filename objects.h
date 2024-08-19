@@ -1112,9 +1112,6 @@ class adventureUI {
     ui* hotbarFocus = 0; //I can't remember to choose my item based on the center one, 
                          //so I need this
 
-    ui* thisUsableIcon = 0;
-    ui* nextUsableIcon = 0;
-    ui* prevUsableIcon = 0;
     ui* cooldownIndicator = 0;
     SDL_Texture* noIconTexture = 0; //set the backpack icon uis to this if we have no texture
                                     //for them, to prevent crashing
@@ -1527,7 +1524,7 @@ class entity:public actor {
     weapon* hisweapon = 0;
     bool canFight = 1;
     bool invincible = 0;
-    //float invincibleMS = 0; //ms before setting invincible to 0
+    float invincibleMS = 0; //ms before setting invincible to 0
     
     bool useAgro = 0; //the switch from seeing a target and agroing on them (boring)
                                   //to gaining aggressiveness when seeing a target and losing it

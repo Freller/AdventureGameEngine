@@ -2930,7 +2930,6 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
     if(texture == nullptr) {
       E("Error loading texture for entity " + name);
       D(spritefile);
-
     }
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "3");
@@ -4147,6 +4146,8 @@ door* entity::update(vector<door*> doors, float elapsed) {
         if(usingTimeToLive) {
           timeToLiveMs -= elapsed;
         }
+
+        invincibleMS -= elapsed;
 
         for(auto t : mobilesounds) {
           t->x = getOriginX();
@@ -6964,7 +6965,6 @@ void levelSequence::addLevels(string filename) {
 
     getline(file, temp);
     int dungeonGoldMs = stoi(temp);
-    D(dungeonGoldMs);
 
     getline(file, temp);
     vector<string> behemoths = splitString(temp, ' ');
@@ -7186,7 +7186,6 @@ int loadSave() {
 
 
   //load which levels are unlocked, as a list of lowercase names
-  M("LETS UNLOCK LEVELS");
   //
   //unlocked levels should have '-' instead of ' ' in the name, for parsing reasons
   //
@@ -7196,7 +7195,6 @@ int loadSave() {
   }
   while(getline(file, line)) {
     if(line == "&") { break;}
-    D(line);
     for(int i = 0; i < g_levelSequence->levelNodes.size(); i++) {
       string lowerName = g_levelSequence->levelNodes[i]->name;
       std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),  [](unsigned char c) { if(c == ' ') {int e = '-'; return e;} else {return std::tolower(c);}  } );
@@ -8730,8 +8728,10 @@ void clear_map(camera& cameraToReset) {
       }
       else
       {
-        inventoryMarker->show = 0;
-        inventoryText->show = 0;
+        if(inventoryMarker != nullptr) {
+          inventoryMarker->show = 0;
+          inventoryText->show = 0;
+        }
       }
 
 
@@ -9657,31 +9657,6 @@ void adventureUI::initFullUI() {
 
   noIconTexture = loadTexture(renderer, "resources/engine/sp-no-texture.qoi");
 
-  nextUsableIcon = new ui(renderer, "resources/engine/sp-no-texture.qoi", 0.45 + 0.1, 0.84, 0.1, 1, 1);
-  nextUsableIcon->persistent = true;
-  nextUsableIcon->heightFromWidthFactor = 1;
-  SDL_DestroyTexture(nextUsableIcon->texture);
-  nextUsableIcon->texture = noIconTexture;
-  nextUsableIcon->shrinkPercent = 0.01; 
-  nextUsableIcon->priority = -7;
-  nextUsableIcon->show = 0;
-
-  prevUsableIcon = new ui(renderer, "resources/engine/sp-no-texture.qoi", 0.45 - 0.1, 0.84, 0.1, 1, 1);
-  prevUsableIcon->persistent = true;
-  prevUsableIcon->heightFromWidthFactor = 1;
-  SDL_DestroyTexture(prevUsableIcon->texture);
-  prevUsableIcon->texture = noIconTexture;
-  prevUsableIcon->shrinkPercent = 0.01; 
-  prevUsableIcon->priority = -7;
-
-  thisUsableIcon = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.45, 0.84, 0.1, 1, 1);
-  thisUsableIcon->persistent = true;
-  thisUsableIcon->heightFromWidthFactor = 1;
-  SDL_DestroyTexture(thisUsableIcon->texture);
-  thisUsableIcon->texture = noIconTexture;
-  thisUsableIcon->shrinkPercent = 0.01; 
-  thisUsableIcon->priority = -7;
-
   float shrinkPercent = 0.015;
 
   t1 = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.45, 0.84, 0.1, 1, 1);
@@ -9730,10 +9705,6 @@ void adventureUI::initFullUI() {
   hotbarTransitionIcons.push_back(t4);
   hotbarTransitionIcons.push_back(t5);
   
-  prevUsableIcon->show = 0;
-  thisUsableIcon->show = 0;
-  nextUsableIcon->show = 0;
-
   cooldownIndicator = new ui(renderer, "resources/engine/cooldownIndicator.qoi", g_hotbarX + g_backpackHorizontalOffset, 0.83, 0.03, 1, 1);
   cooldownIndicator->priority = -6;
   cooldownIndicator->persistent = 1;
@@ -9943,6 +9914,7 @@ void adventureUI::initDialogue() {
 //scripts
 void adventureUI::continueDialogue()
 {
+  M("continueDialogue");
   g_fancybox->show = 0;
   // has our entity died?
   if (g_forceEndDialogue && playersUI)

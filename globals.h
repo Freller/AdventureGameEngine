@@ -756,6 +756,8 @@ extern int protagConsecutiveBhops;
 extern float g_jump_afterslow;
 extern float g_jump_afterslow_seconds;
 
+extern int g_protagBonusSpeedMS;
+
 extern bool g_spin_enabled;
 extern entity* g_spin_entity;
 //extern entity* g_protag_s_ent;

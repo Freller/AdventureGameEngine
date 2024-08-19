@@ -791,6 +791,8 @@ int protagConsecutiveBhops = 0; //increased for every successive bhop
 float g_jump_afterslow = 0;
 float g_jump_afterslow_seconds = 0; //make it so that the longer you bhop the longer you are slowed
 
+int g_protagBonusSpeedMS = 0;
+
 bool g_spin_enabled = 1;
 entity* g_spin_entity = nullptr;
 //entity* g_protag_s_ent = nullptr;
@@ -1344,6 +1346,7 @@ float frng(float min, float max) {
 
 void hurtProtag(int dmg) {
   if(devMode) {return;}
+  if(protag->invincibleMS > 0) {return;}
   if(g_dungeonDoorActivated) {return;} //don't trigger multiple times at once, don't get hurt if he already finished the level
  
   g_dungeonHits++;

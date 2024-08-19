@@ -1880,9 +1880,12 @@ void specialObjectsInteract(entity* a) {
     {
       //dungeon door
       if(g_dungeonSystemOn) {
+        M("Dungeon system is ON");
         g_dungeonDoorActivated = 1;
       } else {
-        clear_map(g_camera);
+        M("Dungeon system is OFF");
+        //clear_map(g_camera);
+        g_dungeonDarkness = 0;
         g_inventoryUiIsLevelSelect = 1;
         g_inventoryUiIsKeyboard = 0;
         g_inventoryUiIsLoadout = 0;
@@ -2035,6 +2038,26 @@ void usableItemCode(usable* a) {
         g_dungeonIndex--;
         g_dungeonRedo = 1;
       }
+    }
+    case 5:
+    {
+      //mechanism 2
+      //give protag invincible status
+      protag->invincibleMS = 3000;
+    }
+    case 6:
+    {
+      //boots
+      //give protag bonus speed
+      protag->bonusSpeed = 50;
+      g_protagBonusSpeedMS = 3000;
+    }
+    case 7:
+    {
+      //mechanism 3
+      //give protag enraged status, than slowed status
+      //reset if they leave the room
+
     }
   }
 }

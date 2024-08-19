@@ -4748,6 +4748,7 @@ void write_map(entity *mapent)
         if (chosenEntity != nullptr)
         {
           M("--DEBUG INFO FOR CHOSEN ENTITY:");
+          M(chosenEntity->name);
           M("");
 
           M("Physics Data:");

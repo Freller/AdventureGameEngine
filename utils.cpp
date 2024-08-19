@@ -190,10 +190,6 @@ string loadTextAsString(string fileaddress)
   } else {
     E("FNF: " + fileaddress);
     int i = 0;
-    for(auto x : fileaddress) {
-      cout << i << " : " << x << endl;
-      i++;
-    }
     breakpoint();
 //    abort();
     return {};
