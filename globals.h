@@ -179,6 +179,10 @@ extern vector<tile *> g_tiles;
 
 extern vector<door *> g_doors;
 
+extern vector<entity *> g_poweredDoors;
+
+extern vector<entity *> g_poweredLevers;
+
 extern vector<dungeonDoor*> g_dungeonDoors;
 
 extern vector<vector<box *>> g_boxs;
@@ -757,6 +761,8 @@ extern float g_jump_afterslow;
 extern float g_jump_afterslow_seconds;
 
 extern int g_protagBonusSpeedMS;
+extern int g_protagMsToStunned;
+extern int g_usingMsToStunned;
 
 extern bool g_spin_enabled;
 extern entity* g_spin_entity;

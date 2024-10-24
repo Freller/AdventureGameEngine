@@ -1365,6 +1365,7 @@ class entity:public actor {
     bool groundedByEntity = 0;
     float xmaxspeed = 0;
     float baseMaxSpeed = 0;
+    int mobile = 1;
     float bonusSpeed = 0;
     float friction = 0;
     float baseFriction = 0;
@@ -1459,10 +1460,14 @@ class entity:public actor {
     statusComponent hisStatusComponent;
     int timeToLiveMs = 0;  //or ttl, time updated and when <=0 ent is destroyed
     bool usingTimeToLive = 0;
-
+    
+    bool usingVisibleMs = 0;
+    int visibleMs = 0;
+    
 
     //stuff for orbitals
     bool isOrbital = false;
+    int orbitalIgnoreZ = false;
     entity* parent = nullptr;
     string parentName = "null";
     float angularPosition = 0;
@@ -1890,6 +1895,8 @@ class usable {
     string name = "";
 
     SDL_Texture* texture;
+
+    entity* ent = nullptr;
 
     int maxCooldownMs = 0;
     int cooldownMs = 0;

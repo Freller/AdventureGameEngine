@@ -16,6 +16,7 @@
 #include "objects.h"
 #include "globals.h"
 #include "utils.h"
+#include "specialobjects.h"
 
 void dungeonFlash();
 
@@ -82,8 +83,10 @@ void populateMapWithEntities()
 
 void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
 {
-  breakpoint();
   M("Loading map: " + filename);
+  g_usingMsToStunned = 0;
+  protag->hisStatusComponent.enraged.clearStatuses();
+  protag->bonusSpeed = 0;
   transition = 1;
   debugClock = clock();
   mapname = filename;
@@ -1257,6 +1260,10 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
     }
   }
 
+  for(auto x : g_entities) {
+    specialObjectsInit(x);
+  }
+
   // now that map geometry is done, add guests for collisionZones
   for (auto x : g_collisionZones)
   {
@@ -1705,7 +1712,6 @@ bool mapeditor_save_map(string word)
         }
 
         ofile << "entity " << g_entities[i]->name << " " << to_string(g_entities[i]->x) << " " << to_string(g_entities[i]->y) << " " << to_string(g_entities[i]->z) << " " << g_entities[i]->animation << " " << (g_entities[i]->flip == SDL_FLIP_HORIZONTAL) << endl;
-        D(g_entities[i]->animation);
       }
     }
   }
@@ -1719,7 +1725,7 @@ bool mapeditor_save_map(string word)
     ofile << "collisionZone " << x->bounds.x << " " << x->bounds.y << " " << x->bounds.width << " " << x->bounds.height << endl;
   }
 
-  D("resources/maps/" + g_mapdir + "/scripts/INIT-" + g_map + ".txt");
+  //D("resources/maps/" + g_mapdir + "/scripts/INIT-" + g_map + ".txt");
   // run script on load
 
   if (narrarator->myScriptCaller == nullptr)
@@ -1728,8 +1734,6 @@ bool mapeditor_save_map(string word)
     narrarator->myScriptCaller->talker = narrarator;
 
   }
-
-  M("Done with recent code");
 
   ofile.close();
   return 0;

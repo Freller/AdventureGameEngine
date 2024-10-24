@@ -35,7 +35,7 @@ void dungeonFlash();
 int WinMain()
 {
 
-  devMode = 1;
+  devMode = 0;
 
   canSwitchOffDevMode = devMode;
 
@@ -51,7 +51,7 @@ int WinMain()
 
   SDL_SetWindowMinimumSize(window, 100, 100);
 
-  SDL_SetWindowPosition(window, 1280, 720);
+  //SDL_SetWindowPosition(window, 1280, 720);
 
   Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
   SDL_RenderSetIntegerScale(renderer, SDL_FALSE);
@@ -301,6 +301,10 @@ int WinMain()
 
   { //init static sounds
     //g_staticSounds.push_back(loadWav("resources/static/sounds/....wav"));
+    g_staticSounds.push_back(loadWav("resources/static/sounds/pellet.wav"));
+    g_staticSounds.push_back(loadWav("resources/static/sounds/protag-step-1.wav"));
+    g_staticSounds.push_back(loadWav("resources/static/sounds/protag-step-2.wav"));
+    g_staticSounds.push_back(loadWav("resources/static/sounds/land.wav"));
   }
 
   g_ui_voice = loadWav("resources/static/sounds/voice-normal.wav");
@@ -871,6 +875,7 @@ int WinMain()
     // lock time
     elapsed = 16.6666666667;
 
+
     // cooldowns
     if(g_dungeonSystemOn) {g_dungeonMs += elapsed;}
     halfsecondtimer += elapsed;
@@ -883,6 +888,13 @@ int WinMain()
     g_usableWaitToCycleTime -= elapsed;
     g_protagBonusSpeedMS -= elapsed;
     if(g_protagBonusSpeedMS < 0) {protag->bonusSpeed = 0;}
+    if(g_usingMsToStunned == 1) {
+      g_protagMsToStunned -= elapsed;
+      if(g_protagMsToStunned <= 0) {
+        protag->hisStatusComponent.stunned.addStatus(3000, 1);
+        g_usingMsToStunned = 0;
+      }
+    }
     if(g_protagIsWithinBoardable) { 
       g_msSinceBoarding += elapsed;
     
@@ -892,6 +904,19 @@ int WinMain()
       } else {
         g_boardedEntity->sizeRestoreMs = 1000;
       }
+    }
+
+    if(g_behemoth0 != nullptr) {
+      g_behemoth0->mobile = !protag_is_talking;
+    }
+    if(g_behemoth1 != nullptr) {
+      g_behemoth1->mobile = !protag_is_talking;
+    }
+    if(g_behemoth2 != nullptr) {
+      g_behemoth2->mobile = !protag_is_talking;
+    }
+    if(g_behemoth3 != nullptr) {
+      g_behemoth3->mobile = !protag_is_talking;
     }
 
     // g_dash_cooldown -= elapsed;
@@ -2637,9 +2662,6 @@ int WinMain()
 //    adventureUIManager->healthText->boxY = protagHealthbarA->y - 0.005;
 
     //bottom-most layer of ui
-    if(g_backpack.size() > 0) {
-      breakpoint();
-    }
     for (long long unsigned int i = 0; i < g_ui.size(); i++)
     {
       if(g_ui[i]->layer0) {
@@ -3382,10 +3404,12 @@ int WinMain()
 
       if(g_ex_familiars.size() > 0 && g_exFamiliarTimer > 0) {
         g_exFamiliarTimer -= elapsed;
-        
+        breakpoint();
         for(auto x : g_ex_familiars) {
-          x->shadow->x = x->x + x->shadow->xoffset;
-          x->shadow->y = x->y + x->shadow->yoffset;
+          if(x->shadow != nullptr) {
+            x->shadow->x = x->x + x->shadow->xoffset;
+            x->shadow->y = x->y + x->shadow->yoffset;
+          }
           const float speed = 0.9;
           const float r = 1 - speed;
           float tx = g_exFamiliarParent->getOriginX();
@@ -3495,7 +3519,7 @@ int WinMain()
             adventureUIManager->tungShakeDurationMs = 0;
             
             
-            //playSound(4, g_pelletCollectSound, 0);
+            playSound(4, g_staticSounds[0], 0);
             x->usingTimeToLive = 1;
             x->timeToLiveMs = -1;
             x->shadow->size = 0;
@@ -5386,6 +5410,7 @@ void getInput(float &elapsed)
       for(int x : g_loadout) {
         usable* newUsable = new usable(g_chest[x]->internalName);
         g_backpack.push_back(newUsable);
+        usableItemOnLoad(newUsable);
       }
     }
     
@@ -5398,8 +5423,10 @@ void getInput(float &elapsed)
     }
   }
 
-  for(int i = 0; i < g_backpack.size(); i++) { g_backpack.at(i)->cooldownMs -= elapsed/2;}
-  if(g_backpack.size() > 0) { g_backpack.at(g_backpackIndex)->cooldownMs -= elapsed/2; } //item selected cools down faster 
+  if(!protag_is_talking) {
+    for(int i = 0; i < g_backpack.size(); i++) { g_backpack.at(i)->cooldownMs -= elapsed/2;}
+    if(g_backpack.size() > 0) { g_backpack.at(g_backpackIndex)->cooldownMs -= elapsed/2; } //item selected cools down faster 
+                                                }
 
   g_spin_cooldown -= elapsed;
   g_spinning_duration -= elapsed;
@@ -6257,6 +6284,9 @@ void protagMakesNoise() {
 
 
 void dungeonFlash() {
+  g_usingMsToStunned = 0; //the trick!
+  protag->hisStatusComponent.enraged.clearStatuses();
+  protag->bonusSpeed = 0;
   protag_is_talking = 2;
   adventureUIManager->executingScript = 0;
   adventureUIManager->mobilize = 0;
@@ -6330,6 +6360,8 @@ void dungeonFlash() {
     adventureUIManager->ownScript = beatenScript;
     adventureUIManager->dialogue_index = -1;
     adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
+    adventureUIManager->sleepingMS = 0;
+    g_forceEndDialogue = 0;
     adventureUIManager->continueDialogue();
 
   } else {
@@ -6379,7 +6411,6 @@ void dungeonFlash() {
 
     }
 
-    g_dungeonRedo = 0;
 
 
     g_dungeonIndex++;
@@ -6389,13 +6420,16 @@ void dungeonFlash() {
     if(g_dungeonIndex == 0) {
       load_map(renderer, "resources/maps/" + g_mapdir + "/start.map", "a");
     } else {
-      bool randomCheck = rng(1,20) > 19;
+      bool randomCheck = rng(1,20) > 18;
       D(randomCheck);
-      if(g_dungeonSpecialFloors.size() > 0 && numberOfActiveBehemoths == 0 && randomCheck && g_dungeonIndex < g_dungeon.size()-1) {
+      if(g_dungeonSpecialFloors.size() > 0 && numberOfActiveBehemoths == 0 && randomCheck && g_dungeonIndex < g_dungeon.size()-1 && !g_dungeonRedo) {
         M("Replace the floor with a special floor");
         D(g_dungeonSpecialFloors.size());
         int randomIndex = rng(0, g_dungeonSpecialFloors.size() - 1);
-        load_map(renderer, "resources/maps/" + g_mapdir + "/" + g_dungeonSpecialFloors[randomIndex], "a");
+        string replacestr = "resources/maps/" + g_mapdir + "/" + g_dungeonSpecialFloors[randomIndex];
+        g_dungeon.at(g_dungeonIndex).map = g_dungeonSpecialFloors[randomIndex];
+        load_map(renderer, replacestr, "a");
+        g_dungeonSpecialFloors.erase(g_dungeonSpecialFloors.begin() + randomIndex);
 
       } else {
 
@@ -6409,6 +6443,7 @@ void dungeonFlash() {
     protag->z = 0;
     g_levelFlashing = 0;
     adventureUIManager->showHUD();
+    g_dungeonRedo = 0;
 
     //this could be faster.
     //I added some lines clearing g_behemothx to clear_map() to

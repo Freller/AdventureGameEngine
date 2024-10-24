@@ -54,7 +54,11 @@ vector<entity *> g_large_entities;
 
 vector<tile *> g_tiles;
 
-vector<door *> g_doors;
+vector<door *> g_doors; //generally speaking, a load-level trigger
+
+vector<entity *> g_poweredDoors;
+
+vector<entity *> g_poweredLevers;
 
 vector<dungeonDoor*> g_dungeonDoors;
 
@@ -792,6 +796,8 @@ float g_jump_afterslow = 0;
 float g_jump_afterslow_seconds = 0; //make it so that the longer you bhop the longer you are slowed
 
 int g_protagBonusSpeedMS = 0;
+int g_protagMsToStunned = 0;
+int g_usingMsToStunned = 0;
 
 bool g_spin_enabled = 1;
 entity* g_spin_entity = nullptr;

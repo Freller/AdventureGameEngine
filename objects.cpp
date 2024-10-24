@@ -2506,7 +2506,7 @@ int fancybox::reveal() {
   {
     Mix_HaltChannel(6);
     Mix_VolumeChunk(adventureUIManager->blip, 20);
-    //playSound(6, adventureUIManager->blip, 0);
+    playSound(6, adventureUIManager->blip, 0);
   }
 
   if(wordProgress < words.size()) {
@@ -3373,9 +3373,6 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
     //stream.close();
 
   }
-
-  specialObjectsInit(this);
-
 }
 
 //copy constructor
@@ -3628,9 +3625,9 @@ entity::entity(SDL_Renderer * renderer, int idk,  string texturename) {
 
 
 entity::~entity() {
-  //M("~entity()" );
   if (!wallcap) {
     delete shadow;
+    shadow = nullptr;
   }
 
   if(!asset_sharer) {
@@ -3731,12 +3728,7 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
   opacity += opacity_delta;
   shadow->alphamod += opacity_delta;
   if(opacity_delta < 0 && opacity <= 0) {
-    if(this->asset_sharer) {
-      this->usingTimeToLive = 1;
-      this->timeToLiveMs = -1;
-    } else {
-      this->tangible = 0;
-    }
+    this->tangible = 0;
   } else if(opacity_delta > 0 && opacity >= 255) {
     this->opacity_delta = 0;
     this->opacity = 255;
@@ -3896,17 +3888,17 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
 
       //color for statuseffects
       Uint8 rmod = 255; Uint8 gmod = 255; Uint8 bmod = 255; bool setColor = 0;
-      if(flashingMS > 0) {
+      if(flashingMS > 0 || hisStatusComponent.enraged.statuses.size() > 0) {
         gmod = 255 * (1-((float)flashingMS/g_flashtime));
         bmod = 255 * (1-((float)flashingMS/g_flashtime));
         //SDL_SetTextureColorMod(texture, 255, 255 * (1-((float)flashingMS/g_flashtime)), 255 * (1-((float)flashingMS/g_flashtime)));
       }
 
-//      if(stunned && hisStatusComponent.stunned.statuses.size() > 0) {
-//        rmod *= 0.5;
-//        gmod *= 0.5;
-//        bmod *= 0.5;
-//      }
+      if(this == protag && stunned && hisStatusComponent.stunned.statuses.size() > 0) {
+        rmod *= 0.5;
+        gmod *= 0.5;
+        bmod *= 0.5;
+      }
 
       if(marked) {
         rmod *= 0.9;
@@ -4149,13 +4141,22 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
         invincibleMS -= elapsed;
 
+        if(usingVisibleMs) {
+          visibleMs -= elapsed;
+          if(visibleMs <= 0) {
+            visible = 0;
+          }
+        }
+
         for(auto t : mobilesounds) {
           t->x = getOriginX();
           t->y = getOriginY();
         }
 
         if(isOrbital) {
-          this->z = parent->z -10 - (parent->height - parent->curheight);
+          if(!orbitalIgnoreZ) {
+            this->z = parent->z -10 - (parent->height - parent->curheight);
+          }
 
 
           float angle = convertFrameToAngle(parent->animation, parent->flip == SDL_FLIP_HORIZONTAL);
@@ -4303,9 +4304,9 @@ door* entity::update(vector<door*> doors, float elapsed) {
             if(footstep_reset && grounded) {
               footstep_reset = 0;
               if(1 - sin(animtime * animspeed) < 0.04) {
-                //playSound(-1, g_footstep_a, 0);
+                playSound(-1, g_staticSounds[1], 0);
               } else {
-                //playSound(-1, g_footstep_b, 0);
+                playSound(-1, g_staticSounds[2], 0);
               }
 
 
@@ -4456,7 +4457,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
           steeringAngle = wrapAngle(steeringAngle);
         }
 
-        if(1) {xmaxspeed = baseMaxSpeed + bonusSpeed;} else 
+        if(mobile) {xmaxspeed = baseMaxSpeed + bonusSpeed;} else 
         {xmaxspeed = baseMaxSpeed;}
 
         //normalize accel vector
@@ -5557,6 +5558,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
             //play landing sound
             //playSound(-1, g_land, 0);
+            playSound(-1, g_staticSounds[3], 0);
 
             if(!storedJump) {
               //penalize the player for not bhopping
@@ -5604,6 +5606,10 @@ door* entity::update(vector<door*> doors, float elapsed) {
               // }
             }
 
+          }
+          if(solid) {
+            solid = 0;
+            g_solid_entities.erase(remove(g_solid_entities.begin(), g_solid_entities.end(), this), g_solid_entities.end());
           }
           return nullptr;
         }
@@ -7050,12 +7056,14 @@ usable::usable(string fname) {
 
   texture = loadTexture(renderer, loadstr);
 
+
 }
 
 
 
 usable::~usable() {
   SDL_DestroyTexture(texture);
+  usableItemOnUnload(this);
 }
 
 
@@ -8247,6 +8255,8 @@ void escapeUI::uiSelecting() {
 //clear map
 //CLEAR MAP
 void clear_map(camera& cameraToReset) {
+  g_poweredDoors.clear();
+  g_poweredLevers.clear();
   g_budget = 0;
   enemiesMap.clear();
   g_ai.clear();
@@ -9872,7 +9882,7 @@ void adventureUI::updateText()
     {
       Mix_HaltChannel(6);
       Mix_VolumeChunk(blip, 20);
-      //playSound(6, blip, 0);
+      playSound(6, blip, 0);
     }
   }
   else
@@ -9898,7 +9908,7 @@ void adventureUI::skipText() {
     Mix_HaltChannel(6);
     Mix_VolumeChunk(blip, 20);
   }
-  //playSound(6, blip, 0);
+  playSound(6, blip, 0);
 }
 
 //for resetting text color
@@ -9922,6 +9932,7 @@ void adventureUI::continueDialogue()
     g_forceEndDialogue = 0;
     protag_is_talking = 2;
     adventureUIManager->hideTalkingUI();
+    M("Ret A");
     return;
   }
 
@@ -9931,6 +9942,7 @@ void adventureUI::continueDialogue()
     if( playersUI) {
       protag_is_talking = !mobilize;
     }
+    M("Ret B");
     return;
   }
   else
@@ -9985,6 +9997,7 @@ void adventureUI::continueDialogue()
         talker->animation = talker->defaultAnimation;
       }
     }
+    M("Ret C");
     return;
   }
 
@@ -11808,7 +11821,7 @@ I("s");
     g_alphabet = g_alphabet_lower;
     g_alphabet_textures = &g_alphabetLower_textures;
 
-    //keyboardPrompt = pushedText;
+    keyboardPrompt = pushedText;
 
     g_inventoryUiIsLevelSelect = 0;
     g_inventoryUiIsLoadout = 0;
