@@ -15,14 +15,16 @@
 #include <string>
 #include <map> //saves
 #include <ctime> //clock display
-#include "windows.h"
+//#include "windows.h"
 #include "stdio.h"
-#include "tchar.h"
+//#include "tchar.h"
 #include "physfs.h"
+#include "unistd.h"
+#include "stdio.h"
 //#include "unistd.h"
 
 // this is unique to the windowsport
-#include "windowsinclude.h"
+//#include "windowsinclude.h"
 #include "objects.h"
 
 #undef M_PI
@@ -126,6 +128,10 @@ vector<levelNode *> g_levelNodes;
 
 vector<ribbon *> g_ribbons;
 
+vector<combatant *> g_enemyCombatants;
+
+vector<combatant *> g_partyCombatants;
+
 map<string, int> enemiesMap; // stores (file,cost) for enemies to be spawned procedurally in the map
 int g_budget = 0;						 // how many points this map can spend on enemies;
 
@@ -186,6 +192,13 @@ float XtoY = 0.866;
 float YtoX = 1/XtoY;
 float g_ratio = 1.618;
 bool transition = 0;
+SDL_Texture* transitionTexture;
+SDL_Surface* transitionSurface;
+void* transitionPixelReference;
+int transitionPitch;
+int transitionDelta;
+const int transitionImageWidth = 300;
+const int transitionImageHeight = 300;
 int g_walldarkness = 55;			// 65, 75. could be controlled by the map unless you get crafty with recycling textures across maps
 bool g_unlit = 0;							// set to 1 if the user has the lowest graphical setting, to disable lighting in maps for performance. Don't eh, don't dev like this
 int g_graphicsquality = 3;		// 0 is least, 4 is max
@@ -380,36 +393,6 @@ TTF_Font* g_ttf_font;
 float g_minifontsize = 0.01;
 float g_transitionSpeed = 3; // 3, 9
 
-//backpack - holds usable items on a hotbar
-int g_whichUsableSelectedIndex = 0;
-vector<usable*> g_backpack; //max six
-vector<usable*> g_chest; //all of the player's usables
-
-vector<int> g_loadout;
-int g_maxLoadoutSize = 5; //maxusables
-SDL_Texture* g_loadoutHighlightTexture = 0;
-
-float g_usableWaitToCycleTime = 0;
-float g_maxUsableWaitToCycleTime = 100;
-entity *g_backpackNarrarator; //script callers should have thier own ent to not mess up dialogue indexes (dumb!)
-const float g_backpackHorizontalOffset = 0.35;
-const float g_hotbarX = 0.45; //don't change this, to move it horizontally change g_backpackHorizontalOffset
-
-int g_backpackIndex = 0; //set to 1 if the player is holding down the button
-int g_selectingUsable = 0;
-
-//the hotbar widens when the inventory button is held
-float g_hotbarWidth = 0.1;
-float g_hotbarWidth_inventoryOpen = 0.3;
-float g_hotbarWidth_inventoryClosed = 0.1;
-float g_hotbarNextPrevOpacity = 25500; //for fading out next/prev icons
-float g_hotbarNextPrevOpacityDelta = 250;
-//a short press of the inventory button will advance the backpack index, but
-//a longer one will let player select with the movement keys
-float g_hotbarLongSelectMs = 150;
-float g_currentHotbarSelectMs = 0;
-float g_hotbarCycleDirection = 0;
-
 // inventory - we're switching things up. This will be the picnic-box, the inventory for consumables
 float use_cooldown = 0; // misleading, its not for attacks at all
 vector<attack *> AdventureattackSet;
@@ -492,21 +475,6 @@ const int g_maxBoardingCooldownMs = 2000;
 //for animating the boardable
 int g_msSinceBoarding = 0; //counts up from 0 after boarding
 
-//I want the objective to be able to be set to fade away if the player is moving and 
-//fade in if the player is standing still, to help them if they are lost
-int g_objectiveFadeModeOn = 0;
-int g_objectiveOpacity = 25500;
-int g_objectiveFadeMaxWaitMs = 2000;
-int g_objectiveFadeWaitMs = 0;
-
-//for security, scriptcallers need their own entity
-//It's kinda dumb but just go with it
-adventureUI* g_pelletGoalScriptCaller = nullptr;
-entity *g_pelletNarrarator;
-
-                                     
-
-
 camera::camera(float fx, float fy)
 {
   fx = x;
@@ -585,6 +553,7 @@ const int STANDARD_SCREENWIDTH = 1080;
 //int WIN_WIDTH = 1280; int WIN_HEIGHT = 720;
 // int WIN_WIDTH = 640; int WIN_HEIGHT = 360;
 int old_WIN_WIDTH = 0; // used for detecting change in window width to recalculate scalex and y
+int old_WIN_HEIGHT = 0; // used for detecting change in window width to recalculate scalex and y
 int saved_WIN_WIDTH = WIN_WIDTH;
 int saved_WIN_HEIGHT = WIN_HEIGHT;
 SDL_Window *window;
@@ -606,13 +575,11 @@ float g_zoom_mod = 1;		// for devmode
 bool g_update_zoom = 0; // update the zoom this frame
 
 float scalex = 1;
-float scaley = scalex;
+float scaley = 1;
 float min_scale = 0.000000000001;
 float max_scale = 2.4;
 
 entity *g_focus;
-entity *g_objective = 0;
-bool g_usingPelletsAsObjective = 0; //can be set by scripts, is unset when another objective is set. Makes is so that the objective is set to a pellet and when the player collects it, it is set to another pellet
 entity *narrarator;
 vector<entity *> party;
 float g_max_framerate = 120;
@@ -976,6 +943,16 @@ vector<pair<int, Mix_Chunk*>> g_loadPlaySounds;
 
 //for preventing the player from begining dialog after closing a menu
 int g_menuTalkReset = 0;
+
+gamemode g_gamemode = gamemode::EXPLORATION; //exploration, combat, gameover
+
+turn g_turn = turn::PLAYER;
+
+submode g_submode = submode::TEXT;
+
+combatUI* combatUIManager;
+
+int curCombatantIndex = 0; //the party combatant for which the player currently builds the turnserial
 
 bool fileExists(const std::string &name)
 {
@@ -1390,8 +1367,15 @@ void doSpringForce(entity* target, entity* him)
 }
 
 string getCurrentDir() {
-  char buf[6000];
-  GetCurrentDirectory(6000, buf);
-  string curdir(buf);
+  char cwd[2000];
+  getcwd(cwd, sizeof(cwd));
+  string curdir(cwd);
   return curdir;
 }
+
+//string getCurrentDir() {
+//  char buf[6000];
+//  GetCurrentDirectory(6000, buf);
+//  string curdir(buf);
+//  return curdir;
+//}

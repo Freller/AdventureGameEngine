@@ -91,8 +91,9 @@ void specialObjectsInit(entity* a) {
     case 11:
     {
       //lever
+      g_poweredLevers.push_back(a);
       
-      //search for door
+      //search for doors
       for(auto x: g_entities) {
         if(x->identity == 12) {
           char b = x->name.at(x->name.size() - 1);
@@ -107,15 +108,15 @@ void specialObjectsInit(entity* a) {
     }
     case 12:
     {
+      g_poweredDoors.push_back(a);
       //door
-      
-      //search for lever
+      //search for levers
       for(auto x: g_entities) {
         if(x->identity == 11) {
           char c = x->name.at(x->name.size() - 1);
           char b = a->name.at(a->name.size() - 1);
           if(c == b) {
-            x->spawnlist.push_back(a);
+            a->spawnlist.push_back(x);
           }
         }
 
@@ -1787,38 +1788,90 @@ void specialObjectsInteract(entity* a) {
     {
       //lever
       if(a->flagA == 0) {
+        breakpoint();
+        //to power a door, all other doors must close
+        for(auto x: g_poweredDoors) {
+          x->banished = 0;
+          x->dynamic = 1;
+          x->opacity = 255;
+          x->shadow->enabled = 1;
+          x->navblock = 1;
+          if(!x->solid) {
+            g_solid_entities.push_back(x);
+            x->solid = 1;
+          }
+          for(auto y : x->overlappedNodes) {
+            y->enabled = 0;
+          }
+        }
+
+        for(auto x: g_poweredLevers) {
+          x->flagA = 0;
+          x->frameInAnimation = 0;
+        }
+
         //open door
-        M("open");
-        a->spawnlist[0]->banished = 1;
-        a->spawnlist[0]->zaccel = 220;
-        a->spawnlist[0]->shadow->enabled = 0;
-        a->flagA = 1;
-        a->frameInAnimation = 1;
-        a->spawnlist[0]->navblock = 0;
+        for(auto x : a->spawnlist) {
+          x->banished = 1;
+          x->zaccel = 220;
+          x->shadow->enabled = 0;
+          x->navblock = 0;
+        }
+//        a->spawnlist[0]->banished = 1;
+//        a->spawnlist[0]->zaccel = 220;
+//        a->spawnlist[0]->shadow->enabled = 0;
+        //a->spawnlist[0]->navblock = 0;
+        
+        for(auto x : a->spawnlist[0]->spawnlist) {
+          x->flagA = 1;
+          x->frameInAnimation = 1;
+        }
+//        a->flagA = 1;
+//        a->frameInAnimation = 1;
+
+        
       } else {
         //close door
         //need to add check for entities
-        int good = 1;
-        for(auto x : g_entities) {
-          if(!x->dynamic || !x->tangible) {continue;}
-          if(RectOverlap(a->spawnlist[0]->getMovedBounds(), x->getMovedBounds())) {
-            good = 0;
+//        int good = 1;
+//        for(auto x : g_entities) {
+//          if(!x->dynamic || !x->tangible) {continue;}
+//          if(RectOverlap(a->spawnlist[0]->getMovedBounds(), x->getMovedBounds())) {
+//            good = 0;
+//          }
+//        }
+//        if(!good) {break;}
+        
+        for(auto x : a->spawnlist) { //for all matching doors...
+          x->banished = 0;
+          x->dynamic = 1;
+          x->opacity = 255;
+          x->shadow->enabled = 1;
+          x->navblock = 1;
+          if(!x->solid) {
+            g_solid_entities.push_back(x);
+            x->solid = 1;
+          }
+          for(auto y : x->overlappedNodes) {
+            y->enabled = 0;
           }
         }
-        if(!good) {break;}
-        
-        M("close");
-        a->spawnlist[0]->banished = 0;
-        a->spawnlist[0]->dynamic = 1;
-        a->spawnlist[0]->opacity = 255;
-        a->spawnlist[0]->shadow->enabled = 1;
-        a->spawnlist[0]->navblock = 1;
-        for(auto x : a->spawnlist[0]->overlappedNodes) {
-          x->enabled = 0;
-        }
+//        a->spawnlist[0]->banished = 0;
+//        a->spawnlist[0]->dynamic = 1;
+//        a->spawnlist[0]->opacity = 255;
+//        a->spawnlist[0]->shadow->enabled = 1;
+//        a->spawnlist[0]->navblock = 1;
+//        for(auto x : a->spawnlist[0]->overlappedNodes) {
+//          x->enabled = 0;
+//        }
 
-        a->flagA = 0;
-        a->frameInAnimation = 0;
+//        a->flagA = 0;
+//        a->frameInAnimation = 0;
+        for(auto x : a->spawnlist[0]->spawnlist) { // for all levers...
+          M("Set data for a lever to go down");
+          x->flagA = 0;
+          x->frameInAnimation = 0;
+        }
       }
       break;
     }
@@ -2017,6 +2070,75 @@ void specialObjectsOncePerFrame(float elapsed)
 
 }
 
+void usableItemOnLoad(usable* a) {
+  switch(a->specialAction) {
+    case 5:
+      {
+        //mechanism 2
+        if(a->ent == nullptr) { 
+          a->ent = new entity(renderer, "usable/shield");
+          a->ent->persistentGeneral = 1;
+        }
+        break;
+      }
+    case 7:
+      {
+//        //mechanism 3
+//        if(a->ent == nullptr) { 
+//          a->ent = new entity(renderer, "usable/anger");
+//          a->ent->persistentGeneral = 1;
+//        }
+        break;
+      }
+    case 8:
+      {
+        //shell
+        if(a->ent == nullptr) { 
+          a->ent = new entity(renderer, "usable/shell");
+          a->ent->persistentGeneral = 1;
+        }
+        break;
+      }
+
+  }
+}
+
+void usableItemOnUnload(usable* a) {
+  switch(a->specialAction) {
+    case 5:
+      {
+        //mechanism 2
+        if(a->ent != nullptr) { 
+          a->ent->persistentGeneral = 0;
+          delete a->ent;
+          a->ent = nullptr;
+        }
+        break;
+      }
+    case 7:
+      {
+        //mechanism 3
+//        if(a->ent != nullptr) { 
+//          a->ent->persistentGeneral = 0;
+//          delete a->ent;
+//          a->ent = nullptr;
+//        }
+        break;
+      }
+    case 8:
+      {
+        //shell
+        if(a->ent != nullptr) { 
+          a->ent->persistentGeneral = 0;
+          delete a->ent;
+          a->ent = nullptr;
+        }
+        break;
+      }
+
+  }
+}
+
 void usableItemCode(usable* a) {
   switch(a->specialAction) {
     case 3:
@@ -2038,12 +2160,20 @@ void usableItemCode(usable* a) {
         g_dungeonIndex--;
         g_dungeonRedo = 1;
       }
+      break;
     }
     case 5:
     {
       //mechanism 2
       //give protag invincible status
       protag->invincibleMS = 3000;
+      a->ent->usingVisibleMs = 1;
+      a->ent->visibleMs = 3000;
+      a->ent->visible = 1;
+      a->ent->parent = protag;
+      a->ent->isOrbital = 1;
+
+      break;
     }
     case 6:
     {
@@ -2051,13 +2181,47 @@ void usableItemCode(usable* a) {
       //give protag bonus speed
       protag->bonusSpeed = 50;
       g_protagBonusSpeedMS = 3000;
+      break;
     }
     case 7:
     {
       //mechanism 3
       //give protag enraged status, than slowed status
       //reset if they leave the room
+      protag->hisStatusComponent.enraged.addStatus(6000, 1);
+      protag->bonusSpeed = 100;
+      g_protagBonusSpeedMS = 6000;
+      g_protagMsToStunned = 6000;
+      g_usingMsToStunned = 1;
 
+//      a->ent->setOriginX(protag->getOriginX());
+//      a->ent->setOriginY(protag->getOriginY());
+//      a->ent->loopAnimation = 1;
+//      a->ent->usingVisibleMs = 1;
+//      a->ent->visibleMs = 6000;
+//      a->ent->visible = 1;
+//      a->ent->parent = protag;
+//      a->ent->isOrbital = 1;
+
+      break;
+    }
+    case 8: 
+    {
+      //shell flip
+      a->ent->setOriginX(protag->getOriginX());
+      a->ent->setOriginY(protag->getOriginY());
+      a->ent->loopAnimation = 1;
+      a->ent->msPerFrame = 1;
+      a->ent->z = protag->z + 64;
+      a->ent->zvel = 150;
+      a->ent->zaccel = 0;
+      a->ent->usingVisibleMs = 1;
+      a->ent->visibleMs = 500;
+      a->ent->visible = 1;
+      a->ent->parent = protag;
+      a->ent->isOrbital = 1;
+      a->ent->orbitalIgnoreZ = 1;
+      break;
     }
   }
 }

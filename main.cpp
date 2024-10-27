@@ -12,17 +12,19 @@
 #include "physfs.h"
 
 #include "globals.h"
+#include "main.h"
 #include "objects.h"
 #include "map_editor.h"
 #include "lightcookies.h"
 #include "specialobjects.h"
 #include "utils.h"
+#include "combat.h"
 
 using namespace std;
 
 void flushInput();
 
-void getInput(float &elapsed);
+void getExplorationInput(float &elapsed);
 
 void toggleDevmode();
 
@@ -32,860 +34,102 @@ void protagMakesNoise();
 
 void dungeonFlash();
 
-int WinMain()
-{
-
-  devMode = 0;
-
-  canSwitchOffDevMode = devMode;
-
-  SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
-  IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG);
-  TTF_Init();
-  PHYSFS_init(NULL);
-
-
-  window = SDL_CreateWindow("Game",
-      SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIN_WIDTH, WIN_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALWAYS_ON_TOP);
-  renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-
-  SDL_SetWindowMinimumSize(window, 100, 100);
-
-  //SDL_SetWindowPosition(window, 1280, 720);
-
-  Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
-  SDL_RenderSetIntegerScale(renderer, SDL_FALSE);
- 
-  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "3");
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-
-  SDL_RenderSetScale(renderer, scalex * g_zoom_mod, scalex * g_zoom_mod);
-
-  PHYSFS_ErrorCode errnum = PHYSFS_getLastErrorCode();
-
-  if(devMode || 1) {
-    string currentDirectory = getCurrentDir();
-    PHYSFS_mount(currentDirectory.c_str(), "/", 1);
-  }
-  
-  int ret = PHYSFS_mount("resources.a", "/", 0); //to deploy, just zip up the "resources" folder in  the "shipping" directory and change the filetype from .zip to .a
-
-  for(char **i = PHYSFS_getSearchPath(); *i != NULL; i++) {
-    printf("[%s] is in the search path.\n", *i);
-  }
-
-  if(PHYSFS_exists("resources/static/entities/common/fomm.ent")) {
-    M("Archive is present"); //this has worked before! Make sure the exe is in the same directory as the archive file
-  } else {
-    M("Archive is NOT present");
-  }
-
-  
-
-  // for brightness
-  // reuse texture for transition, cuz why not
-  SDL_Texture* brightness_a = loadTexture(renderer, "resources/engine/transition.qoi");
-
-  SDL_Texture* brightness_b_s = loadTexture(renderer, "resources/engine/black-diffuse.qoi");
-
-  // entities will be made here so have them set as created during loadingtime and not arbitrarily during play
-  g_loadingATM = 1;
-
-
-  // set global shadow-texture
-
-  g_shadowTexture = loadTexture(renderer, "resources/engine/shadow.qoi");
-  g_shadowTextureAlternate = loadTexture(renderer, "resources/engine/shadow-square.qoi");
-
-  // narrarator holds scripts caused by things like triggers
-  narrarator = new entity(renderer, "engine/sp-deity");
-  narrarator->tangible = 0;
-  narrarator->persistentHidden = 1;
-
-  g_pelletNarrarator = new entity(renderer, "engine/sp-deity");
-  g_pelletNarrarator->tangible = 0;
-  g_pelletNarrarator->persistentHidden = 1;
-
-  g_backpackNarrarator = new entity(renderer, "engine/sp-deity");
-  g_backpackNarrarator->tangible = 0;
-  g_backpackNarrarator->persistentHidden = 1;
-
-  // for transition
-  SDL_Surface* transitionSurface = loadSurface("resources/engine/transition.qoi");
-
-  const int transitionImageWidth = 300;
-  const int transitionImageHeight = 300;
-
-  SDL_Texture *transitionTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, 300, 300);
-  SDL_SetTextureBlendMode(transitionTexture, SDL_BLENDMODE_BLEND);
-
-  void *transitionPixelReference;
-  int transitionPitch;
-
-  float transitionDelta = transitionImageHeight;
-
-  // font
-  g_font = "resources/engine/fonts/Rubik-Bold.ttf";
-  //g_font = "resources/engine/fonts/BeVietnamPro-Bold.ttf";
-  g_ttf_font = loadFont(g_font, 60);
-
-  // setup UI
-  adventureUIManager = new adventureUI(renderer);
-  // The adventureUI class has three major uses:
-  // The adventureUIManager points to an instance with the full UI for the player
-  // The narrarator->myScriptCaller points to an instance which might have some dialogue, so it needs some ui
-  // Many objects have a pointer to an instance which is used to just run scripts, and thus needs no dialgue box
-  // To init the UI which is wholey unqiue to the instance pointed to by the adventureUIManager, we must  wa
-  adventureUIManager->initFullUI();
-
-
-  if (canSwitchOffDevMode)
+void drawUI() {
+  //bottom-most layer of ui
+  for (long long unsigned int i = 0; i < g_ui.size(); i++)
   {
-    init_map_writing(renderer);
-    // done once, because textboxes aren't cleared during clear_map()
-    nodeInfoText = new textbox(renderer, "",  g_fontsize, 0, 0, WIN_WIDTH);
-    g_config = "dev";
-    nodeDebug = loadTexture(renderer, "resources/engine/walkerYellow.qoi");
-  }
-
-  // set bindings from file
-  ifstream bindfile;
-  bindfile.open("user/configs/" + g_config + ".cfg");
-  string line;
-  for (int i = 0; i < 14; i++)
-  {
-    getline(bindfile, line);
-    bindings[i] = SDL_GetScancodeFromName(line.c_str());
-  }
-
-  // set vsync and g_fullscreen from config
-  string valuestr;
-  float value;
-
-  // get g_fullscreen
-  getline(bindfile, line);
-  valuestr = line.substr(line.find(' '), line.length());
-  value = stoi(valuestr);
-  g_fullscreen = value;
-
-  // get bg darkness
-  getline(bindfile, line);
-  valuestr = line.substr(line.find(' '), line.length());
-  value = stof(valuestr);
-  g_background_darkness = value;
-
-  // get music volume
-  getline(bindfile, line);
-  valuestr = line.substr(line.find(' '), line.length());
-  value = stof(valuestr);
-  g_music_volume = value;
-
-  // get sfx volume
-  getline(bindfile, line);
-  valuestr = line.substr(line.find(' '), line.length());
-  value = stof(valuestr);
-  g_sfx_volume = value;
-
-  // get standard textsize
-  getline(bindfile, line);
-  valuestr = line.substr(line.find(' '), line.length());
-  value = stof(valuestr);
-  g_fontsize = value;
-
-  // get mini textsize
-  getline(bindfile, line);
-  valuestr = line.substr(line.find(' '), line.length());
-  value = stof(valuestr);
-  g_minifontsize = value;
-
-  // transitionspeed
-  getline(bindfile, line);
-  valuestr = line.substr(line.find(' '), line.length());
-  value = stof(valuestr);
-  g_transitionSpeed = value;
-
-  // mapdetail
-  //  0 -   - ultra low - no lighting, crappy settings for g_tilt_resolution
-  //  1 -   -
-  //  2 -
-  getline(bindfile, line);
-  valuestr = line.substr(line.find(' '), line.length());
-  value = stof(valuestr);
-  g_graphicsquality = value;
-
-  //adjustment of brightness
-  getline(bindfile, line);
-  valuestr = line.substr(line.find(' '), line.length());
-  value = stoi(valuestr);
-  g_brightness = value;
-  g_shade = loadTexture(renderer, "resources/engine/black-diffuse.qoi");
-  SDL_SetWindowBrightness(window, g_brightness/100.0 );
-  SDL_SetTextureAlphaMod(g_shade, 0);
-
-  switch (g_graphicsquality)
-  {
-    case 0:
-      g_TiltResolution = 16;
-      g_platformResolution = 55;
-      g_unlit = 1;
-      break;
-
-    case 1:
-      g_TiltResolution = 4;
-      g_platformResolution = 11;
-      break;
-    case 2:
-      g_TiltResolution = 2;
-      g_platformResolution = 11;
-      break;
-    case 3:
-      g_TiltResolution = 1;
-      g_platformResolution = 11;
-      break;
-  }
-
-  bindfile.close();
-
-  // apply vsync
-  SDL_GL_SetSwapInterval(1);
-
-  // hide mouse
-  // REMEMBER SHIPPING JOSEPH
-
-  g_fullscreen = 0; //!!!
-  // apply fullscreen
-  if (g_fullscreen)
-  {
-    SDL_GetCurrentDisplayMode(0, &DM);
-    SDL_SetWindowSize(window, DM.w, DM.h);
-    SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
-  }
-  else
-  {
-    SDL_SetWindowFullscreen(window, 0);
-  }
-
-  // initialize box matrix z
-  for (int i = 0; i < g_layers; i++)
-  {
-    vector<box *> v = {};
-    g_boxs.push_back(v);
-  }
-
-  for (int i = 0; i < g_layers; i++)
-  {
-    vector<tri *> v = {};
-    g_triangles.push_back(v);
-  }
-
-  for (int i = 0; i < g_layers; i++)
-  {
-    vector<ramp *> v = {};
-    g_ramps.push_back(v);
-  }
-
-  for (int i = 0; i < g_numberOfInterestSets; i++)
-  {
-    vector<pointOfInterest *> v = {};
-    g_setsOfInterest.push_back(v);
-  }
-
-
-  //for water effect
-  g_wPixels = new Uint32[g_wNumPixels];
-  g_wDistort = loadSurface("resources/engine/waterRipple.qoi");
-  g_wSpec = loadTexture(renderer, "resources/engine/specular.qoi");
-  SDL_SetTextureBlendMode(g_wSpec, SDL_BLENDMODE_ADD);
-
-  // init static resources
-
-  { //init static sounds
-    //g_staticSounds.push_back(loadWav("resources/static/sounds/....wav"));
-    g_staticSounds.push_back(loadWav("resources/static/sounds/pellet.wav"));
-    g_staticSounds.push_back(loadWav("resources/static/sounds/protag-step-1.wav"));
-    g_staticSounds.push_back(loadWav("resources/static/sounds/protag-step-2.wav"));
-    g_staticSounds.push_back(loadWav("resources/static/sounds/land.wav"));
-  }
-
-  g_ui_voice = loadWav("resources/static/sounds/voice-normal.wav");
-
-
-  g_spurl_entity = new entity(renderer, "common/spurl");
-  g_spurl_entity->msPerFrame = 75;
-
-  g_chain_entity = new entity(renderer, "common/chain");
-  g_chain_entity->msPerFrame = 75;
-
-  if(devMode) {
-    g_dijkstraDebugRed = new ui(renderer, "resources/engine/walkerRed.qoi", 0,0,32,32, 3);
-    g_dijkstraDebugRed->persistent = 1;
-    g_dijkstraDebugRed->worldspace = 1;
-    g_dijkstraDebugBlue = new ui(renderer, "resources/engine/walkerBlue.qoi", 0,0,32,32, 3);
-    g_dijkstraDebugBlue->persistent = 1;
-    g_dijkstraDebugBlue->worldspace = 1;
-    g_dijkstraDebugYellow = new ui(renderer, "resources/engine/walkerYellow.qoi", 0,0,32,32, 3);
-    g_dijkstraDebugYellow->persistent = 1;
-    g_dijkstraDebugYellow->worldspace = 1;
-  }
-
-  //init user keyboard
-  //render each character of the alphabet to a texture
-  //TTF_Font* alphabetfont = 0;
-  //alphabetfont = TTF_OpenFont(g_font.c_str(), 60 * g_fontsize);
-  //TTF_Font* alphabetfont = loadFont(g_font, 60*g_fontsize, );
-  TTF_Font* alphabetfont = g_ttf_font;
-  SDL_Surface* textsurface = 0;
-  SDL_Texture* texttexture = 0;
-  g_alphabet_textures = &g_alphabetLower_textures;
-  for (int i = 0; i < g_alphabet.size(); i++) {
-    string letter = "";
-    letter += g_alphabet_lower[i];
-    bool special = 0;
-    if(letter == ";") {
-      //load custom enter graphic
-      textsurface = loadSurface("resources/static/ui/menu_confirm.qoi");
-      special = 1;
-    } else if (letter == "<") {
-      //load custom backspace graphic
-      textsurface = loadSurface("resources/static/ui/menu_back.qoi");
-      special = 1;
-    } else if (letter == "^") {
-      //load custom capslock graphic
-      textsurface = loadSurface("resources/static/ui/menu_upper_empty.qoi");
-      special = 1;
-    } else {
-      textsurface = TTF_RenderText_Blended_Wrapped(alphabetfont, letter.c_str(), g_textcolor, 70);
-    }
-    texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
-
-    int texW = 0;int texH = 0;
-    SDL_QueryTexture(texttexture, NULL, NULL, &texW, &texH);
-    if(!special) {
-      texW *= 1.1; //gotta boosh out those letters
-      g_alphabet_widths.push_back(texW);
-    } else {
-      g_alphabet_widths.push_back(50);
-    }
-
-    //SDL_SetTextureBlendMode(texttexture, SDL_BLENDMODE_ADD);
-    g_alphabetLower_textures.push_back(texttexture);
-    SDL_FreeSurface(textsurface);
-  }
-
-  for (int i = 0; i < g_alphabet.size(); i++) {
-    string letter = "";
-    letter += g_alphabet_upper[i];
-    bool special = 0;
-    if(letter == ";") {
-      //load custom enter graphic
-      textsurface = loadSurface("resources/static/ui/menu_confirm.qoi");
-      special = 1;
-    } else if (letter == "<") {
-      //load custom backspace graphic
-      textsurface = loadSurface("resources/static/ui/menu_back.qoi");
-      special = 1;
-    } else if (letter == "^") {
-      //load custom capslock graphic
-      textsurface = loadSurface("resources/static/ui/menu_upper.qoi");
-      special = 1;
-    } else {
-      textsurface = TTF_RenderText_Blended_Wrapped(alphabetfont, letter.c_str(), g_textcolor, 70);
-    }
-    texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
-
-    int texW = 0;int texH = 0;
-    SDL_QueryTexture(texttexture, NULL, NULL, &texW, &texH);
-
-    if(!special) {
-      texW *= 1.1; //gotta boosh out those letters
-      g_alphabet_upper_widths.push_back(texW);
-    } else {
-      g_alphabet_upper_widths.push_back(50);
-    }
-
-    //SDL_SetTextureBlendMode(texttexture, SDL_BLENDMODE_ADD);
-    g_alphabetUpper_textures.push_back(texttexture);
-    SDL_FreeSurface(textsurface);
-  }
-
-  //fancy alphabet
-  int fancyIndex = 0;
-  SDL_Color white = {255, 255, 255};
-  for(char character : g_fancyAlphabetChars) { //not a char
-    string letter = "";
-    letter += character;
-
-    // add support for special chars here
-    textsurface = TTF_RenderText_Blended_Wrapped(alphabetfont, letter.c_str(), white, 70);
-
-    texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
-
-    int texW = 0;int texH = 0;
-    SDL_QueryTexture(texttexture, NULL, NULL, &texW, &texH);
-
-    float texWidth = texW;
-    texWidth *= 0.2;
-    
-    std::pair<SDL_Texture*, float> imSecond(texttexture, texW);
-    g_fancyAlphabet.insert( {fancyIndex, imSecond} );
-    
-    g_fancyCharLookup.insert({character, fancyIndex});
-    
-    fancyIndex++;
-
-    SDL_FreeSurface(textsurface);
-  }
-
-  g_fancybox = new fancybox();
-  g_fancybox->bounds.x = 0.05;
-  g_fancybox->bounds.x = 0.7;
-  g_fancybox->show = 1;
-
-
-  //init options menu
-  g_settingsUI = new settingsUI();
-
-  g_escapeUI = new escapeUI();
-  
-  { //load static textures
-    string loadSTR = "resources/levelsequence/icons/locked.qoi";
-    g_locked_level_texture = loadTexture(renderer, loadSTR);
-
-    loadSTR = "resources/static/ui/loadout_highlight.qoi";
-    g_loadoutHighlightTexture = loadTexture(renderer, loadSTR);
-  }
-
-  //load levelSequence
-  g_levelSequence = new levelSequence(g_levelSequenceName, renderer);
-
-  //for dlc/custom content, add extra levels from any file that might be there
-  char ** entries = PHYSFS_enumerateFiles("resources/levelsequence");
-  char **i;
-  for(i = entries; *i != NULL; i++) {
-    string fn(*i);
-    if(fn.substr(fn.size() - 4, 4) == ".txt"){
-      g_levelSequence->addLevels(*i);
-    }
-  }
-  PHYSFS_freeList(entries);
-
-  //This is used to call scripts triggered by pellet goals
-  g_pelletGoalScriptCaller = new adventureUI(renderer, 1);
-  g_pelletGoalScriptCaller->playersUI = 0;
-  g_pelletGoalScriptCaller->useOwnScriptInsteadOfTalkersScript = 1;
-  g_pelletGoalScriptCaller->talker = narrarator;
-
-  g_pelletGoalScriptCaller->talker = narrarator;
-
-  srand(time(NULL));
-  if (devMode)
-  {
-    // g_transitionSpeed = 10000;
-    
-    loadSave();
-     
-    string filename = g_levelSequence->levelNodes[0]->mapfilename;
-
-    protag->x = 100000;
-    protag->y = 100000;
-
-    filename = "resources/maps/crypt/g.map"; //temporary
-    g_mapdir = "crypt"; //temporary
-    
-    load_map(renderer, filename,"a");
-    vector<string> x = splitString(filename, '/');
-    g_mapdir = x[1];
-
-    g_mapdir = "crypt"; //temporary
-    
-  }
-  else
-  {
-    SDL_ShowCursor(0);
-    loadSave();
-    g_inTitleScreen = 1;
-    load_map(renderer, "resources/maps/base/start.map","a"); //lol
-    g_levelFlashing = 1;
-    clear_map(g_camera); 
-    g_levelFlashing = 0;
-    load_map(renderer, "resources/maps/base/start.map","a");
-    //load_map(renderer, "resources/maps/sp-title/g.map","a");
-//    adventureUIManager->hideBackpackUI();
-//    adventureUIManager->hideHUD();
-//    adventureUIManager->hideScoreUI();
-//    adventureUIManager->hideTalkingUI();
-  }
-
-  inventoryMarker = new ui(renderer, "resources/static/ui/finger_selector_angled.qoi", 0, 0, 0.1, 0.1, 2);
-  inventoryMarker->show = 0;
-  inventoryMarker->persistent = 1;
-  inventoryMarker->renderOverText = 1;
-  inventoryMarker->heightFromWidthFactor = 1;
-  inventoryMarker->height = 1;
-
-  g_UiGlideSpeedY = 0.012 * WIN_WIDTH/WIN_HEIGHT;
-
-  inventoryText = new textbox(renderer, "1", 40,  g_fontsize, 0, WIN_WIDTH * 0.2);
-  inventoryText->dropshadow = 1;
-  inventoryText->show = 0;
-  inventoryText->align = 1;
-
-  
-  g_itemsines.push_back( sin(g_elapsed_accumulator / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator - 1400) / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator + 925) / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator + 500) / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator + 600) / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator + 630) / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator + 970) / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator + 1020) / 300) * 10 + 30);
- 
-
-  // This stuff is for the FoW mechanic
-  // engine/resolution.qoi has resolution 1920 x 1200
-  SDL_Surface *SurfaceA = loadSurface("resources/engine/resolution.qoi");
-
-  TextureA = SDL_CreateTextureFromSurface(renderer, SurfaceA);
-  TextureD = SDL_CreateTextureFromSurface(renderer, SurfaceA);
-
-  SDL_FreeSurface(SurfaceA);
-
-  blackbarTexture = loadTexture(renderer, "resources/engine/black-diffuse.qoi");
-
-
-  result = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 500, 500);
-  result_c = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 500, 500);
-
-  SDL_SetTextureBlendMode(result, SDL_BLENDMODE_MOD);
-  SDL_SetTextureBlendMode(result_c, SDL_BLENDMODE_MOD);
-
-  SDL_SetTextureBlendMode(TextureA, SDL_BLENDMODE_MOD);
-  SDL_SetTextureBlendMode(TextureA, SDL_BLENDMODE_MOD);
-  SDL_SetTextureBlendMode(TextureD, SDL_BLENDMODE_MOD);
-
-  // SDL_SetTextureBlendMode(TextureB, SDL_BLENDMODE_NONE);
-
-  // init fogslates
-  
-  //strange displacement in debugger vs standalone
-  //in debugger g_fc[20][19] = g_fc[20][20] = -1414812757
-  //but standalone = 0
-  //?
-  for(int i = 0; i < g_fogwidth; i++) {
-    for(int j = 0; j < g_fogheight; j++) {
-      g_fc[i][j] = 0;
-      g_sc[i][j] = 0;
-      g_fogcookies[i][j] = 0;
+    if(g_ui[i]->layer0) {
+      g_ui[i]->render(renderer, g_camera, elapsed);
     }
   }
 
-
-  entity *s = nullptr;
-//  s->dynamic = 0;
-//  s->width = 0;
-
-  for (size_t i = 0; i < 19; i++)
+  for (long long unsigned int i = 0; i < g_textboxes.size(); i++)
   {
-    s = new entity(renderer, "engine/sp-fogslate");
-    g_fogslates.push_back(s);
-    s->height = 56;
-    s->width = g_fogwidth * 64 + 50;
-    s->curheight = s->height - 1;
-    s->curwidth = s->width;
-    s->xframes = 1;
-    s->yframes = 19;
-    s->animation = i;
-    // s->persistentGeneral = 1;
-    s->frameheight = 26;
-    s->framewidth = 500;
-    s->shadow->width = 0;
-    s->dynamic = 0;
-    s->sortingOffset = 130; // -35 then 130
-    s->isFogSlate = 1;
-  }
-
-  for (size_t i = 0; i < 19; i++)
-  {
-    s = new entity(renderer, "engine/sp-fogslate");
-    g_fogslatesA.push_back(s);
-    s->z = 64;
-    s->height = 56;
-    s->width = g_fogwidth * 64 + 50;
-    s->curheight = s->height - 1;
-    s->curwidth = s->width;
-    s->xframes = 1;
-    s->yframes = 19;
-    s->animation = i;
-    // s->persistentGeneral = 1;
-    s->frameheight = 26;
-    s->framewidth = 500;
-    s->shadow->width = 0;
-    s->dynamic = 0;
-    s->sortingOffset = 165; // -65 55
-    //s->width = 0;
-    s->isFogSlate = 1;
-  }
-
-  for (size_t i = 0; i < 19; i++)
-  {
-    s = new entity(renderer, "engine/sp-fogslate");
-    g_fogslatesB.push_back(s);
-    s->height = 56;
-    s->width = g_fogwidth * 64 + 50;
-    s->curheight = s->height - 1;
-    s->curwidth = s->width;
-    s->xframes = 1;
-    s->yframes = 19;
-    s->animation = i;
-    // s->persistentGeneral = 1;
-    s->frameheight = 26;
-    s->framewidth = 500;
-    s->shadow->width = 0;
-    s->dynamic = 0;
-    s->sortingOffset = 45000; // !!! might need to be bigger
-    //s->width = 0;
-    s->isFogSlate = 1;
-  }
-
-  SDL_DestroyTexture(s->texture);
-
-  for (auto x : g_fogslates)
-  {
-    x->texture = TextureC;
-  }
-
-  for (auto x : g_fogslatesA)
-  {
-    x->texture = TextureC;
-  }
-
-  for (auto x : g_fogslatesB)
-  {
-    x->texture = TextureC;
-  }
-
-
-  //this is used when spawning in entities
-  smokeEffect = new effectIndex("puff", renderer);
-  smokeEffect->persistent = 1;
-
-  littleSmokeEffect = new effectIndex("steam", renderer);
-  littleSmokeEffect->persistent = 1;
-
-  blackSmokeEffect = new effectIndex("blackpowder", renderer);
-  blackSmokeEffect->persistent = 1;
-
-  sparksEffect = new effectIndex("sparks", renderer);
-  sparksEffect->persistent = 1;
-
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-  SDL_RenderPresent(renderer);
-  SDL_GL_SetSwapInterval(1);
-
-  // textures for adding operation
-  canvas = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 500, 500);
-  //canvas_fc = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 500, 500); seems to be unused
-
-  light = loadTexture(renderer, "resources/engine/light.qoi");
-
-  lighta = loadTexture(renderer, "resources/engine/lighta.qoi");
-
-  lightb = loadTexture(renderer, "resources/engine/lightb.qoi");
-
-  lightc = loadTexture(renderer, "resources/engine/lightc.qoi");
-
-  lightd = loadTexture(renderer, "resources/engine/lightd.qoi");
-
-  lightaro = loadTexture(renderer, "resources/engine/lightaro.qoi");
-
-  lightbro = loadTexture(renderer, "resources/engine/lightbro.qoi");
-
-  lightcro = loadTexture(renderer, "resources/engine/lightcro.qoi");
-
-  lightdro = loadTexture(renderer, "resources/engine/lightdro.qoi");
-
-  lightari = loadTexture(renderer, "resources/engine/lightari.qoi");
-
-  lightbri = loadTexture(renderer, "resources/engine/lightbri.qoi");
-
-  lightcri = loadTexture(renderer, "resources/engine/lightcri.qoi");
-
-  lightdri = loadTexture(renderer, "resources/engine/lightdri.qoi");
-
-  g_loadingATM = 0;
-
-  while (!quit)
-  {
-    // behemoth debug here
-    if(g_behemoth0 != nullptr) {
+    if(g_textboxes[i]->layer0) {
+      g_textboxes[i]->render(renderer, WIN_WIDTH, WIN_HEIGHT);
     }
+  }
 
-    // some event handling
-    while (SDL_PollEvent(&event))
+  for (long long unsigned int i = 0; i < g_ui.size(); i++)
+  {
+    if(!g_ui[i]->renderOverText && !g_ui[i]->layer0) {
+      g_ui[i]->render(renderer, g_camera, elapsed);
+    }
+  }
+
+  for (long long unsigned int i = 0; i < g_textboxes.size(); i++)
+  {
+    if(!g_textboxes[i]->layer0) {
+      g_textboxes[i]->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+    }
+  }
+
+  //some ui are rendered over text
+  for (long long unsigned int i = 0; i < g_ui.size(); i++)
+  {
+    if(g_ui[i]->renderOverText) {
+      g_ui[i]->render(renderer, g_camera, elapsed);
+    }
+  }
+
+}
+
+void updateWindowResolution() {
+  // update camera
+  SDL_GetWindowSize(window, &WIN_WIDTH, &WIN_HEIGHT);
+
+  float w = WIN_WIDTH; float h = WIN_HEIGHT;
+  // !!! it might be better to not run this every frame
+  if (old_WIN_WIDTH != WIN_WIDTH || old_WIN_HEIGHT != WIN_HEIGHT || g_update_zoom)
+  {
+    // user scaled window
+    scalex = ((float)WIN_WIDTH / STANDARD_SCREENWIDTH) * g_defaultZoom * g_zoom_mod;
+    scaley = ((float)WIN_HEIGHT / (STANDARD_SCREENWIDTH * 0.5625)) * g_defaultZoom * g_zoom_mod;
+    if (scalex < min_scale)
     {
-      switch (event.type)
-      {
-        case SDL_WINDOWEVENT:
-          switch (event.window.event)
-          {
-            case SDL_WINDOWEVENT_RESIZED:
-              // we need to reload some (all?) textures
-              for (auto x : g_mapObjects)
-              {
-                if (x->mask_fileaddress != "&")
-                {
-                  x->reloadTexture();
-                }
-              }
-
-              // reassign textures for asset-sharers
-              for (auto x : g_mapObjects)
-              {
-                if (x->mask_fileaddress != "&")
-                {
-                  x->reassignTexture();
-                }
-              }
-
-              // the same must be done for masked tiles
-              for (auto t : g_tiles)
-              {
-                if (t->mask_fileaddress != "&")
-                {
-                  t->reloadTexture();
-                }
-              }
-
-              // reassign textures for any asset-sharers
-              for (auto x : g_tiles)
-              {
-                x->reassignTexture();
-              }
-              break;
-          }
-          break;
-        case SDL_KEYDOWN:
-          switch (event.key.keysym.sym)
-          {
-            case SDLK_TAB:
-              g_holdingCTRL = 1;
-              // protag->getItem(a, 1);
-              break;
-            case SDLK_LALT:
-              g_holdingTAB = 1;
-          }
-          if(g_swallowAKey) {
-            M("We should swallow this key");
-            g_swallowedKey = event.key.keysym.scancode;
-            g_swallowAKey = 0;
-            g_swallowedAKeyThisFrame = 1;
-          } else {
-            g_swallowedAKeyThisFrame = 0;
-          }
-
-          break;
-        case SDL_KEYUP:
-          switch (event.key.keysym.sym)
-          {
-            case SDLK_TAB:
-              g_holdingCTRL = 0;
-              break;
-            case SDLK_LALT:
-              g_holdingTAB = 0;
-              break;
-          }
-          break;
-        case SDL_MOUSEWHEEL:
-          if (g_holdingCTRL)
-          {
-            if (event.wheel.y > 0)
-            {
-              wallstart -= 64;
-            }
-            else if (event.wheel.y < 0)
-            {
-              wallstart += 64;
-            }
-            if (wallstart < 0)
-            {
-              wallstart = 0;
-            }
-            else
-            {
-              if (wallstart > 64 * g_layers)
-              {
-                wallstart = 64 * g_layers;
-              }
-              if (wallstart > wallheight - 64)
-              {
-                wallstart = wallheight - 64;
-              }
-            }
-          }
-          else
-          {
-            if (event.wheel.y > 0)
-            {
-              wallheight -= 64;
-            }
-            else if (event.wheel.y < 0)
-            {
-              wallheight += 64;
-            }
-            if (wallheight < wallstart + 64)
-            {
-              wallheight = wallstart + 64;
-            }
-            else
-            {
-              if (wallheight > 64 * g_layers)
-              {
-                wallheight = 64 * g_layers;
-              }
-            }
-            break;
-          }
-        case SDL_MOUSEBUTTONDOWN:
-          if (event.button.button == SDL_BUTTON_LEFT)
-          {
-            devinput[3] = 1;
-          }
-          if (event.button.button == SDL_BUTTON_MIDDLE)
-          {
-            devinput[10] = 1;
-          }
-          if (event.button.button == SDL_BUTTON_RIGHT)
-          {
-            devinput[4] = 1;
-          }
-          break;
-
-        case SDL_QUIT:
-          quit = 1;
-          break;
-      }
+      scalex = min_scale;
+    }
+    if (scalex > max_scale)
+    {
+      scalex = max_scale;
     }
 
-    ticks = SDL_GetTicks();
-    elapsed = ticks - lastticks;
-    lastticks = ticks;
+    if(w / h > 1.777778) {
+      SDL_RenderSetScale(renderer, scaley * g_zoom_mod, scaley * g_zoom_mod);
+    } else {
+      SDL_RenderSetScale(renderer, scalex * g_zoom_mod, scalex * g_zoom_mod);
+    }
+    g_UiGlideSpeedY = 0.012 * WIN_WIDTH/WIN_HEIGHT;
+  }
 
-    // I(elapsed);
+  old_WIN_WIDTH = WIN_WIDTH;
+  old_WIN_HEIGHT = WIN_HEIGHT;
 
-    // lock time
-    elapsed = 16.6666666667;
+  if(w / h > 1.777778) {
+    WIN_HEIGHT /= scaley;
+    WIN_WIDTH = WIN_HEIGHT * 1.777778;
+
+  } else {
+    WIN_WIDTH /= scalex;
+    WIN_HEIGHT = WIN_WIDTH * 0.5625;
+  }
+
+  //SDL_RenderSetLogicalSize(renderer, 600, 480);
+//  WIN_WIDTH = 600 / scalex;
+//  WIN_HEIGHT = 480 / scalex;
+
+}
 
 
+void ExplorationLoop() {
     // cooldowns
     if(g_dungeonSystemOn) {g_dungeonMs += elapsed;}
     halfsecondtimer += elapsed;
-    use_cooldown -= elapsed / 1000;
     musicFadeTimer += elapsed;
     musicUpdateTimer += elapsed;
     g_blinkingMS += elapsed;
     g_jumpGaranteedAccelMs -= elapsed;
     g_boardingCooldownMs -= elapsed;
-    g_usableWaitToCycleTime -= elapsed;
     g_protagBonusSpeedMS -= elapsed;
     if(g_protagBonusSpeedMS < 0) {protag->bonusSpeed = 0;}
     if(g_usingMsToStunned == 1) {
@@ -935,7 +179,7 @@ int WinMain()
     specialObjectsOncePerFrame(elapsed);
 
     // INPUT
-    getInput(elapsed);
+    getExplorationInput(elapsed);
 
     
     //lerp protag to boarded ent smoothly
@@ -968,7 +212,7 @@ int WinMain()
 
 
     // spring
-    if ((input[8] && !oldinput[8] && protag->grounded && protag_can_move) || (input[8] && storedJump && protag->grounded && protag_can_move && !g_selectingUsable))
+    if ((input[8] && !oldinput[8] && protag->grounded && protag_can_move) || (input[8] && storedJump && protag->grounded && protag_can_move))
     {
       protagMakesNoise();
       g_hasBeenHoldingJump = 1;
@@ -1163,32 +407,8 @@ int WinMain()
       }
     }
 
-    // update camera
-    SDL_GetWindowSize(window, &WIN_WIDTH, &WIN_HEIGHT);
 
-    // !!! it might be better to not run this every frame
-    if (old_WIN_WIDTH != WIN_WIDTH || g_update_zoom)
-    {
-      // user scaled window
-      scalex = ((float)WIN_WIDTH / STANDARD_SCREENWIDTH) * g_defaultZoom * g_zoom_mod;
-      scaley = scalex;
-      if (scalex < min_scale)
-      {
-        scalex = min_scale;
-      }
-      if (scalex > max_scale)
-      {
-        scalex = max_scale;
-      }
-      SDL_RenderSetScale(renderer, scalex * g_zoom_mod, scalex * g_zoom_mod);
-      SDL_GetWindowSize(window, &WIN_WIDTH, &WIN_HEIGHT);
-      g_UiGlideSpeedY = 0.012 * WIN_WIDTH/WIN_HEIGHT;
-    }
-
-    old_WIN_WIDTH = WIN_WIDTH;
-
-    WIN_WIDTH /= scalex;
-    WIN_HEIGHT /= scaley;
+    updateWindowResolution();
 
     //animate dialogproceedarrow
     {
@@ -1240,63 +460,6 @@ int WinMain()
         g_camera.update_movement(elapsed, avgX - zoomoffsetx, ((avgY - XtoZ * g_focus->z) - zoomoffsety));
       }
     }
-
-
-    if(adventureUIManager->shiftingMs > 0) {
-      adventureUIManager->shiftingMs -= elapsed;
-    } else {
-      //reposition them
-      int i = 1;
-      for(auto x : adventureUIManager->hotbarTransitionIcons) {
-        x->x = adventureUIManager->hotbarPositions[i].first;
-        x->y = adventureUIManager->hotbarPositions[i].second;
-        x->targetx = adventureUIManager->hotbarPositions[i].first;
-        x->targety = adventureUIManager->hotbarPositions[i].second;
-        
-        if(g_backpack.size() > 0) {
-          int index = g_backpackIndex - i + 3 + g_backpack.size();
-          index = index % g_backpack.size();
-          x->texture = g_backpack.at(index)->texture;
-        }
-        i++;
-      }
-
-    }
-
-    float percentSame = 0.5 * elapsed / 16;
-    float percentDiff = 1 - percentSame;
-    if(g_selectingUsable) {
-      g_hotbarWidth = (g_hotbarWidth *percentSame) + (g_hotbarWidth_inventoryOpen*percentDiff);
-      g_hotbarNextPrevOpacity = (g_hotbarNextPrevOpacity * percentSame) + (25500 * percentDiff);
-
-    } else {
-      g_hotbarWidth = (g_hotbarWidth *percentSame) + (g_hotbarWidth_inventoryClosed*percentDiff);
-      g_hotbarNextPrevOpacity = (g_hotbarNextPrevOpacity * percentSame) + (0 * percentDiff);
-    }
-    adventureUIManager->hotbar->width = g_hotbarWidth;
-    adventureUIManager->hotbar->height = 0.1/g_hotbarWidth; //maintain height despite using heightFromWidthFactor
-    //next/prev icons should move with hotbar
-   
-    adventureUIManager->hotbarPositions[4].first = g_hotbarX - (g_hotbarWidth - 0.1)/2 + g_backpackHorizontalOffset;
-    adventureUIManager->hotbarPositions[2].first = g_hotbarX + (g_hotbarWidth - 0.1)/2 + g_backpackHorizontalOffset;
-
-    
-    adventureUIManager->t1->opacity = g_hotbarNextPrevOpacity;
-    adventureUIManager->t2->opacity = g_hotbarNextPrevOpacity;
-    adventureUIManager->t3->opacity = 25500;
-    adventureUIManager->t4->opacity = g_hotbarNextPrevOpacity;
-    adventureUIManager->t5->opacity = g_hotbarNextPrevOpacity;
-
-    
-    adventureUIManager->hotbar->x = 0.65 - g_hotbarWidth + g_backpackHorizontalOffset;
-    adventureUIManager->hotbarPositions[3].first = 0.1 + (g_hotbarX - (g_hotbarWidth - 0.1)/2 + g_backpackHorizontalOffset);
-    adventureUIManager->hotbarFocus->x = 0.1 + 0.005 + (g_hotbarX - (g_hotbarWidth - 0.1)/2 + g_backpackHorizontalOffset);
-    adventureUIManager->hotbarMutedXIcon->x = adventureUIManager->hotbarFocus->x;
-    adventureUIManager->cooldownIndicator->x = adventureUIManager->hotbarPositions[3].first;
-
-
-
-    
 
     // update ui
     curTextWait += elapsed * text_speed_up;
@@ -1814,63 +977,6 @@ int WinMain()
       }
     }
 
-    {
-      if (g_objective != 0)
-      {
-
-        if (!g_objective->tangible)
-        {
-          g_objective = 0;
-        }
-
-        float ox = g_objective->getOriginX();
-        float oy = g_objective->getOriginY();
-        
-        float distToObj = XYWorldDistanceSquared(ox, oy, protag->getOriginX(), protag->getOriginY());
-        // update crosshair to current objective
-        //
-        
-        float crossx = 0;
-        float crossy = 0;
-
-        // hide crosshair if we are close
-        if(distToObj < pow(64*5.5,2))
-        {
-          crossx = 5;
-          crossy = 5;
-        } else {
-          //crosshair should point to the object
-          float angleToObj = atan2(ox - protag->getOriginX(), oy - protag->getOriginY());
-          angleToObj += M_PI/2;
-          float magnitude = 0.43;
-          crossx = 0.5;
-          crossy = 0.5;
-          float w = WIN_WIDTH;
-          float h = WIN_HEIGHT;
-
-          //Since the camera is angled, a world block appears wider than it is tall
-          //And so I want the reticles to travel around an elipse rather than a sphere
-          //it's not perfectly simple to accomodate for this here, though
-          //Let's do math to find the difference between the radius of a circle
-          //and of an elipse
-          
-          float a = YtoX; //this ellipse has the same dimensional ratio as an image of a block in the world
-          float b = 1;
-          float ellipseRadius = (a * b) / ( pow( (pow(a,2) * pow(sin(angleToObj),2) + pow(b,2) * pow(cos(angleToObj),2)  ) , 0.5) );
-          magnitude *=ellipseRadius;
-
-          crossx += (-cos(angleToObj) * magnitude) * h/w;
-          crossy += sin(angleToObj) * magnitude;
-        }
-
-
-
-        adventureUIManager->crosshair->x = crossx - adventureUIManager->crosshair->width / 2;
-        adventureUIManager->crosshair->y = crossy - adventureUIManager->crosshair->height;
-      }
-    }
-
-
     { //behemoth ui
       if(g_behemoth0 != nullptr && g_behemoth0->tangible) {
         adventureUIManager->b0_element->show = 1;
@@ -2115,50 +1221,6 @@ int WinMain()
       adventureUIManager->seeingDetectable->show = 1;
       adventureUIManager->hearingDetectable->show = 0;
     }
-
-    //update cooldown indicator
-    if(g_backpack.size() > 0){
-      adventureUIManager->cooldownIndicator->show = 1;
-      auto x = g_backpack.at(g_backpackIndex);
-      float percentage = (float)x->cooldownMs / ((float)x->maxCooldownMs);
-      percentage *= 48;
-      bool useReady = 0;
-      if(percentage <= 0) { useReady = 1;}
-      int frame = 48 - round(percentage);
-      adventureUIManager->cooldownIndicator->frame = frame;
-
-      if(adventureUIManager->cooldownIndicator->frame >= adventureUIManager->cooldownIndicator->xframes) {
-        adventureUIManager->cooldownIndicator->frame = adventureUIManager->cooldownIndicator->xframes - 1;
-
-      } else {
-        if(adventureUIManager->cooldownIndicator->frame < 0) {
-          adventureUIManager->cooldownIndicator->frame = 0;
-        }
-
-      }
-      if(useReady) {
-        adventureUIManager->cooldownIndicator->frame = 24;
-        adventureUIManager->cooldownIndicator->show = 0;
-      }
-
-      
-
-    } else {
-      adventureUIManager->cooldownIndicator->show = 0;
-
-    }
-
-    //!!! remove this before shipping
-    for(auto u : g_navNodes) {
-      u->costFromUsage = 0;
-      u->highlighted = 0;
-    }
-    for(auto x: g_ai) {
-      if(x->current != nullptr) {
-        x->current->highlighted = 1;
-      }
-    }
-
 
     //do global nav calcs (shared intelligence for behemoths)
     if(protag != nullptr) {
@@ -2511,19 +1573,19 @@ int WinMain()
     {
       // !!! segfaults on mapload sometimes
       
-//      SDL_Color useThisColor = g_healthtextcolor;
-//      if(protag->hp < 5) {
-//        useThisColor = g_healthtextlowcolor;
-//      }
-//      adventureUIManager->healthText->updateText(to_string(int(protag->hp)) + '/' + to_string(int(protag->maxhp)), -1, 0.9,  useThisColor);
-//      adventureUIManager->healthText->show = 1;
+      SDL_Color useThisColor = g_healthtextcolor;
+      if(protag->hp < 5) {
+        useThisColor = g_healthtextlowcolor;
+      }
+      adventureUIManager->healthText->updateText(to_string(int(protag->hp)) + '/' + to_string(int(protag->maxhp)), -1, 0.9,  useThisColor);
+      adventureUIManager->healthText->show = 1;
 
       //adventureUIManager->hungerText->updateText(to_string((int)((float)(min(g_foodpoints, g_maxVisibleFoodpoints) * 100) / (float)g_maxVisibleFoodpoints)) + '%', -1, 0.9);
       //adventureUIManager->hungerText->show = 0;
    
       //animate the guts sometimes
       //heart shake
-      adventureUIManager->heartShakeIntervalMs -= elapsed;
+//      adventureUIManager->heartShakeIntervalMs -= elapsed;
 //      if(adventureUIManager->heartShakeIntervalMs < 0) {
 //        //make the heart shake back and forth briefly
 //        adventureUIManager->heartShakeDurationMs = adventureUIManager->maxHeartShakeDurationMs;
@@ -2631,7 +1693,7 @@ int WinMain()
     }
     else
     {
-      //adventureUIManager->healthText->show = 0;
+      adventureUIManager->healthText->show = 0;
       //adventureUIManager->hungerText->show = 0;
     }
 
@@ -2661,42 +1723,7 @@ int WinMain()
 //    adventureUIManager->healthText->boxX = protagHealthbarA->x + protagHealthbarA->width / 2;
 //    adventureUIManager->healthText->boxY = protagHealthbarA->y - 0.005;
 
-    //bottom-most layer of ui
-    for (long long unsigned int i = 0; i < g_ui.size(); i++)
-    {
-      if(g_ui[i]->layer0) {
-        g_ui[i]->render(renderer, g_camera, elapsed);
-      }
-    }
-
-    for (long long unsigned int i = 0; i < g_textboxes.size(); i++)
-    {
-      if(g_textboxes[i]->layer0) {
-        g_textboxes[i]->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-      }
-    }
-
-    for (long long unsigned int i = 0; i < g_ui.size(); i++)
-    {
-      if(!g_ui[i]->renderOverText && !g_ui[i]->layer0) {
-        g_ui[i]->render(renderer, g_camera, elapsed);
-      }
-    }
-
-    for (long long unsigned int i = 0; i < g_textboxes.size(); i++)
-    {
-      if(!g_textboxes[i]->layer0) {
-        g_textboxes[i]->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-      }
-    }
-
-    //some ui are rendered over text
-    for (long long unsigned int i = 0; i < g_ui.size(); i++)
-    {
-      if(g_ui[i]->renderOverText) {
-        g_ui[i]->render(renderer, g_camera, elapsed);
-      }
-    }
+    drawUI();
 
     //render fancybox
     g_fancybox->render();
@@ -2884,77 +1911,6 @@ int WinMain()
           g_itemsInInventory = g_alphabet.size();
 
 
-        } else if(g_inventoryUiIsLoadout) {
-          //this is how the player chooses which items 
-          //to bring to a level
-          for(auto t : g_chest) {
-            if (i < itemsPerRow * inventoryScroll)
-            {
-              // this item won't be rendered
-              i++;
-              continue;
-            }
-            
-            SDL_Rect drect = {(int)x, (int)y, (int)itemWidth, (int)itemWidth};
-            float boosh = 0.02*WIN_WIDTH;
-            SDL_Rect hdrect = {(int)x - boosh/2, (int)y-boosh/2, (int)itemWidth+boosh, (int)itemWidth+boosh};
-
-            //should the highlight be rendered?
-            if(find(g_loadout.begin(), g_loadout.end(), i) != g_loadout.end()) {
-              SDL_RenderCopy(renderer, g_loadoutHighlightTexture, NULL, &hdrect);
-            }
-
-            SDL_RenderCopy(renderer, t->texture, NULL, &drect);
-
-            if (i == inventorySelection || g_firstFrameOfPauseMenu)
-            {
-              // this item should have the marker
-              inventoryMarker->show = 1;
-
-              float biggen = 0.01; // !!! resolutions : might have problems with diff resolutions
-              if(g_firstFrameOfPauseMenu) {
-                inventoryMarker->x = x / WIN_WIDTH;
-                inventoryMarker->y = y / WIN_HEIGHT;
-                inventoryMarker->x -= biggen;
-                inventoryMarker->y -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                //now that it's a hand
-                inventoryMarker->x += 0.02 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                inventoryMarker->y += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                inventoryMarker->targetx = inventoryMarker->x;
-                inventoryMarker->targety = inventoryMarker->y;
-                g_firstFrameOfPauseMenu = 0;
-              } else {
-                inventoryMarker->targetx = x / WIN_WIDTH;
-                inventoryMarker->targety = y / WIN_HEIGHT;
-                inventoryMarker->targetx -= biggen;
-                inventoryMarker->targety -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                //now that it's a hand
-                inventoryMarker->targetx += 0.02 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                inventoryMarker->targety += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              }
-
-              inventoryMarker->width = itemWidth / WIN_WIDTH;
-              inventoryMarker->width += biggen * 2;
-              inventoryMarker->height = inventoryMarker->width * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-            }
-            x += itemWidth + padding;
-            if (x > maxX)
-            {
-              x = defaultX;
-              y += itemWidth + padding;
-              if (y > maxY)
-              {
-                // we filled up the entire inventory, so lets leave
-                break;
-              }
-            }
-            i++;
-
-          }
-          g_itemsInInventory = g_chest.size();
-          
-          adventureUIManager->escText->updateText(g_chest[inventorySelection]->aboutTxt, -1, 0.9);
-          
         } else {
           //populate boxes based on inventory
           for (auto it = mainProtag->inventory.rbegin(); it != mainProtag->inventory.rend(); ++it)
@@ -3404,7 +2360,6 @@ int WinMain()
 
       if(g_ex_familiars.size() > 0 && g_exFamiliarTimer > 0) {
         g_exFamiliarTimer -= elapsed;
-        breakpoint();
         for(auto x : g_ex_familiars) {
           if(x->shadow != nullptr) {
             x->shadow->x = x->x + x->shadow->xoffset;
@@ -3507,162 +2462,8 @@ int WinMain()
         if(ydiff < 85 && ydiff > 0) {
           //x->sortingOffset = 30;
         }
-        
-        
-        bool collected = 0;
-        //try to collect
-        if(devMode == 0) {
-          bool m = CylinderOverlap(protag->getMovedBounds(), x->getMovedBounds());
-          if(m) {
-            //make tung image do swallow animation
-            adventureUIManager->tungShakeIntervalMs = 500; //swallow 500ms after eating this
-            adventureUIManager->tungShakeDurationMs = 0;
-            
-            
-            playSound(4, g_staticSounds[0], 0);
-            x->usingTimeToLive = 1;
-            x->timeToLiveMs = -1;
-            x->shadow->size = 0;
-            x->dynamic = 1;
-            x->steeringAngle = wrapAngle(atan2(protag->getOriginX() - x->getOriginX(), protag->getOriginY() - x->getOriginY()) - M_PI/2);
-            x->targetSteeringAngle = x->steeringAngle;
-            x->forwardsVelocity = 14000;
-  
-            
-            g_pellets.erase(remove(g_pellets.begin(), g_pellets.end(), x), g_pellets.end());
-            x->identity = 0;
-            i--;
-            g_currentPelletsCollected++;
-
-            if(g_backpack.size() > 0) {
-//              int indexToReduceCooldown = g_backpackIndex;
-//              int initialIndex = g_backpackIndex;
-//              while(g_backpack.at(indexToReduceCooldown)->cooldownMs <= 0 || g_backpack.at(indexToReduceCooldown)->specialAction == 1) {
-//                indexToReduceCooldown ++;
-//                if(indexToReduceCooldown > g_backpack.size()) {
-//                  indexToReduceCooldown = 0;
-//                }
-//  
-//                if(indexToReduceCooldown == initialIndex) {
-//                  break;
-//                }
-//              }
-  
-              for(auto x : g_backpack) {
-                x->cooldownMs -= 1000;
-                if(x->cooldownMs < 0) {
-                  x->cooldownMs = 0;
-                }
-              }
-            }
-  
-            collected = 1;
-            
-            //did we collect the objective?
-            if(x == g_objective) {
-              g_objective = nullptr;
-            }
-          }
-        }
-  
-        if(collected) {
-          for(auto x : g_pelletGoalScripts) {
-  
-            if(x.first <= g_currentPelletsCollected) {
-              g_pelletGoalScripts.erase(remove(g_pelletGoalScripts.begin(), g_pelletGoalScripts.end(), x), g_pelletGoalScripts.end());
-              M("Calling goalscript for " + to_string(x.first) + " pellets");
-              //M("We'll call this script: " + x.second);
-  
-              //load and call this script (this code is taken from that for the "/script" script-command
-              ifstream stream;
-              string loadstr;
-              string s = x.second;
-          
-              loadstr = "resources/maps/" + g_map + "/scripts/" + s + ".txt";
-              const char *plik = loadstr.c_str();
-  
-              stream.open(plik);
-          
-              if (!stream.is_open())
-              {
-                stream.open("scripts/" + s + ".txt");
-              }
-              string line;
-          
-              getline(stream, line);
-          
-              vector<string> nscript;
-              while (getline(stream, line))
-              {
-                nscript.push_back(line);
-              }
-  
-              parseScriptForLabels(nscript);
-              
-              g_pelletGoalScriptCaller->blip = g_ui_voice;
-              g_pelletGoalScriptCaller->ownScript = nscript;
-              g_pelletGoalScriptCaller->dialogue_index = -1;
-              g_pelletGoalScriptCaller->talker = g_pelletNarrarator;
-
-              g_pelletGoalScriptCaller->continueDialogue();
-  
-  
-            }
-  
-          }
-  
-        }
       }
     }
-
-    if(g_objectiveFadeModeOn) {
-      if(abs(protag->xvel) > 2 || abs(protag->yvel) > 2) {
-        g_objectiveOpacity -= elapsed * 50;
-        g_objectiveFadeWaitMs = g_objectiveFadeMaxWaitMs;
-      } else {
-        g_objectiveFadeWaitMs -= elapsed;
-        if(g_objectiveFadeWaitMs < 0) {
-          g_objectiveOpacity += elapsed * 50;
-        } else {
-          g_objectiveOpacity -= elapsed * 50;
-        }
-
-
-      }
-      g_objectiveOpacity = min(max(g_objectiveOpacity, 0), 25500);
-      
-    } else {
-      g_objectiveOpacity = 25500;
-
-    }
-    
-    adventureUIManager->crosshair->opacity = g_objectiveOpacity;
-
-    
-    if(g_usingPelletsAsObjective) {
-      if(g_objective == nullptr) {
-        M("Must find another pellet");
-
-        //search for a nearby pellet
-        entity* closest = nullptr;
-        float closestDist = 0;
-//        int px = protag->getOriginX();
-//        int py = protag->getOriginY();
-        int px = protag->x;
-        int py = protag->y;
-        int thisDist = 0;
-        for(int i = 0; i < g_pellets.size(); i++) {
-          thisDist = XYWorldDistanceSquared(px, py, g_pellets[i]->x, g_pellets[i]->y);
-          if(thisDist < closestDist || closest == nullptr) {
-            closest = g_pellets[i];
-            closestDist = thisDist;
-          }
-        }
-        g_objective = closest; //might be nullptr, that's fine
-
-      }
-    }
-
 
     string systemTimePrint = "";
     if(g_dungeonSystemOn) {
@@ -3698,25 +2499,7 @@ int WinMain()
       }
     }
 
-    adventureUIManager->systemClock->updateText(systemTimePrint, -1, 1);
-
-
-    //show dijkstra debugging sprites
-//    if(devMode && g_dijkstraEntity != nullptr) {
-//      if(g_dijkstraEntity->current != nullptr) {
-//        g_dijkstraDebugRed->x = g_dijkstraEntity->current->x;
-//        g_dijkstraDebugRed->y = g_dijkstraEntity->current->y;
-//      }
-//      if(g_dijkstraEntity->dest != nullptr) {
-//        g_dijkstraDebugBlue->x = g_dijkstraEntity->dest->x;
-//        g_dijkstraDebugBlue->y = g_dijkstraEntity->dest->y;
-//      }
-//      if(g_dijkstraEntity->Destination != nullptr) {
-//        g_dijkstraDebugYellow->x = g_dijkstraEntity->Destination->x;
-//        g_dijkstraDebugYellow->y = g_dijkstraEntity->Destination->y;
-//      }
-//    }
-
+    //adventureUIManager->systemClock->updateText(systemTimePrint, -1, 1);
 
     // did the protag die?
     if (protag->hp <= 0 && protag->essential)
@@ -3733,9 +2516,6 @@ int WinMain()
       // if(canSwitchOffDevMode) { init_map_writing(renderer);}
     }
 
-    // late november 2021 - projectiles are now updated after entities are - that way
-    // if a behemoth has trapped the player in a tight corridor, their hitbox will hit the player before being
-    // destroyed in the wall
     // update projectiles
     for (auto n : g_projectiles)
     {
@@ -4027,10 +2807,841 @@ int WinMain()
     }
 
     SDL_RenderPresent(renderer);
+}
+
+int WinMain()
+{
+
+  devMode = 1;
+
+  canSwitchOffDevMode = devMode;
+
+  SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+  IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG);
+  TTF_Init();
+  PHYSFS_init(NULL);
+
+  window = SDL_CreateWindow("Game",
+      SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIN_WIDTH, WIN_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALWAYS_ON_TOP);
+  renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+  //SDL_RenderSetLogicalSize(renderer, WIN_WIDTH, WIN_WIDTH * (9.0f/16.0f));
+  SDL_RenderSetLogicalSize(renderer, 16, 9);
+  SDL_SetWindowMinimumSize(window, 100, 100);
+
+  SDL_SetWindowPosition(window, 1280, 720);
+
+  Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
+  SDL_RenderSetIntegerScale(renderer, SDL_FALSE);
+ 
+  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "3");
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+
+  SDL_RenderSetScale(renderer, scalex * g_zoom_mod, scalex * g_zoom_mod);
+
+  PHYSFS_ErrorCode errnum = PHYSFS_getLastErrorCode();
+
+  if(devMode || 1) {
+    string currentDirectory = getCurrentDir();
+    PHYSFS_mount(currentDirectory.c_str(), "/", 1);
+  }
+  
+  int ret = PHYSFS_mount("resources.a", "/", 0); //to deploy, just zip up the "resources" folder in  the "shipping" directory and change the filetype from .zip to .a
+
+  for(char **i = PHYSFS_getSearchPath(); *i != NULL; i++) {
+    printf("[%s] is in the search path.\n", *i);
+  }
+
+  if(PHYSFS_exists("resources/static/entities/common/fomm.ent")) {
+    M("Archive is present"); //this has worked before! Make sure the exe is in the same directory as the archive file
+  } else {
+    M("Archive is NOT present");
+  }
+
+  // for brightness
+  // reuse texture for transition, cuz why not
+  SDL_Texture* brightness_a = loadTexture(renderer, "resources/engine/transition.qoi");
+
+  SDL_Texture* brightness_b_s = loadTexture(renderer, "resources/engine/black-diffuse.qoi");
+
+  // entities will be made here so have them set as created during loadingtime and not arbitrarily during play
+  g_loadingATM = 1;
+
+
+  // set global shadow-texture
+
+  g_shadowTexture = loadTexture(renderer, "resources/engine/shadow.qoi");
+  g_shadowTextureAlternate = loadTexture(renderer, "resources/engine/shadow-square.qoi");
+
+  // narrarator holds scripts caused by things like triggers
+  narrarator = new entity(renderer, "engine/sp-deity");
+  narrarator->tangible = 0;
+  narrarator->persistentHidden = 1;
+
+  // for transition
+  transitionSurface = loadSurface("resources/engine/transition.qoi");
+
+  transitionTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, 300, 300);
+  SDL_SetTextureBlendMode(transitionTexture, SDL_BLENDMODE_BLEND);
+
+  //void *transitionPixelReference;
+  //int transitionPitch;
+
+  transitionDelta = transitionImageHeight;
+
+  // font
+  g_font = "resources/engine/fonts/Rubik-Bold.ttf";
+  g_ttf_font = loadFont(g_font, 60);
+
+  // setup UI
+  adventureUIManager = new adventureUI(renderer);
+  // The adventureUI class has three major uses:
+  // The adventureUIManager points to an instance with the full UI for the player
+  // The narrarator->myScriptCaller points to an instance which might have some dialogue, so it needs some ui
+  // Many objects have a pointer to an instance which is used to just run scripts, and thus needs no dialgue box
+  // To init the UI which is wholey unique to the instance pointed to by the adventureUIManager, we must
+  adventureUIManager->initFullUI();
+
+  combatUIManager = new combatUI(renderer);
+  combatUIManager->hideAll();
+
+
+  if (canSwitchOffDevMode)
+  {
+    init_map_writing(renderer);
+    // done once, because textboxes aren't cleared during clear_map()
+    nodeInfoText = new textbox(renderer, "",  g_fontsize, 0, 0, WIN_WIDTH);
+    g_config = "dev";
+    nodeDebug = loadTexture(renderer, "resources/engine/walkerYellow.qoi");
+  }
+
+  // set bindings from file
+  ifstream bindfile;
+  bindfile.open("user/configs/" + g_config + ".cfg");
+  string line;
+  for (int i = 0; i < 14; i++)
+  {
+    getline(bindfile, line);
+    if(line.back() == '\r') {
+      line.pop_back();
+    }
+    bindings[i] = SDL_GetScancodeFromName(line.c_str());
+  }
+
+  // set vsync and g_fullscreen from config
+  string valuestr;
+  float value;
+
+  // get g_fullscreen
+  getline(bindfile, line);
+  valuestr = line.substr(line.find(' '), line.length());
+  value = stoi(valuestr);
+  g_fullscreen = value;
+
+  // get bg darkness
+  getline(bindfile, line);
+  valuestr = line.substr(line.find(' '), line.length());
+  value = stof(valuestr);
+  g_background_darkness = value;
+
+  // get music volume
+  getline(bindfile, line);
+  valuestr = line.substr(line.find(' '), line.length());
+  value = stof(valuestr);
+  g_music_volume = value;
+
+  // get sfx volume
+  getline(bindfile, line);
+  valuestr = line.substr(line.find(' '), line.length());
+  value = stof(valuestr);
+  g_sfx_volume = value;
+
+  // get standard textsize
+  getline(bindfile, line);
+  valuestr = line.substr(line.find(' '), line.length());
+  value = stof(valuestr);
+  g_fontsize = value;
+
+  // get mini textsize
+  getline(bindfile, line);
+  valuestr = line.substr(line.find(' '), line.length());
+  value = stof(valuestr);
+  g_minifontsize = value;
+
+  // transitionspeed
+  getline(bindfile, line);
+  valuestr = line.substr(line.find(' '), line.length());
+  value = stof(valuestr);
+  g_transitionSpeed = value;
+
+  // mapdetail
+  //  0 -   - ultra low - no lighting, crappy settings for g_tilt_resolution
+  //  1 -   -
+  //  2 -
+  getline(bindfile, line);
+  valuestr = line.substr(line.find(' '), line.length());
+  value = stof(valuestr);
+  g_graphicsquality = value;
+
+  //adjustment of brightness
+  getline(bindfile, line);
+  valuestr = line.substr(line.find(' '), line.length());
+  value = stoi(valuestr);
+  g_brightness = value;
+  g_shade = loadTexture(renderer, "resources/engine/black-diffuse.qoi");
+  SDL_SetWindowBrightness(window, g_brightness/100.0 );
+  SDL_SetTextureAlphaMod(g_shade, 0);
+
+  switch (g_graphicsquality)
+  {
+    case 0:
+      g_TiltResolution = 16;
+      g_platformResolution = 55;
+      g_unlit = 1;
+      break;
+
+    case 1:
+      g_TiltResolution = 4;
+      g_platformResolution = 11;
+      break;
+    case 2:
+      g_TiltResolution = 2;
+      g_platformResolution = 11;
+      break;
+    case 3:
+      g_TiltResolution = 1;
+      g_platformResolution = 11;
+      break;
+  }
+
+  bindfile.close();
+
+  // apply vsync
+  SDL_GL_SetSwapInterval(1);
+
+  // hide mouse
+  // REMEMBER SHIPPING JOSEPH
+
+  g_fullscreen = 0; //!!!
+  // apply fullscreen
+  if (g_fullscreen)
+  {
+    SDL_GetCurrentDisplayMode(0, &DM);
+    SDL_SetWindowSize(window, DM.w, DM.h);
+    SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
+  }
+  else
+  {
+    SDL_SetWindowFullscreen(window, 0);
+  }
+
+  // initialize box matrix z
+  for (int i = 0; i < g_layers; i++)
+  {
+    vector<box *> v = {};
+    g_boxs.push_back(v);
+  }
+
+  for (int i = 0; i < g_layers; i++)
+  {
+    vector<tri *> v = {};
+    g_triangles.push_back(v);
+  }
+
+  for (int i = 0; i < g_layers; i++)
+  {
+    vector<ramp *> v = {};
+    g_ramps.push_back(v);
+  }
+
+  for (int i = 0; i < g_numberOfInterestSets; i++)
+  {
+    vector<pointOfInterest *> v = {};
+    g_setsOfInterest.push_back(v);
+  }
+
+
+  //for water effect
+  g_wPixels = new Uint32[g_wNumPixels];
+  g_wDistort = loadSurface("resources/engine/waterRipple.qoi");
+  g_wSpec = loadTexture(renderer, "resources/engine/specular.qoi");
+  SDL_SetTextureBlendMode(g_wSpec, SDL_BLENDMODE_ADD);
+
+  // init static resources
+
+  { //init static sounds
+    //g_staticSounds.push_back(loadWav("resources/static/sounds/....wav"));
+    g_staticSounds.push_back(loadWav("resources/static/sounds/pellet.wav"));
+    g_staticSounds.push_back(loadWav("resources/static/sounds/protag-step-1.wav"));
+    g_staticSounds.push_back(loadWav("resources/static/sounds/protag-step-2.wav"));
+    g_staticSounds.push_back(loadWav("resources/static/sounds/land.wav"));
+  }
+
+  g_ui_voice = loadWav("resources/static/sounds/voice-normal.wav");
+
+
+  g_spurl_entity = new entity(renderer, "common/spurl");
+  g_spurl_entity->msPerFrame = 75;
+  g_spurl_entity->visible = 0;
+
+  g_chain_entity = new entity(renderer, "common/chain");
+  g_chain_entity->msPerFrame = 75;
+
+  if(devMode) {
+    g_dijkstraDebugRed = new ui(renderer, "resources/engine/walkerRed.qoi", 0,0,32,32, 3);
+    g_dijkstraDebugRed->persistent = 1;
+    g_dijkstraDebugRed->worldspace = 1;
+    g_dijkstraDebugBlue = new ui(renderer, "resources/engine/walkerBlue.qoi", 0,0,32,32, 3);
+    g_dijkstraDebugBlue->persistent = 1;
+    g_dijkstraDebugBlue->worldspace = 1;
+    g_dijkstraDebugYellow = new ui(renderer, "resources/engine/walkerYellow.qoi", 0,0,32,32, 3);
+    g_dijkstraDebugYellow->persistent = 1;
+    g_dijkstraDebugYellow->worldspace = 1;
+  }
+
+  //init user keyboard
+  //render each character of the alphabet to a texture
+  //TTF_Font* alphabetfont = 0;
+  //alphabetfont = TTF_OpenFont(g_font.c_str(), 60 * g_fontsize);
+  //TTF_Font* alphabetfont = loadFont(g_font, 60*g_fontsize, );
+  TTF_Font* alphabetfont = g_ttf_font;
+  SDL_Surface* textsurface = 0;
+  SDL_Texture* texttexture = 0;
+  g_alphabet_textures = &g_alphabetLower_textures;
+  for (int i = 0; i < g_alphabet.size(); i++) {
+    string letter = "";
+    letter += g_alphabet_lower[i];
+    bool special = 0;
+    if(letter == ";") {
+      //load custom enter graphic
+      textsurface = loadSurface("resources/static/ui/menu_confirm.qoi");
+      special = 1;
+    } else if (letter == "<") {
+      //load custom backspace graphic
+      textsurface = loadSurface("resources/static/ui/menu_back.qoi");
+      special = 1;
+    } else if (letter == "^") {
+      //load custom capslock graphic
+      textsurface = loadSurface("resources/static/ui/menu_upper_empty.qoi");
+      special = 1;
+    } else {
+      textsurface = TTF_RenderText_Blended_Wrapped(alphabetfont, letter.c_str(), g_textcolor, 70);
+    }
+    texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
+
+    int texW = 0;int texH = 0;
+    SDL_QueryTexture(texttexture, NULL, NULL, &texW, &texH);
+    if(!special) {
+      texW *= 1.1; //gotta boosh out those letters
+      g_alphabet_widths.push_back(texW);
+    } else {
+      g_alphabet_widths.push_back(50);
+    }
+
+    //SDL_SetTextureBlendMode(texttexture, SDL_BLENDMODE_ADD);
+    g_alphabetLower_textures.push_back(texttexture);
+    SDL_FreeSurface(textsurface);
+  }
+
+  for (int i = 0; i < g_alphabet.size(); i++) {
+    string letter = "";
+    letter += g_alphabet_upper[i];
+    bool special = 0;
+    if(letter == ";") {
+      //load custom enter graphic
+      textsurface = loadSurface("resources/static/ui/menu_confirm.qoi");
+      special = 1;
+    } else if (letter == "<") {
+      //load custom backspace graphic
+      textsurface = loadSurface("resources/static/ui/menu_back.qoi");
+      special = 1;
+    } else if (letter == "^") {
+      //load custom capslock graphic
+      textsurface = loadSurface("resources/static/ui/menu_upper.qoi");
+      special = 1;
+    } else {
+      textsurface = TTF_RenderText_Blended_Wrapped(alphabetfont, letter.c_str(), g_textcolor, 70);
+    }
+    texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
+
+    int texW = 0;int texH = 0;
+    SDL_QueryTexture(texttexture, NULL, NULL, &texW, &texH);
+
+    if(!special) {
+      texW *= 1.1; //gotta boosh out those letters
+      g_alphabet_upper_widths.push_back(texW);
+    } else {
+      g_alphabet_upper_widths.push_back(50);
+    }
+
+    //SDL_SetTextureBlendMode(texttexture, SDL_BLENDMODE_ADD);
+    g_alphabetUpper_textures.push_back(texttexture);
+    SDL_FreeSurface(textsurface);
+  }
+
+  //fancy alphabet
+  int fancyIndex = 0;
+  SDL_Color white = {255, 255, 255};
+  for(char character : g_fancyAlphabetChars) { //not a char
+    string letter = "";
+    letter += character;
+
+    // add support for special chars here
+    textsurface = TTF_RenderText_Blended_Wrapped(alphabetfont, letter.c_str(), white, 70);
+
+    texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
+
+    int texW = 0;int texH = 0;
+    SDL_QueryTexture(texttexture, NULL, NULL, &texW, &texH);
+
+    float texWidth = texW;
+    texWidth *= 0.2;
+    
+    std::pair<SDL_Texture*, float> imSecond(texttexture, texW);
+    g_fancyAlphabet.insert( {fancyIndex, imSecond} );
+    
+    g_fancyCharLookup.insert({character, fancyIndex});
+    
+    fancyIndex++;
+
+    SDL_FreeSurface(textsurface);
+  }
+
+  g_fancybox = new fancybox();
+  g_fancybox->bounds.x = 0.05;
+  g_fancybox->bounds.x = 0.7;
+  g_fancybox->show = 1;
+
+
+  //init options menu
+  g_settingsUI = new settingsUI();
+
+  g_escapeUI = new escapeUI();
+  
+  { //load static textures
+    string loadSTR = "resources/levelsequence/icons/locked.qoi";
+    g_locked_level_texture = loadTexture(renderer, loadSTR);
+  }
+
+  //load levelSequence
+  g_levelSequence = new levelSequence(g_levelSequenceName, renderer);
+
+  //for dlc/custom content, add extra levels from any file that might be there
+  char ** entries = PHYSFS_enumerateFiles("resources/levelsequence");
+  char **i;
+  for(i = entries; *i != NULL; i++) {
+    string fn(*i);
+    if(fn.substr(fn.size() - 4, 4) == ".txt"){
+      g_levelSequence->addLevels(*i);
+    }
+  }
+  PHYSFS_freeList(entries);
+
+  srand(time(NULL));
+  if (devMode)
+  {
+    // g_transitionSpeed = 10000;
+    
+    loadSave();
+     
+    string filename = g_levelSequence->levelNodes[0]->mapfilename;
+
+    protag->x = 100000;
+    protag->y = 100000;
+
+    filename = "resources/maps/crypt/g.map"; //temporary
+    g_mapdir = "crypt"; //temporary
+    
+    load_map(renderer, filename,"a");
+    vector<string> x = splitString(filename, '/');
+    g_mapdir = x[1];
+
+    g_mapdir = "crypt"; //temporary
+    
+  }
+  else
+  {
+    SDL_ShowCursor(0);
+    loadSave();
+    g_inTitleScreen = 1;
+    load_map(renderer, "resources/maps/base/start.map","a"); //lol
+    g_levelFlashing = 1;
+    clear_map(g_camera); 
+    g_levelFlashing = 0;
+    load_map(renderer, "resources/maps/base/start.map","a");
+  }
+
+  inventoryMarker = new ui(renderer, "resources/static/ui/finger_selector_angled.qoi", 0, 0, 0.1, 0.1, 2);
+  inventoryMarker->show = 0;
+  inventoryMarker->persistent = 1;
+  inventoryMarker->renderOverText = 1;
+  inventoryMarker->heightFromWidthFactor = 1;
+  inventoryMarker->height = 1;
+
+  g_UiGlideSpeedY = 0.012 * WIN_WIDTH/WIN_HEIGHT;
+
+  inventoryText = new textbox(renderer, "1", 40,  g_fontsize, 0, WIN_WIDTH * 0.2);
+  inventoryText->dropshadow = 1;
+  inventoryText->show = 0;
+  inventoryText->align = 1;
+
+  
+  g_itemsines.push_back( sin(g_elapsed_accumulator / 300) * 10 + 30);
+  g_itemsines.push_back( sin((g_elapsed_accumulator - 1400) / 300) * 10 + 30);
+  g_itemsines.push_back( sin((g_elapsed_accumulator + 925) / 300) * 10 + 30);
+  g_itemsines.push_back( sin((g_elapsed_accumulator + 500) / 300) * 10 + 30);
+  g_itemsines.push_back( sin((g_elapsed_accumulator + 600) / 300) * 10 + 30);
+  g_itemsines.push_back( sin((g_elapsed_accumulator + 630) / 300) * 10 + 30);
+  g_itemsines.push_back( sin((g_elapsed_accumulator + 970) / 300) * 10 + 30);
+  g_itemsines.push_back( sin((g_elapsed_accumulator + 1020) / 300) * 10 + 30);
+ 
+
+  // This stuff is for the FoW mechanic
+  // engine/resolution.qoi has resolution 1920 x 1200
+  SDL_Surface *SurfaceA = loadSurface("resources/engine/resolution.qoi");
+
+  TextureA = SDL_CreateTextureFromSurface(renderer, SurfaceA);
+  TextureD = SDL_CreateTextureFromSurface(renderer, SurfaceA);
+
+  SDL_FreeSurface(SurfaceA);
+
+  blackbarTexture = loadTexture(renderer, "resources/engine/black-diffuse.qoi");
+
+
+  result = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 500, 500);
+  result_c = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 500, 500);
+
+  SDL_SetTextureBlendMode(result, SDL_BLENDMODE_MOD);
+  SDL_SetTextureBlendMode(result_c, SDL_BLENDMODE_MOD);
+
+  SDL_SetTextureBlendMode(TextureA, SDL_BLENDMODE_MOD);
+  SDL_SetTextureBlendMode(TextureA, SDL_BLENDMODE_MOD);
+  SDL_SetTextureBlendMode(TextureD, SDL_BLENDMODE_MOD);
+
+  // SDL_SetTextureBlendMode(TextureB, SDL_BLENDMODE_NONE);
+
+  // init fogslates
+  
+  //strange displacement in debugger vs standalone
+  //in debugger g_fc[20][19] = g_fc[20][20] = -1414812757
+  //but standalone = 0
+  //?
+  for(int i = 0; i < g_fogwidth; i++) {
+    for(int j = 0; j < g_fogheight; j++) {
+      g_fc[i][j] = 0;
+      g_sc[i][j] = 0;
+      g_fogcookies[i][j] = 0;
+    }
+  }
+
+
+  entity *s = nullptr;
+//  s->dynamic = 0;
+//  s->width = 0;
+
+  for (size_t i = 0; i < 19; i++)
+  {
+    s = new entity(renderer, "engine/sp-fogslate");
+    g_fogslates.push_back(s);
+    s->height = 56;
+    s->width = g_fogwidth * 64 + 50;
+    s->curheight = s->height - 1;
+    s->curwidth = s->width;
+    s->xframes = 1;
+    s->yframes = 19;
+    s->animation = i;
+    // s->persistentGeneral = 1;
+    s->frameheight = 26;
+    s->framewidth = 500;
+    s->shadow->width = 0;
+    s->dynamic = 0;
+    s->sortingOffset = 130; // -35 then 130
+    s->isFogSlate = 1;
+  }
+
+  for (size_t i = 0; i < 19; i++)
+  {
+    s = new entity(renderer, "engine/sp-fogslate");
+    g_fogslatesA.push_back(s);
+    s->z = 64;
+    s->height = 56;
+    s->width = g_fogwidth * 64 + 50;
+    s->curheight = s->height - 1;
+    s->curwidth = s->width;
+    s->xframes = 1;
+    s->yframes = 19;
+    s->animation = i;
+    // s->persistentGeneral = 1;
+    s->frameheight = 26;
+    s->framewidth = 500;
+    s->shadow->width = 0;
+    s->dynamic = 0;
+    s->sortingOffset = 165; // -65 55
+    //s->width = 0;
+    s->isFogSlate = 1;
+  }
+
+  for (size_t i = 0; i < 19; i++)
+  {
+    s = new entity(renderer, "engine/sp-fogslate");
+    g_fogslatesB.push_back(s);
+    s->height = 56;
+    s->width = g_fogwidth * 64 + 50;
+    s->curheight = s->height - 1;
+    s->curwidth = s->width;
+    s->xframes = 1;
+    s->yframes = 19;
+    s->animation = i;
+    // s->persistentGeneral = 1;
+    s->frameheight = 26;
+    s->framewidth = 500;
+    s->shadow->width = 0;
+    s->dynamic = 0;
+    s->sortingOffset = 45000; // !!! might need to be bigger
+    //s->width = 0;
+    s->isFogSlate = 1;
+  }
+
+  SDL_DestroyTexture(s->texture);
+
+  for (auto x : g_fogslates)
+  {
+    x->texture = TextureC;
+  }
+
+  for (auto x : g_fogslatesA)
+  {
+    x->texture = TextureC;
+  }
+
+  for (auto x : g_fogslatesB)
+  {
+    x->texture = TextureC;
+  }
+
+
+  //this is used when spawning in entities
+  smokeEffect = new effectIndex("puff", renderer);
+  smokeEffect->persistent = 1;
+
+  littleSmokeEffect = new effectIndex("steam", renderer);
+  littleSmokeEffect->persistent = 1;
+
+  blackSmokeEffect = new effectIndex("blackpowder", renderer);
+  blackSmokeEffect->persistent = 1;
+
+  sparksEffect = new effectIndex("sparks", renderer);
+  sparksEffect->persistent = 1;
+
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+  SDL_RenderPresent(renderer);
+  SDL_GL_SetSwapInterval(1);
+
+  // textures for adding operation
+  canvas = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 500, 500);
+  //canvas_fc = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 500, 500); seems to be unused
+
+  light = loadTexture(renderer, "resources/engine/light.qoi");
+
+  lighta = loadTexture(renderer, "resources/engine/lighta.qoi");
+
+  lightb = loadTexture(renderer, "resources/engine/lightb.qoi");
+
+  lightc = loadTexture(renderer, "resources/engine/lightc.qoi");
+
+  lightd = loadTexture(renderer, "resources/engine/lightd.qoi");
+
+  lightaro = loadTexture(renderer, "resources/engine/lightaro.qoi");
+
+  lightbro = loadTexture(renderer, "resources/engine/lightbro.qoi");
+
+  lightcro = loadTexture(renderer, "resources/engine/lightcro.qoi");
+
+  lightdro = loadTexture(renderer, "resources/engine/lightdro.qoi");
+
+  lightari = loadTexture(renderer, "resources/engine/lightari.qoi");
+
+  lightbri = loadTexture(renderer, "resources/engine/lightbri.qoi");
+
+  lightcri = loadTexture(renderer, "resources/engine/lightcri.qoi");
+
+  lightdri = loadTexture(renderer, "resources/engine/lightdri.qoi");
+
+  g_loadingATM = 0;
+
+  while (!quit)
+  {
+    // some event handling
+    while (SDL_PollEvent(&event))
+    {
+      switch (event.type)
+      {
+        case SDL_WINDOWEVENT:
+          switch (event.window.event)
+          {
+            case SDL_WINDOWEVENT_RESIZED:
+              // we need to reload some (all?) textures
+              for (auto x : g_mapObjects)
+              {
+                if (x->mask_fileaddress != "&")
+                {
+                  x->reloadTexture();
+                }
+              }
+
+              // reassign textures for asset-sharers
+              for (auto x : g_mapObjects)
+              {
+                if (x->mask_fileaddress != "&")
+                {
+                  x->reassignTexture();
+                }
+              }
+
+              // the same must be done for masked tiles
+              for (auto t : g_tiles)
+              {
+                if (t->mask_fileaddress != "&")
+                {
+                  t->reloadTexture();
+                }
+              }
+
+              // reassign textures for any asset-sharers
+              for (auto x : g_tiles)
+              {
+                x->reassignTexture();
+              }
+              break;
+          }
+          break;
+        case SDL_KEYDOWN:
+          switch (event.key.keysym.sym)
+          {
+            case SDLK_TAB:
+              g_holdingCTRL = 1;
+              // protag->getItem(a, 1);
+              break;
+            case SDLK_LALT:
+              g_holdingTAB = 1;
+          }
+          if(g_swallowAKey) {
+            M("We should swallow this key");
+            g_swallowedKey = event.key.keysym.scancode;
+            g_swallowAKey = 0;
+            g_swallowedAKeyThisFrame = 1;
+          } else {
+            g_swallowedAKeyThisFrame = 0;
+          }
+
+          break;
+        case SDL_KEYUP:
+          switch (event.key.keysym.sym)
+          {
+            case SDLK_TAB:
+              g_holdingCTRL = 0;
+              break;
+            case SDLK_LALT:
+              g_holdingTAB = 0;
+              break;
+          }
+          break;
+        case SDL_MOUSEWHEEL:
+          if (g_holdingCTRL)
+          {
+            if (event.wheel.y > 0)
+            {
+              wallstart -= 64;
+            }
+            else if (event.wheel.y < 0)
+            {
+              wallstart += 64;
+            }
+            if (wallstart < 0)
+            {
+              wallstart = 0;
+            }
+            else
+            {
+              if (wallstart > 64 * g_layers)
+              {
+                wallstart = 64 * g_layers;
+              }
+              if (wallstart > wallheight - 64)
+              {
+                wallstart = wallheight - 64;
+              }
+            }
+          }
+          else
+          {
+            if (event.wheel.y > 0)
+            {
+              wallheight -= 64;
+            }
+            else if (event.wheel.y < 0)
+            {
+              wallheight += 64;
+            }
+            if (wallheight < wallstart + 64)
+            {
+              wallheight = wallstart + 64;
+            }
+            else
+            {
+              if (wallheight > 64 * g_layers)
+              {
+                wallheight = 64 * g_layers;
+              }
+            }
+            break;
+          }
+        case SDL_MOUSEBUTTONDOWN:
+          if (event.button.button == SDL_BUTTON_LEFT)
+          {
+            devinput[3] = 1;
+          }
+          if (event.button.button == SDL_BUTTON_MIDDLE)
+          {
+            devinput[10] = 1;
+          }
+          if (event.button.button == SDL_BUTTON_RIGHT)
+          {
+            devinput[4] = 1;
+          }
+          break;
+
+        case SDL_QUIT:
+          quit = 1;
+          break;
+      }
+    }
+
+    ticks = SDL_GetTicks();
+    elapsed = ticks - lastticks;
+    lastticks = ticks;
+
+    // lock time
+    elapsed = 16.6666666667;
+
+    switch(g_gamemode) {
+      case gamemode::EXPLORATION: 
+      {
+        ExplorationLoop();
+        break;
+      }
+      case gamemode::COMBAT:
+      { 
+        CombatLoop();
+        break;
+      }
+
+    }
+
   }
 
   clear_map(g_camera);
   delete adventureUIManager;
+  delete combatUIManager;
   close_map_writing();
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
@@ -4317,7 +3928,7 @@ int interact(float elapsed, entity *protag)
   return 0;
 }
 
-void getInput(float &elapsed)
+void getExplorationInput(float &elapsed)
 {
   for (int i = 0; i < 16; i++)
   {
@@ -4440,40 +4051,6 @@ void getInput(float &elapsed)
     g_cameraAimingOffsetXTarget = 0;
     g_cameraAimingOffsetYTarget = 0;
 
-    if (keystate[bindings[4]] && !inPauseMenu && g_cur_diagonalHelpFrames > g_diagonalHelpFrames)
-    {
-      protag->shoot_up();
-      g_cameraAimingOffsetYTarget = 1;
-    }
-
-    if (keystate[bindings[5]] && !inPauseMenu && g_cur_diagonalHelpFrames > g_diagonalHelpFrames)
-    {
-      protag->shoot_down();
-      g_cameraAimingOffsetYTarget = -1;
-    }
-
-    if (keystate[bindings[6]] && !inPauseMenu && g_cur_diagonalHelpFrames > g_diagonalHelpFrames)
-    {
-      protag->shoot_left();
-      g_cameraAimingOffsetXTarget = -1;
-    }
-
-    if (keystate[bindings[7]] && !inPauseMenu && g_cur_diagonalHelpFrames > g_diagonalHelpFrames)
-    {
-      protag->shoot_right();
-      g_cameraAimingOffsetXTarget = 1;
-    }
-
-    // if we aren't pressing any shooting keys, reset g_cur_diagonalhelpframes
-    if (!(keystate[bindings[4]] || keystate[bindings[5]] || keystate[bindings[6]] || keystate[bindings[7]]))
-    {
-      g_cur_diagonalHelpFrames = 0;
-    }
-    else
-    {
-      g_cur_diagonalHelpFrames++;
-    }
-
     // normalize g_cameraAimingOffsetTargetVector
     float len = pow(pow(g_cameraAimingOffsetXTarget, 2) + pow(g_cameraAimingOffsetYTarget, 2), 0.5);
     if (!isnan(len) && len != 0)
@@ -4506,7 +4083,7 @@ void getInput(float &elapsed)
       }
       else
       {
-        if(protag_can_move && !g_selectingUsable) {
+        if(protag_can_move) {
           protag->move_up();
         }
       }
@@ -4535,7 +4112,7 @@ void getInput(float &elapsed)
       }
       else
       {
-        if(protag_can_move && !g_selectingUsable) {
+        if(protag_can_move) {
           protag->move_down();
         }
       }
@@ -4564,38 +4141,9 @@ void getInput(float &elapsed)
       }
       else
       {
-        if(protag_can_move && !g_selectingUsable) {
+        if(protag_can_move) {
           protag->move_left();
-        } else if(protag_can_move && g_selectingUsable && SoldUILeft <= 0 && !inPauseMenu && g_spinning_duration <= 0 && g_usableWaitToCycleTime < 0) {
-          //select prev backpack item
-          g_backpackIndex --;
-          g_hotbarCycleDirection = 1;
-          if(g_backpackIndex < 0) { g_backpackIndex = g_backpack.size()-1;}
-          SoldUILeft = (oldUILeft) ? g_inputDelayRepeatFrames : g_inputDelayFrames;
-
-          adventureUIManager->hotbarPositions[4].first = 0.35 + g_backpackHorizontalOffset;
-          adventureUIManager->hotbarPositions[2].first = 0.55 + g_backpackHorizontalOffset;
-
-          //move icons
-          int i = 0; //shift previous
-          for(auto x : adventureUIManager->hotbarTransitionIcons) {
-            x->targetx = adventureUIManager->hotbarPositions[i].first;
-            x->targety = adventureUIManager->hotbarPositions[i].second;
-            i++;
-          }
-          i = 1;
-          for(auto x : adventureUIManager->hotbarTransitionIcons) {
-            x->x = adventureUIManager->hotbarPositions[i].first;
-            x->y = adventureUIManager->hotbarPositions[i].second;
-            if(g_backpack.size() > 0) {
-              int index = g_backpackIndex - i + 4 + g_backpack.size();
-              index = index % g_backpack.size();
-              x->texture = g_backpack.at(index)->texture;
-            }
-            i++;
-          }
-          adventureUIManager->shiftingMs = adventureUIManager->maxShiftingMs;
-        }
+        } 
       }
       oldUILeft = 1;
     }
@@ -4625,37 +4173,8 @@ void getInput(float &elapsed)
 
       else
       {
-        if(protag_can_move && !g_selectingUsable) {
+        if(protag_can_move) {
           protag->move_right();
-        } else if(protag_can_move && g_selectingUsable && SoldUIRight <= 0 && !inPauseMenu && g_spinning_duration <= 0 && g_usableWaitToCycleTime < 0) {
-          //select next backpack item
-          g_backpackIndex ++;
-          g_hotbarCycleDirection = 0;
-          if(g_backpackIndex > g_backpack.size() - 1) { g_backpackIndex = 0;}
-          SoldUIRight = (oldUIRight) ? g_inputDelayRepeatFrames : g_inputDelayFrames;
-
-          adventureUIManager->hotbarPositions[4].first = 0.35 + g_backpackHorizontalOffset;
-          adventureUIManager->hotbarPositions[2].first = 0.55 + g_backpackHorizontalOffset;
-
-          //move icons
-          int i = 2; //shift next
-          for(auto x : adventureUIManager->hotbarTransitionIcons) {
-            x->targetx = adventureUIManager->hotbarPositions[i].first;
-            x->targety = adventureUIManager->hotbarPositions[i].second;
-            i++;
-          }
-          i = 1;
-          for(auto x : adventureUIManager->hotbarTransitionIcons) {
-            x->x = adventureUIManager->hotbarPositions[i].first;
-            x->y = adventureUIManager->hotbarPositions[i].second;
-            if(g_backpack.size() > 0) {
-              int index = g_backpackIndex - i + 2 + g_backpack.size();
-              index = index % g_backpack.size();
-              x->texture = g_backpack.at(index)->texture;
-            }
-            i++;
-          }
-          adventureUIManager->shiftingMs = adventureUIManager->maxShiftingMs;
         }
       }
       oldUIRight = 1;
@@ -4666,11 +4185,6 @@ void getInput(float &elapsed)
       SoldUIRight = 0;
     }
     SoldUIRight--;
-
-    // //fix inventory input
-    // if(inventorySelection < 0) {
-    // 	inventorySelection = 0;
-    // }
 
     // check if the stuff is onscreen
     if (inventorySelection >= (g_inventoryRows * itemsPerRow) + (inventoryScroll * itemsPerRow))
@@ -4695,56 +4209,6 @@ void getInput(float &elapsed)
     if (inventorySelection < 0)
     {
       inventorySelection = 0;
-    }
-   
-    if(keystate[bindings[12]] && protag_can_move && !inPauseMenu && g_backpack.size() > 0) {
-      //for short presses, advance inventory left rather than widening the hotbar
-      g_currentHotbarSelectMs += elapsed;
-      if(g_currentHotbarSelectMs >= g_hotbarLongSelectMs) {
-        if(g_selectingUsable == 0) {
-          g_usableWaitToCycleTime = g_maxUsableWaitToCycleTime;
-        }
-        g_selectingUsable = 1;
-      }
-    } else {
-      if(g_currentHotbarSelectMs > 0 && g_selectingUsable == 0 && !inPauseMenu && g_spinning_duration <= 0) {
-        //select next backpack item
-        g_backpackIndex ++;
-        if(g_backpackIndex > g_backpack.size() - 1) { g_backpackIndex = 0;}
-      }
-      g_selectingUsable = 0;
-      g_currentHotbarSelectMs = 0;
-
-      //end animation quickly
-//      adventureUIManager->hotbarTransitionIcons[2]->x = adventureUIManager->hotbarPositions[3].first;
-//      adventureUIManager->hotbarTransitionIcons[2]->y = adventureUIManager->hotbarPositions[3].second;
-      adventureUIManager->hotbarTransitionIcons[2]->targetx = adventureUIManager->hotbarPositions[3].first;
-      adventureUIManager->hotbarTransitionIcons[2]->targety = adventureUIManager->hotbarPositions[3].second;
-     
-      //this moves it to where it should be (other side), and then it glides to the middle
-      //since the hotbar was moved to the right side of the screen it was adjusted 
-//      if(adventureUIManager->shiftingMs < 150) {
-//        if(g_hotbarCycleDirection) {
-//          adventureUIManager->hotbarTransitionIcons[2]->x = adventureUIManager->hotbarTransitionIcons[3]->x;
-//          adventureUIManager->hotbarTransitionIcons[2]->y = adventureUIManager->hotbarTransitionIcons[3]->y;
-//        } else {
-//          adventureUIManager->hotbarTransitionIcons[2]->x = adventureUIManager->hotbarTransitionIcons[1]->x;
-//          adventureUIManager->hotbarTransitionIcons[2]->y = adventureUIManager->hotbarTransitionIcons[1]->y;
-//        }
-//      }
-      if(adventureUIManager->shiftingMs < 150) {
-        if(g_hotbarCycleDirection) {
-          adventureUIManager->hotbarTransitionIcons[2]->x = adventureUIManager->smallBarStableX;
-          //adventureUIManager->hotbarTransitionIcons[2]->y = adventureUIManager->hotbarTransitionIcons[3]->y;
-        } else {
-          adventureUIManager->hotbarTransitionIcons[2]->x = adventureUIManager->smallBarStableX;
-          //adventureUIManager->hotbarTransitionIcons[2]->y = adventureUIManager->hotbarTransitionIcons[1]->y;
-        }
-      }
-
-      if(g_backpack.size() > 0) {
-        adventureUIManager->hotbarTransitionIcons[2]->texture = g_backpack.at(g_backpackIndex)->texture;
-      }
     }
 
   }
@@ -5285,28 +4749,16 @@ void getInput(float &elapsed)
     input[13] = 0;
   }
 
-  bool protag_can_use_items = !(protag->hisStatusComponent.disabled.statuses.size() > 0);
-  adventureUIManager->hotbarMutedXIcon->show = 0;
-  g_spurl_entity->visible = 0;
-  if(!protag_can_use_items) {
-    input[13] = 0; //bad!
-    if(adventureUIManager->showHud) {
-      adventureUIManager->hotbarMutedXIcon->show = 1;
-    }
-    g_spurl_entity->visible = protag->visible && protag->tangible;
-  } 
 
   //spinning/using item
-  if( g_backpack.size() > 0 && protag_can_move && !inPauseMenu) {
-    if(g_backpack.at(g_backpackIndex)->specialAction == 1 ) { //do a spin
+  if(protag_can_move && !inPauseMenu) {
+    if(1) { //do a spin
 
       if ( ((input[13] && !oldinput[13]) || (input[13] && storedSpin) ) && protag_can_move && (protag->grounded || g_currentSpinJumpHelpMs > 0 )
               && (g_spin_cooldown <= 0 && g_spinning_duration <= 0 + g_doubleSpinHelpMs && g_afterspin_duration <= 0 )
     
          )
       {
-        g_backpack.at(g_backpackIndex)->cooldownMs = g_backpack.at(g_backpackIndex)->maxCooldownMs;
-        protagMakesNoise();
         storedSpin = 0;
         //propel the protag in the direction of their velocity
         //at high speed, removing control from them
@@ -5333,110 +4785,14 @@ void getInput(float &elapsed)
     
       g_spin_entity->x = protag->x;
       g_spin_entity->y = protag->y;
-      g_spin_entity->z = protag->z;
-    
-  
-    } else if ( (input[13] && !oldinput[13]) && g_backpack.at(g_backpackIndex)->specialAction == 2 && g_backpack.at(g_backpackIndex)->cooldownMs <= 0) { //open inventory
-      
-      if (inPauseMenu)
-      {
-
-        //if this is the inventory screen, close it
-        if(g_inventoryUiIsLevelSelect == 0) {
-          //playSound(-1, g_menu_close_sound, 0);
-          inPauseMenu = 0;
-          elapsed = 16;
-          adventureUIManager->hideInventoryUI();
-        }
-
-      }
-      else
-      {
-        protagMakesNoise();
-        usable* thisUsable = g_backpack.at(g_backpackIndex); 
-        thisUsable->cooldownMs = thisUsable->maxCooldownMs;
-        //playSound(-1, g_menu_open_sound, 0);
-        g_inventoryUiIsLevelSelect = 0;
-        g_inventoryUiIsLoadout = 0;
-        g_inventoryUiIsKeyboard = 0;
-        inPauseMenu = 1;
-        g_firstFrameOfPauseMenu = 1;
-        adventureUIManager->escText->updateText("", -1, 0.9);
-        inventorySelection = 0;
-        adventureUIManager->positionInventory();
-        adventureUIManager->showInventoryUI();
-      }
-
-    } else if (input[13] && !oldinput[13] && g_backpack.at(g_backpackIndex)->cooldownMs <= 0) { //there is an item to use, and it doesn't make the protag spin
-      
-      //is the player too hungry to use an item?
-      if(g_foodpoints < g_starvingFoodpoints) {
-        //make the stomach shake
-        adventureUIManager->stomachShakeIntervalMs = 0;
-        adventureUIManager->stomachShakeDurationMs = 0;
-
-      } else {
-        protagMakesNoise();
-        
-        usable* thisUsable = g_backpack.at(g_backpackIndex); 
-        thisUsable->cooldownMs = thisUsable->maxCooldownMs;
-
-        usableItemCode(thisUsable);
-
-      }
+      g_spin_entity->z = protag->z; 
 
     }
-  } else if (inPauseMenu && ( (input[13] && !oldinput[13]) || (input[8] && !oldinput[8])) ) {
-    //this button should take the player out of the inventory for safety
-    //incase they somehow switch off 
-    
-    oldinput[8] = 1;
-    oldinput[13] = 1;
-
-    //if that was the chest/loadout screen, update g_backpack
-    if(g_inventoryUiIsLoadout) {
-      
-      for(auto x : adventureUIManager->hotbarTransitionIcons) {
-        x->texture = adventureUIManager->noIconTexture;
-      }
-      
-      for(int i = 0; i < g_backpack.size(); i++) {
-        delete g_backpack[i];
-      }
-      g_backpack.clear();
-      g_backpackIndex = 0;
-  
-
-      for(int x : g_loadout) {
-        usable* newUsable = new usable(g_chest[x]->internalName);
-        g_backpack.push_back(newUsable);
-        usableItemOnLoad(newUsable);
-      }
-    }
-    
-    //if this is the inventory screen, close it
-    if(g_inventoryUiIsLevelSelect == 0) {
-      //playSound(-1, g_menu_close_sound, 0);
-      inPauseMenu = 0;
-      elapsed = 16;
-      adventureUIManager->hideInventoryUI();
-    }
-  }
-
-  if(!protag_is_talking) {
-    for(int i = 0; i < g_backpack.size(); i++) { g_backpack.at(i)->cooldownMs -= elapsed/2;}
-    if(g_backpack.size() > 0) { g_backpack.at(g_backpackIndex)->cooldownMs -= elapsed/2; } //item selected cools down faster 
-                                                }
+  } 
 
   g_spin_cooldown -= elapsed;
   g_spinning_duration -= elapsed;
   g_afterspin_duration -= elapsed;
-
-  // mapeditor cancel button
-//  if (keystate[SDL_SCANCODE_X])
-//  {
-//    devinput[4] = 1;
-//  }
 
   int markeryvel = 0;
   // mapeditor cursor vertical movement for keyboards
@@ -5592,22 +4948,6 @@ void getInput(float &elapsed)
 
         }
 
-      } else if(g_inventoryUiIsLoadout) {
-        //toggle item equipped
-        bool highlighted = 0;
-        for(int i = 0; i < g_loadout.size(); i++) {
-          if(inventorySelection == g_loadout[i]) {
-            g_loadout.erase(g_loadout.begin() + i);
-            highlighted = 1;
-            break;
-          }
-        }
-        if(!highlighted) {
-          if(g_loadout.size() < g_maxLoadoutSize) {
-            g_loadout.push_back(inventorySelection);
-          }
-        }
-        
       } else {
       // select item in pausemenu
       // only if we arent running a script
@@ -5641,10 +4981,6 @@ void getInput(float &elapsed)
 
         
         int numFloors = g_levelSequence->levelNodes[inventorySelection]->dungeonFloors;
-
-        adventureUIManager->showScoreUI();
-        string scorePrint = "1/" + to_string(numFloors);
-        adventureUIManager->scoreText->updateText(scorePrint, 34, 34);
 
         g_dungeonDarkness = g_levelSequence->levelNodes[inventorySelection]->darkness;
 
@@ -6332,8 +5668,6 @@ void dungeonFlash() {
     }
     g_dungeonBehemoths.clear();
 
-    adventureUIManager->hideScoreUI();
-
     //this dungeon is finished, play the beaten script to probably unlock a level, save the game, and open
     //the menu select, but it might be to initiate a credits sequence or play a cutscene or something cool
     string l = "resources/maps/" + g_mapdir + "/beaten.txt";
@@ -6366,9 +5700,6 @@ void dungeonFlash() {
 
   } else {
 
-    adventureUIManager->showScoreUI();
-    string scorePrint = to_string(g_dungeonIndex+2) + "/" + to_string(g_dungeon.size());
-    adventureUIManager->scoreText->updateText(scorePrint, 34, 34);
 
     int numberOfActiveBehemoths = 0;
 

@@ -20,6 +20,10 @@ void specialObjectsInteract(entity* a);
 
 void specialObjectsOncePerFrame(float elapsed);
 
+void usableItemOnLoad(usable* a);
+
+void usableItemOnUnload(usable* a);
+
 void usableItemCode(usable* a);
 
 float exponentialCurve(int max, int exponent);

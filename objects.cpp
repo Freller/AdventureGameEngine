@@ -23,6 +23,7 @@
 #include "map_editor.h"
 #include "specialobjects.h"
 #include "utils.h"
+#include "combat.h"
 
 #include <utility>
 
@@ -7056,7 +7057,6 @@ usable::usable(string fname) {
 
   texture = loadTexture(renderer, loadstr);
 
-
 }
 
 
@@ -7081,7 +7081,7 @@ int loadSave() {
   string value = "";
   //load save fields
   while(getline(file, line)) {
-    if(line == "&") { break;}
+    if(line[0] == '&') { break;}
     field = line.substr(0, line.find(' '));
     value = line.substr(line.find(" "), line.length()-1);
 
@@ -7096,7 +7096,7 @@ int loadSave() {
 
   //load saved strings
   while(getline(file, line)) {
-    if(line == "&") { break;}
+    if(line[0] == '&') { break;}
     field = line.substr(0, line.find(' '));
     value = line.substr(line.find(" ")+1, line.length()-1);
 
@@ -7120,10 +7120,15 @@ int loadSave() {
   party.clear();
   delete protag;
 
+  for(int i = 0; i < g_partyCombatants.size(); i++) {
+    delete g_partyCombatants[i];
+  }
+  g_partyCombatants.clear();
+
   bool setMainProtag = 0;
   //load party
   while(getline(file, line)) {
-    if(line == "&") {break;}
+    if(line[0] == '&') {break;}
 
     auto tokens = splitString(line, ' ');
     string name = tokens[0];
@@ -7136,6 +7141,16 @@ int loadSave() {
     party.push_back(a);
     a->tangible = 0;
     a->inParty = 1;
+
+    combatant* b = new combatant(name, level);
+    b->maxHealth = b->baseHealth + (b->healthGain * b->level);
+    b->health = b->maxHealth;
+    g_partyCombatants.push_back(b);
+//    b = new combatant(name, level);
+//    b->maxHealth = b->baseHealth + (b->healthGain * b->level);
+//    b->health = b->maxHealth;
+//    g_partyCombatants.push_back(b);
+
     if(a->essential) {
       mainProtag = a;
       setMainProtag = 1;
@@ -7143,12 +7158,12 @@ int loadSave() {
     
   }
 
-  party[0]->tangible = 1;
   if(setMainProtag) {
     protag = mainProtag;
+    protag->tangible = 1;
   } else {
     //fick
-    //E("No essential entity found in save");
+    M("No essential entity found in save");
     protag = party[0];
     mainProtag = protag;
   }
@@ -7184,7 +7199,7 @@ int loadSave() {
 
   //load inventory
   while(getline(file, line)) {
-    if(line == "&") { break;}
+    if(line[0] == '&') { break;}
 
     field = line.substr(0, line.find(' '));
     value = line.substr(line.find(" "), line.length()-1);
@@ -7202,44 +7217,13 @@ int loadSave() {
     g_levelSequence->levelNodes[i]->locked = 1;
   }
   while(getline(file, line)) {
-    if(line == "&") { break;}
+    if(line[0] == '&') { break;}
     for(int i = 0; i < g_levelSequence->levelNodes.size(); i++) {
       string lowerName = g_levelSequence->levelNodes[i]->name;
       std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),  [](unsigned char c) { if(c == ' ') {int e = '-'; return e;} else {return std::tolower(c);}  } );
       if (lowerName == line) {
         g_levelSequence->levelNodes[i]->locked = 0;
       }
-    }
-
-  }
-
-  //delete all usables
-  int size = g_backpack.size();
-  for(int i = 0; i < size; i++) {
-    delete g_chest[i];
-  }
-  g_chest.clear();
-
-  adventureUIManager->hideBackpackUI();
-  adventureUIManager->resetBackpackUITextures();
-    
-  g_backpackIndex = 0; //otherwise we might segfault
-
-  //load protag's usables
-  while(getline(file, line)) {
-    if(line == "&") { break;}
-    int good = 1;
-    for(auto x: g_backpack) {
-      if(x->internalName == line) {
-        good = 0;
-        break;
-      }
-    }
-
-    if(good == 1) {
-      usable* newUsable = new usable(line);
-      g_chest.push_back(newUsable);
-      adventureUIManager->showBackpackUI();
     }
 
   }
@@ -7322,14 +7306,6 @@ int writeSave() {
 
   file << "&" << endl; //token to stop writing unlocked levels
   
-  //write protag's usables
-  for(auto x : g_chest) {
-    file << x->internalName << endl;
-  }
-  
-  file << "&" << endl; //token to stop writing usables
-
-
   file.close();
   return 0;
 }
@@ -8262,7 +8238,6 @@ void clear_map(camera& cameraToReset) {
   g_ai.clear();
   g_musicalEntities.clear();
   g_boardableEntities.clear();
-  g_objective = 0;
   g_familiars.clear();
   g_ex_familiars.clear();
   g_lt_collisions.clear();
@@ -8314,8 +8289,6 @@ void clear_map(camera& cameraToReset) {
     SDL_SetRenderTarget(renderer, frame);
 
     //to stop the clock and the goal text from rendering
-    adventureUIManager->scoreText->show = 0;
-    adventureUIManager->systemClock->show = 0;
 
     //render current frame to texture -- this is gonna get weird
     {
@@ -8477,15 +8450,15 @@ void clear_map(camera& cameraToReset) {
 
 
       //ui
-      // if(!inPauseMenu && g_showHUD) {
-      // 	// !!! segfaults on mapload sometimes
-      // 	adventureUIManager->healthText->updateText( to_string(int(protag->hp)) + '/' + to_string(int(protag->maxhp)), WIN_WIDTH * g_minifontsize, 0.9);
-      // 	adventureUIManager->healthText->show = 1;
+      if(!inPauseMenu && g_showHUD) {
+      	// !!! segfaults on mapload sometimes
+      	adventureUIManager->healthText->updateText( to_string(int(protag->hp)) + '/' + to_string(int(protag->maxhp)), WIN_WIDTH * g_minifontsize, 0.9);
+      	adventureUIManager->healthText->show = 1;
 
-      // } else {
-      // 	adventureUIManager->healthText->show = 0;
+      } else {
+      	adventureUIManager->healthText->show = 0;
 
-      // }
+      }
 
       // //move the healthbar properly to the protagonist
       // rect obj; // = {( , (((protag->y - ((protag->height))) - protag->z * XtoZ) - g_camera.y) * g_camera.zoom, (protag->width * g_camera.zoom), (protag->height * g_camera.zoom))};
@@ -8750,8 +8723,6 @@ void clear_map(camera& cameraToReset) {
     }
 
     //to stop the clock and the goal text from rendering
-    adventureUIManager->scoreText->show = 1;
-    adventureUIManager->systemClock->show = 1;
 
     SDL_SetRenderTarget(renderer, NULL);
     while (!cont) {
@@ -9284,30 +9255,6 @@ void debugUI() {
   }
 }
 
-void adventureUI::hideBackpackUI() {
-  t1->show = 0;
-  t2->show = 0;
-  t3->show = 0;
-  t4->show = 0;
-  t5->show = 0;
-}
-
-void adventureUI::showBackpackUI() {
-  t1->show = 1;
-  t2->show = 1;
-  t3->show = 1;
-  t4->show = 1;
-  t5->show = 1;
-}
-
-void adventureUI::resetBackpackUITextures() {
-  t1->texture = noIconTexture;
-  t2->texture = noIconTexture;
-  t3->texture = noIconTexture;
-  t4->texture = noIconTexture;
-  t5->texture = noIconTexture;
-}
-
 void adventureUI::showTalkingUI()
 {
   // M("showTalkingUI()");
@@ -9333,15 +9280,6 @@ void adventureUI::hideTalkingUI()
   talkingText->updateText("", -1, 34, defaultTextcolor);
   responseText->show = 0;
   responseText->updateText("", -1, 34, defaultTextcolor);
-}
-
-void adventureUI::showScoreUI() {
-  scoreText->show = 1;
-}
-
-void adventureUI::hideScoreUI() {
-  scoreText->show = 0;
-  //scoreText->updateText("", 34, 34);
 }
 
 void adventureUI::showInventoryUI()
@@ -9411,30 +9349,31 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     responseText->worldspace = 1;
     responseText->align = 2; // center-align
     responseText->dropshadow = 1;
+
                              
 
-    scoreText = new textbox(renderer, "Yes", 1700 * g_fontsize, 0, 0, 0.9);
-    scoreText->boxWidth = 0;
-    scoreText->width = 0.95;
-    scoreText->boxHeight = 0;
-    scoreText->boxX = 0.2;
-    scoreText->boxY = 1-0.1;
-    scoreText->worldspace = 1;
-    scoreText->align = 1; // right
-    scoreText->dropshadow = 1;
-    scoreText->layer0 = 1;
-    scoreText->show = 0;
+//    scoreText = new textbox(renderer, "Yes", 1700 * g_fontsize, 0, 0, 0.9);
+//    scoreText->boxWidth = 0;
+//    scoreText->width = 0.95;
+//    scoreText->boxHeight = 0;
+//    scoreText->boxX = 0.2;
+//    scoreText->boxY = 1-0.1;
+//    scoreText->worldspace = 1;
+//    scoreText->align = 1; // right
+//    scoreText->dropshadow = 1;
+//    scoreText->layer0 = 1;
+//    scoreText->show = 0;
 
-    systemClock = new textbox(renderer, "Yes", 1700 * g_fontsize, 0, 0, 0.9);
-    systemClock->boxWidth = 1;
-    systemClock->width = 0.95;
-    systemClock->boxHeight = 0;
-    systemClock->boxX = 1 -0.2;
-    systemClock->boxY = 1-0.1;
-    systemClock->worldspace = 1;
-    systemClock->align = 2; // left
-    systemClock->dropshadow = 1;
-    systemClock->layer0 = 1;
+//    systemClock = new textbox(renderer, "Yes", 1700 * g_fontsize, 0, 0, 0.9);
+//    systemClock->boxWidth = 1;
+//    systemClock->width = 0.95;
+//    systemClock->boxHeight = 0;
+//    systemClock->boxX = 1 -0.2;
+//    systemClock->boxY = 1-0.1;
+//    systemClock->worldspace = 1;
+//    systemClock->align = 2; // left
+//    systemClock->dropshadow = 1;
+//    systemClock->layer0 = 1;
     //systemClock->show = 0;
 
 
@@ -9517,19 +9456,20 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     seeingDetectable->show = 1;
     seeingDetectable->priority = -2;
 
+    M("Made seeingDetectable");
 
 
-//    healthText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
-//    healthText->boxWidth = 0.95;
-//    healthText->width = 0.95;
-//    healthText->boxHeight = 0;
-//    healthText->boxX = 0.05;
-//    healthText->boxY = 0.15; //0.3 to get it under the heart
-//    healthText->worldspace = 1;
-//    healthText->show = 1;
-//    healthText->align = 0;
-//    healthText->dropshadow = 1;
-//    healthText->layer0 = 1;
+    healthText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
+    healthText->boxWidth = 0.95;
+    healthText->width = 0.95;
+    healthText->boxHeight = 0;
+    healthText->boxX = 0.05;
+    healthText->boxY = 0.15; //0.3 to get it under the heart
+    healthText->worldspace = 1;
+    healthText->show = 1;
+    healthText->align = 0;
+    healthText->dropshadow = 1;
+    healthText->layer0 = 1;
 
 //    hungerText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
 //    hungerText->boxWidth = 0.95;
@@ -9593,7 +9533,6 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
 
     hideInventoryUI();
     hideTalkingUI();
-    hideScoreUI();
   }
 
 }
@@ -9632,16 +9571,16 @@ void adventureUI::initFullUI() {
   adventureUIManager->stomachShakeDurationMs = adventureUIManager->maxstomachShakeDurationMs;
   adventureUIManager->stomachShakeIntervalMs = adventureUIManager->maxstomachShakeIntervalMs + rand() % adventureUIManager->stomachShakeIntervalRandomMs;
 
-//  healthPicture = new ui(renderer, "resources/static/ui/health.qoi", -0.04, -0.09, 0.25, 1, -15);
-//  healthPicture->persistent = 1;
-//  healthPicture->heightFromWidthFactor = 1;
-//  healthPicture->show = 1;
-//  healthPicture->framewidth = 410;
-//  healthPicture->frameheight = 465;
-//  healthPicture->layer0 = 1;
-//  healthPicture->glideSpeed = 0.1;
-//  healthPicture->widthGlideSpeed = 0.1;
-//  healthPicture->priority = -10; //health is behind everything
+  healthPicture = new ui(renderer, "resources/static/ui/health.qoi", -0.04, -0.09, 0.25, 1, -15);
+  healthPicture->persistent = 1;
+  healthPicture->heightFromWidthFactor = 1;
+  healthPicture->show = 1;
+  healthPicture->framewidth = 410;
+  healthPicture->frameheight = 465;
+  healthPicture->layer0 = 1;
+  healthPicture->glideSpeed = 0.1;
+  healthPicture->widthGlideSpeed = 0.1;
+  healthPicture->priority = -10; //health is behind everything
 
   emotion = new ui(renderer, "resources/static/ui/emoticons.qoi", 0, 0, 0.05, 0.05, -15);
   emotion->persistent = 1;
@@ -9650,92 +9589,6 @@ void adventureUI::initFullUI() {
   emotion->framewidth = 64;
   emotion->frameheight = 64;
   emotion->priority = 0;
-
-  hotbar = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", g_hotbarX + g_backpackHorizontalOffset, 0.84, 0.1, 0.1, 1);
-  hotbar->is9patch = true;
-  hotbar->patchwidth = 213;
-  hotbar->patchscale = 0.5;
-  hotbar->persistent = true;
-  hotbar->heightFromWidthFactor = 1;
-  hotbar->priority = -8;
-
-  hotbarFocus = new ui(renderer, "resources/static/ui/hotbar_focus.qoi", g_hotbarX + g_backpackHorizontalOffset + 0.005, 0.84 + 0.005, 0.1-0.01, 0.1-0.01, 1);
-  hotbarFocus->persistent = true;
-  hotbarFocus->heightFromWidthFactor = 1;
-  hotbarFocus->priority = -7;
-  hotbarFocus->dropshadow = 1;
-
-  noIconTexture = loadTexture(renderer, "resources/engine/sp-no-texture.qoi");
-
-  float shrinkPercent = 0.015;
-
-  t1 = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.45, 0.84, 0.1, 1, 1);
-  t1->persistent = true;
-  t1->heightFromWidthFactor = 1;
-  SDL_DestroyTexture(t1->texture);
-  t1->texture = noIconTexture;
-  t1->shrinkPercent = shrinkPercent; 
-  t1->priority = -7;
-
-  t2 = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.45, 0.84, 0.1, 1, 1);
-  t2->persistent = true;
-  t2->heightFromWidthFactor = 1;
-  SDL_DestroyTexture(t2->texture);
-  t2->texture = noIconTexture;
-  t2->shrinkPercent = shrinkPercent; 
-  t2->priority = -7;
-
-  t3 = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.45, 0.84, 0.1, 1, 1);
-  t3->persistent = true;
-  t3->heightFromWidthFactor = 1;
-  SDL_DestroyTexture(t3->texture);
-  t3->texture = noIconTexture;
-  t3->shrinkPercent = shrinkPercent; 
-  t3->priority = -6;
-
-  t4 = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.45, 0.84, 0.1, 1, 1);
-  t4->persistent = true;
-  t4->heightFromWidthFactor = 1;
-  SDL_DestroyTexture(t4->texture);
-  t4->texture = noIconTexture;
-  t4->shrinkPercent = shrinkPercent; 
-  t4->priority = -7;
-
-  t5 = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.45, 0.84, 0.1, 1, 1);
-  t5->persistent = true;
-  t5->heightFromWidthFactor = 1;
-  SDL_DestroyTexture(t5->texture);
-  t5->texture = noIconTexture;
-  t5->shrinkPercent = shrinkPercent; 
-  t5->priority = -7;
-
-  hotbarTransitionIcons.push_back(t1);
-  hotbarTransitionIcons.push_back(t2);
-  hotbarTransitionIcons.push_back(t3);
-  hotbarTransitionIcons.push_back(t4);
-  hotbarTransitionIcons.push_back(t5);
-  
-  cooldownIndicator = new ui(renderer, "resources/engine/cooldownIndicator.qoi", g_hotbarX + g_backpackHorizontalOffset, 0.83, 0.03, 1, 1);
-  cooldownIndicator->priority = -6;
-  cooldownIndicator->persistent = 1;
-  cooldownIndicator->heightFromWidthFactor = 1;
-  cooldownIndicator->xframes = 48;
-  cooldownIndicator->framewidth = 64;
-  cooldownIndicator->frameheight = 64;
-
-  for(auto x : hotbarTransitionIcons) {
-    x->opacity = 0;
-    x->targetx = x->x;
-    x->targety = x->y;
-    x->glideSpeed = 0.3;
-  }
-
-  hotbarMutedXIcon = new ui(renderer, "resources/static/ui/red_x.qoi", g_hotbarX + g_backpackHorizontalOffset + 0.005, 0.84 + 0.005, 0.1-0.01, 0.1-0.01, 1);
-  hotbarMutedXIcon->persistent = true;
-  hotbarMutedXIcon->priority = -6;
-  hotbarMutedXIcon->heightFromWidthFactor = 1;
-  hotbarMutedXIcon->dropshadow = 1;
-
 
 }
 
@@ -9751,7 +9604,7 @@ adventureUI::~adventureUI()
     delete talkingBox;
     // delete talkingBoxTexture;
     delete talkingText;
-    delete scoreText;
+    
 
     delete inventoryA;
     delete inventoryB;
@@ -9805,6 +9658,35 @@ void adventureUI::pushText(entity *ftalker)
   } else {
     pushedText = scriptToUse->at(dialogue_index);
   }
+
+  //parse pushedText for variables within $$, e.g. $$playername$$
+  int position = pushedText.find("$$");  
+  if(position != string::npos) {
+    int position2 = pushedText.find("$$", position+1);
+    if(position2 != string::npos) {
+      //get the text between those two positions
+      string variableName = pushedText.substr(position + 2, position2 - position -2);
+
+      //is there a savestring for that?
+      string res = readSaveStringField(variableName);
+      pushedText.erase(pushedText.begin() + position, pushedText.begin() + position2 + 2);
+      pushedText.insert(position, res);
+
+    }
+  }
+  
+
+  curText = "";
+  typing = true;
+  dialogProceedIndicator->show = 0;
+  showTalkingUI();
+}
+
+void adventureUI::pushText(string text)
+{
+  inPauseMenu = 0;
+  adventureUIManager->hideInventoryUI();
+  pushedText = text;
 
   //parse pushedText for variables within $$, e.g. $$playername$$
   int position = pushedText.find("$$");  
@@ -9924,7 +9806,6 @@ void adventureUI::initDialogue() {
 //scripts
 void adventureUI::continueDialogue()
 {
-  M("continueDialogue");
   g_fancybox->show = 0;
   // has our entity died?
   if (g_forceEndDialogue && playersUI)
@@ -10026,6 +9907,38 @@ void adventureUI::continueDialogue()
   {
     askingQuestion = false;
   }
+
+  //add an entity to the combatlist
+  // /combatant common/disaster 10
+  if (scriptToUse->at(dialogue_index + 1).substr(0,10) == "/combatant") {
+    string s = scriptToUse->at(dialogue_index + 1);
+    vector<string> x = splitString(s, ' ');
+    combatant* a = new combatant (x[1], stoi(x[2]));
+    a->maxHealth = a->baseHealth + (a->healthGain * a->level);
+    a->health = a->maxHealth;
+    g_enemyCombatants.push_back(a);
+
+    dialogue_index++;
+    this->continueDialogue();
+    return;
+  }
+
+  //begin a combat encounter
+  // /combat
+  if (scriptToUse->at(dialogue_index + 1).substr(0,7) == "/combat")
+  {
+    g_gamemode = gamemode::COMBAT;
+    g_submode = submode::TEXT;
+    combatUIManager->finalText = "It's an enemy encounter!";
+    combatUIManager->currentText = "";
+    combatUIManager->queuedStrings.push_back("Second line of combat dialog!");
+    combatUIManager->dialogProceedIndicator->y = 0.25;
+
+    dialogue_index++;
+    this->continueDialogue();
+    return;
+  }
+
 
   // loadsavenames
   if (scriptToUse->at(dialogue_index + 1).substr(0,14) == "/menuloadnames")
@@ -11020,28 +10933,6 @@ I("s");
     return;
   }
 
-  //use fademode for objective crosshair, so it only shows if the player is standing still
-  if (scriptToUse->at(dialogue_index + 1).substr(0, 16) == "/objectivefadeon")
-  {
-    g_objectiveFadeModeOn = 1;
-    g_objectiveFadeWaitMs = g_objectiveFadeMaxWaitMs;
-    g_objectiveOpacity = 0;
-    
-    dialogue_index++;
-    this->continueDialogue();
-    return;
-  }
-
-  if (scriptToUse->at(dialogue_index + 1).substr(0, 17) == "/objectivefadeoff")
-  {
-    g_objectiveFadeModeOn = 0;
-    
-    dialogue_index++;
-    this->continueDialogue();
-    return;
-  }
-
-
   //load/spawn particle effect
   if (scriptToUse->at(dialogue_index + 1).substr(0, 7) == "/effect")
   {
@@ -11344,81 +11235,6 @@ I("s");
     return;
   }
 
-
-  // change objective
-  // /setobjective heart
-  if (scriptToUse->at(dialogue_index + 1).substr(0, 14) == "/setobjective ")
-  {
-    string s = scriptToUse->at(dialogue_index + 1);
-    vector<string> x = splitString(s, ' ');
-    string name = x[1];
-
-    entity *hopeful = searchEntities(name);
-    if (hopeful != nullptr)
-    {
-      g_objective = hopeful;
-      adventureUIManager->crosshair->show = 1;
-    }
-
-    dialogue_index++;
-    this->continueDialogue();
-    return;
-  }
-
-  //set crosshair frame
-  if (scriptToUse->at(dialogue_index + 1).substr(0, 18) == "/setobjectivetype ")
-  {
-    M("Set objective type");
-    g_usingPelletsAsObjective = 0;
-    string s = scriptToUse->at(dialogue_index + 1);
-    vector<string> x = splitString(s, ' ');
-    int frame = stoi(x[1]);
-    
-    if(frame < adventureUIManager->crosshair->xframes) {
-      adventureUIManager->crosshair->frame = frame;
-    } else {
-      E("Tried to set the objective type too highly.");
-
-    }
-
-    dialogue_index++;
-    this->continueDialogue();
-    return;
-  }
-
-  //set pellet objective
-  //until the objective is set again, when the player collects a pellet, 
-  //the objective will be set to a nearby pellet
-  if (scriptToUse->at(dialogue_index + 1).substr(0, 16) == "/pelletobjective")
-  {
-    g_usingPelletsAsObjective = 1;
-    g_objective = nullptr;
-
-    int frame = 1;
-    
-    if(frame < adventureUIManager->crosshair->xframes) {
-      adventureUIManager->crosshair->frame = frame;
-    } else {
-      E("No frame for /pelletobjective call.");
-    }
-
-    dialogue_index++;
-    this->continueDialogue();
-    return;
-  }
-
-
-  // clear objective
-  if (scriptToUse->at(dialogue_index + 1).substr(0, 15) == "/clearobjective")
-  {
-
-    g_objective = 0;
-    adventureUIManager->crosshair->show = 0;
-
-    dialogue_index++;
-    this->continueDialogue();
-    return;
-  }
 
   // change cameratarget
   //  /lookat ward 0 0
@@ -12378,17 +12194,6 @@ I("s");
 
     //make sure we haven't already unlocked it
     int good = 1;
-    for(auto x: g_chest) {
-      if(x->internalName == nameOfUsable) {
-        good = 0;
-        break;
-      }
-    }
-
-    if(good == 1) {
-      usable* newUsable = new usable(nameOfUsable);
-      g_chest.push_back(newUsable);
-    }
 
     dialogue_index++;
     this->continueDialogue();
@@ -12422,25 +12227,16 @@ void adventureUI::positionInventory() {
 //hide heart and other stuff if the player is in the menus
 void adventureUI::hideHUD() {
   showHud = 0;
-  //healthPicture->show = 0;
-  //healthText->show = 0;
-  hideScoreUI();
-  hotbarFocus->show = 0;
-  hotbarMutedXIcon->show = 0;
-  hotbar->show = 0;
-  cooldownIndicator->show = 0;
-  systemClock->show = 0;
+  healthPicture->show = 0;
+  healthText->show = 0;
+  //systemClock->show = 0;
 }
 
 void adventureUI::showHUD() {
   showHud = 1;
-  //healthPicture->show = 1;
-  //healthText->show = 1;
-  hotbarFocus->show = 1;
-  hotbarMutedXIcon->show = 1;
-  hotbar->show = 1;
-  cooldownIndicator->show = 1;
-  systemClock->show = 1;
+  healthPicture->show = 1;
+  healthText->show = 1;
+  //systemClock->show = 1;
 }
 
 ribbon::ribbon() {
@@ -12478,5 +12274,67 @@ void ribbon::render(SDL_Renderer* renderer, camera fcamera) {
   center.y = r_thickness/2;
 
   SDL_RenderCopyEx(renderer, texture, NULL, &drect, angle, &center, SDL_FLIP_NONE);
+}
+
+combatant::combatant(string filename, int flevel) {
+  string loadstr;
+  loadstr = "resources/static/combatfiles/" + filename + ".cmb";
+  istringstream file(loadTextAsString(loadstr));
+
+  string temp;
+  file >> temp;
+  file >> temp;
+
+  name = temp;
+
+  file >> temp;
+  file >> temp;
+
+
+  string spritefilevar;
+  spritefilevar = "resources/static/combatsprites/" + temp + ".qoi";
+  const char* spritefile = spritefilevar.c_str();
+  texture = loadTexture(renderer, spritefile);
+
+  file >> temp;
+  file >> baseAttack;
+
+  file >> temp;
+  file >> attackGain;
+
+  file >> temp;
+  file >> baseDefense;
+
+  file >> temp;
+  file >> defenseGain;
+
+  file >> temp;
+  file >> baseHealth;
+
+  file >> temp;
+  file >> healthGain;
+
+  file >> temp;
+  file >> baseCritical;
+
+  file >> temp;
+  file >> criticalGain;
+
+  level = flevel;
+
+  int fw, fh;
+  SDL_QueryTexture(texture, NULL, NULL, &fw, &fh);
+
+  width = fw;
+  height = fh; 
+
+  width /= 1920.0;
+  height /= 1920.0; 
+
+
+}
+
+combatant::~combatant() {
+  SDL_DestroyTexture(texture);
 }
 

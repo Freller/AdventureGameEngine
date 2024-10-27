@@ -1099,71 +1099,14 @@ class adventureUI {
 
     bool light = 0;
 
-    textbox* scoreText = 0;
+    //textbox* scoreText = 0;
 
-    textbox* systemClock = 0;
+    //textbox* systemClock = 0;
 
     int countEntities = 0; //used now for /lookatall to count how many entities we've looked at
         
-    ui* hotbar = 0; //this is a little box which contains the player's usables
-                    //when the player holds the inventory button, it widens and 
-                    //the player can select a different item with the movement keys
-   
-    ui* hotbarFocus = 0; //I can't remember to choose my item based on the center one, 
-                         //so I need this
-
-    ui* cooldownIndicator = 0;
-    SDL_Texture* noIconTexture = 0; //set the backpack icon uis to this if we have no texture
-                                    //for them, to prevent crashing
-
-    //eugh, here we go
-    //here is the begining of my attempt at making icons appear to move when the user switches
-    //with a full hotbar (held press)
-    //these elements will be on top of the others and change positions when we cycle through items
-    //the idea is that with five, we have an extra two for when icons should go offscreen
-    ui* t1 = 0; //offscreen left
-    ui* t2 = 0; //left
-    ui* t3 = 0; //middle
-    ui* t4 = 0; //right
-    ui* t5 = 0; //offscreen right
-
-    //so basically, the icons will get snapped to their position, then during a shift they will glide to an adjacent position
-
-    bool shiftDirection = 0; //0 for left, 1 for right
-    int shiftingMs = 0;
-    int maxShiftingMs = 200;
-
-    ui* hotbarMutedXIcon = 0;
-
-    //positions for gliding transition icons to 
-    vector<std::pair<float, float>> hotbarPositions = {
-      {0.55 + g_backpackHorizontalOffset, 1},
-      {0.55 + g_backpackHorizontalOffset, 1},
-      {0.55 + g_backpackHorizontalOffset, 0.84},
-      {0.45 + g_backpackHorizontalOffset, 0.84},
-      {0.35 + g_backpackHorizontalOffset, 0.84},
-      {0.35 + g_backpackHorizontalOffset, 1},
-      {0.35 + g_backpackHorizontalOffset, 1}
-    };
-    float smallBarStableX = hotbarPositions[0].first;
-    //these were for when the bar was centered
-//    vector<std::pair<float, float>> hotbarPositions = {
-//      {0.55, 1},
-//      {0.55, 1},
-//      {0.55, 0.85},
-//      {0.45, 0.85},
-//      {0.35, 0.85},
-//      {0.35, 1},
-//      {0.35, 1}
-//    };
-
-    vector<ui*> hotbarTransitionIcons;
-
     void showTalkingUI();
     void hideTalkingUI();
-
-    void showScoreUI();
-    void hideScoreUI();
 
     void showInventoryUI();
 
@@ -1176,6 +1119,8 @@ class adventureUI {
     void initFullUI();
 
     void pushText(entity* ftalker);
+
+    void pushText(string text);
 
     void pushFancyText(entity * ftalker);
 
@@ -1193,11 +1138,7 @@ class adventureUI {
 
     float inventoryYStart = 0.05;
     float inventoryYEnd = 0.6;
-
-    void hideBackpackUI();
-    void showBackpackUI();
-    void resetBackpackUITextures();
-
+    
     void hideHUD(); //hide heart and other stuff if the player is in the menus
     void showHUD();
 };
@@ -2323,6 +2264,44 @@ struct dungeonBehemothInfo {
 struct dungeonFloorInfo {
   string map;
   char identity; //1, 2, 3, r, s
+};
+
+class combatant {
+public:
+
+  string name;
+
+  float baseAttack;
+  float attackGain;
+
+  float baseDefense;
+  float defenseGain;
+
+  float baseHealth;
+  float healthGain; //should this be an int?
+
+  float baseCritical;
+  float criticalGain;
+
+  int level;
+
+  float attack;
+  float defense;
+  float critical;
+
+  SDL_Texture * texture;
+  float width;
+  float height;
+
+  int maxHealth;
+  int health;
+
+  turnSerialization serial;
+
+  combatant(string filename, int level);
+
+  ~combatant();
+
 };
 
 #endif

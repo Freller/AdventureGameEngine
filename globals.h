@@ -19,6 +19,7 @@
 #include <string>
 #include <map> //saves
 #include <ctime> //clock display
+#include "combat.h"
 
 // this is unique to the windowsport
 //#include "windowsinclude.h"
@@ -125,6 +126,10 @@ class usable;
 struct dungeonBehemothInfo;
 
 struct dungeonFloorInfo;
+
+class combatant;
+
+class combatUI;
 
 class camera
 {
@@ -249,6 +254,10 @@ extern vector<levelNode *> g_levelNodes;
 
 extern vector<ribbon *> g_ribbons;
 
+extern vector<combatant *> g_enemyCombatants;
+
+extern vector<combatant *> g_partyCombatants;
+
 struct cmpCoord
 {
   bool operator()(const pair<int, int> a, const pair<int, int> b) const;
@@ -328,6 +337,13 @@ extern float XtoY;
 extern float YtoX;
 extern float g_ratio;
 extern bool transition;
+extern SDL_Texture* transitionTexture;
+extern SDL_Surface* transitionSurface;
+extern void* transitionPixelReference;
+extern const int transitionImageWidth;
+extern const int transitionImageHeight;
+extern int transitionPitch;
+extern int transitionDelta;
 extern int g_walldarkness;
 extern bool g_unlit;
 extern int g_graphicsquality;
@@ -455,34 +471,6 @@ extern TTF_Font* g_ttf_font;
 extern float g_minifontsize;
 extern float g_transitionSpeed;
 
-extern int g_whichUsableSelectedIndex;
-extern vector<usable*> g_backpack;
-extern vector<usable*> g_chest;
-
-extern vector<int> g_loadout; //this is a set of indices to g_chest which will be put in g_backpack
-extern int g_maxLoadoutSize;
-extern SDL_Texture* g_loadoutHighlightTexture;
-
-extern float g_usableWaitToCycleTime;
-extern float g_maxUsableWaitToCycleTime;
-extern entity *g_backpackNarrarator;
-extern entity *g_currentMusicPlayingEntity;
-extern const float g_backpackHorizontalOffset;
-extern const float g_hotbarX;
-
-extern int g_backpackIndex;
-extern int g_selectingUsable;
-extern float g_hotbarWidth;
-extern float g_hotbarWidth_inventoryOpen;
-extern float g_hotbarWidth_inventoryClosed;
-extern float g_hotbarNextPrevOpacity;
-extern float g_hotbarNextPrevOpacityDelta;
-extern float g_hotbarLongSelectMs;
-extern float g_currentHotbarSelectMs;
-extern float g_hotbarCycleDirection;
-
-extern float use_cooldown;
-extern vector<attack *> AdventureattackSet;
 extern int inPauseMenu;
 extern bool g_firstFrameOfPauseMenu;
 extern bool g_firstFrameOfSettingsMenu;
@@ -561,13 +549,11 @@ extern int g_objectiveOpacity;
 extern int g_objectiveFadeMaxWaitMs;
 extern int g_objectiveFadeWaitMs;
 
-extern adventureUI* g_pelletGoalScriptCaller;
-extern entity *g_pelletNarrarator;
-
 extern int WIN_WIDTH;
 extern int WIN_HEIGHT;
 extern const int STANDARD_SCREENWIDTH;
 extern int old_WIN_WIDTH;
+extern int old_WIN_HEIGHT;
 extern int saved_WIN_WIDTH;
 extern int saved_WIN_HEIGHT;
 extern SDL_Window *window;
@@ -635,6 +621,8 @@ extern float g_volume;
 extern float g_music_volume;
 extern float g_sfx_volume;
 extern bool g_mute;
+
+extern entity* g_currentMusicPlayingEntity;
 
 extern vector<std::pair<Mix_Chunk*,string>> g_preloadedSounds;
 extern Mix_Chunk *g_ui_voice;
@@ -927,6 +915,21 @@ extern int g_maxGrossupShowMs;
 extern vector<pair<int, Mix_Chunk*>> g_loadPlaySounds;
 
 extern int g_menuTalkReset;
+
+enum gamemode {
+  EXPLORATION,
+  COMBAT
+};
+
+extern gamemode g_gamemode;
+
+extern turn g_turn;
+
+extern submode g_submode;
+
+extern combatUI* combatUIManager;
+
+extern int curCombatantIndex;
 
 bool fileExists(const std::string &name);
 

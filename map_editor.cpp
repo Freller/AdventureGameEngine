@@ -154,7 +154,7 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
     if (word == "bg" && g_useBackgrounds)
     {
       iss >> s0 >> backgroundstr;
-      background = loadTexture(renderer, "resources/static/backgrounds/" + backgroundstr + "qoi");
+      background = loadTexture(renderer, "resources/static/backgrounds/" + backgroundstr + ".qoi");
       g_backgroundLoaded = 1;
       SDL_SetTextureColorMod(background, 255 * (1 - g_background_darkness), 255 * (1 - g_background_darkness), 255 * (1 - g_background_darkness));
     }
@@ -347,10 +347,6 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
             x->enabled = 0;
           }
         }
-      }
-      if(e->name == "common/doora") {
-        D(e->y);
-        D(e->bounds.y);
       }
 
     }
@@ -2480,7 +2476,6 @@ void write_map(entity *mapent)
           if (RectOverlap(n->getMovedBounds(), marker->getMovedBounds()) && !n->inParty && n->tangible && n != protag)
           {
             delete n;
-            if(n == g_objective) { g_objective = nullptr;}
             if(n == g_behemoth0) { g_behemoth0 = nullptr;}
             if(n == g_behemoth1) { g_behemoth1 = nullptr;}
             if(n == g_behemoth2) { g_behemoth2 = nullptr;}
@@ -4340,21 +4335,6 @@ void write_map(entity *mapent)
             float fbrightness = brightness;
             SDL_SetTextureAlphaMod(g_shade, 255 - ( ( fbrightness/100.0 ) * 255));
             g_brightness = brightness;
-          }
-          break;
-        }
-
-        if (word == "objective" || word == "obj")
-        {
-          line >> word;
-          if (word != "")
-          {
-            entity *hopeful = searchEntities(word);
-            if (hopeful != 0)
-            {
-              g_objective = hopeful;
-              adventureUIManager->crosshair->show = 1;
-            }
           }
           break;
         }

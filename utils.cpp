@@ -23,7 +23,7 @@ SDL_Texture* loadTexture(SDL_Renderer* renderer, string fileaddress)
     buf = new char[filesize];
     int length_read = PHYSFS_readBytes(myfile, buf, filesize);
     SDL_RWops* myWop = SDL_RWFromMem(buf, filesize);
-    SDL_Texture* texture = IMG_LoadTextureTyped_RW(renderer, myWop, 1, "QOI");
+    SDL_Texture* texture = IMG_LoadTextureTyped_RW(renderer, myWop, 1, ".qoi");
     PHYSFS_close(myfile);
     return texture;
 
@@ -58,7 +58,7 @@ SDL_Surface* loadSurface(string fileaddress)
     buf = new char[filesize];
     int length_read = PHYSFS_readBytes(myfile, buf, filesize);
     SDL_RWops* myWop = SDL_RWFromMem(buf, filesize);
-    SDL_Surface* surface = IMG_LoadTyped_RW(myWop, 1, "QOI");
+    SDL_Surface* surface = IMG_LoadTyped_RW(myWop, 1, ".qoi");
     PHYSFS_close(myfile);
     return surface;
 
