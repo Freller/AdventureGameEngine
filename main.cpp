@@ -82,9 +82,10 @@ void updateWindowResolution() {
   // !!! it might be better to not run this every frame
   if (old_WIN_WIDTH != WIN_WIDTH || old_WIN_HEIGHT != WIN_HEIGHT || g_update_zoom)
   {
+    g_update_zoom = 0;
     // user scaled window
     scalex = ((float)WIN_WIDTH / STANDARD_SCREENWIDTH) * g_defaultZoom * g_zoom_mod;
-    scaley = ((float)WIN_HEIGHT / (STANDARD_SCREENWIDTH * 0.5625)) * g_defaultZoom * g_zoom_mod;
+    scaley = ((float)WIN_HEIGHT / (STANDARD_SCREENWIDTH * 0.625)) * g_defaultZoom * g_zoom_mod;
     if (scalex < min_scale)
     {
       scalex = min_scale;
@@ -94,7 +95,7 @@ void updateWindowResolution() {
       scalex = max_scale;
     }
 
-    if(w / h > 1.777778) {
+    if(w / h > 1.6) {
       SDL_RenderSetScale(renderer, scaley * g_zoom_mod, scaley * g_zoom_mod);
     } else {
       SDL_RenderSetScale(renderer, scalex * g_zoom_mod, scalex * g_zoom_mod);
@@ -105,13 +106,13 @@ void updateWindowResolution() {
   old_WIN_WIDTH = WIN_WIDTH;
   old_WIN_HEIGHT = WIN_HEIGHT;
 
-  if(w / h > 1.777778) {
+  if(w / h > 1.6) {
     WIN_HEIGHT /= scaley;
-    WIN_WIDTH = WIN_HEIGHT * 1.777778;
+    WIN_WIDTH = WIN_HEIGHT * 1.6;
 
   } else {
     WIN_WIDTH /= scalex;
-    WIN_HEIGHT = WIN_WIDTH * 0.5625;
+    WIN_HEIGHT = WIN_WIDTH * 0.625;
   }
 
   //SDL_RenderSetLogicalSize(renderer, 600, 480);
@@ -2825,7 +2826,7 @@ int WinMain()
       SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIN_WIDTH, WIN_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALWAYS_ON_TOP);
   renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
   //SDL_RenderSetLogicalSize(renderer, WIN_WIDTH, WIN_WIDTH * (9.0f/16.0f));
-  SDL_RenderSetLogicalSize(renderer, 16, 9);
+  SDL_RenderSetLogicalSize(renderer, 16, 10);
   SDL_SetWindowMinimumSize(window, 100, 100);
 
   SDL_SetWindowPosition(window, 1280, 720);
@@ -3511,6 +3512,9 @@ int WinMain()
               {
                 x->reassignTexture();
               }
+              break;
+            case SDL_WINDOWEVENT_MOVED:
+              g_update_zoom = 1;
               break;
           }
           break;
@@ -5366,7 +5370,6 @@ void getExplorationInput(float &elapsed)
   }
   if (devMode)
   {
-    g_update_zoom = 0;
     if (keystate[SDL_SCANCODE_Q] && devMode && g_holdingCTRL)
     {
       g_update_zoom = 1;
