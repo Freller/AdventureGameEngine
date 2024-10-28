@@ -105,8 +105,6 @@ class worldItem;
 
 class ribbon;
 
-class indexItem;
-
 class effectIndex;
 
 class particle;
@@ -120,8 +118,6 @@ class pointOfInterest;
 class levelNode;
 
 class levelSequence;
-
-class usable;
 
 struct dungeonBehemothInfo;
 
@@ -239,8 +235,6 @@ extern vector<attack *> g_attacks;
 extern vector<weapon *> g_weapons;
 
 extern vector<worldItem *> g_worldItems;
-
-extern vector<indexItem *> g_indexItems;
 
 extern vector<particle *> g_particles;
 
@@ -918,10 +912,13 @@ extern int g_menuTalkReset;
 
 enum gamemode {
   EXPLORATION,
-  COMBAT
+  COMBAT,
+  TITLE,
+  LOSS,
 };
 
 extern gamemode g_gamemode;
+
 
 extern turn g_turn;
 
@@ -930,6 +927,10 @@ extern submode g_submode;
 extern combatUI* combatUIManager;
 
 extern int curCombatantIndex;
+
+extern vector<int> g_combatInventory;
+
+extern int g_maxInventorySize;
 
 bool fileExists(const std::string &name);
 

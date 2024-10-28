@@ -4295,7 +4295,6 @@ void write_map(entity *mapent)
         }
         break;
       }
-      M("Are we getting here?");
       if (word == "set" || word == "s")
       {
         line >> word;

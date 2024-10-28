@@ -29,8 +29,6 @@
 
 using namespace std;
 
-class usable;
-
 navNode* getNodeByPos(vector<navNode*> array, int x, int y);
 entity* searchEntities(string fname, entity* caller);
 entity* searchEntities(string fname);
@@ -748,18 +746,6 @@ class mapObject:public actor {
     void render(SDL_Renderer * renderer, camera fcamera); 
 };
 
-//an item in someone's inventory, which can be used during events (not an actor)
-//instances are not static.
-class indexItem {
-  public:
-    SDL_Texture* texture = 0;
-    string name = "Error";
-    bool isKeyItem = 0; //key item, can it be sold
-    vector<string> script;
-    indexItem(string fname, bool fisKeyItem); 
-
-    ~indexItem(); 
-};
 
 //work as INSTANCES and not INDEXES
 class ability {
@@ -1642,9 +1628,6 @@ class entity:public actor {
     int semisolid = 0; //push away close entities
     int storedSemisolidValue = 0; //semisolid has to be stored for ents that start as not solid but can later have values of 1 or 2
 
-    //inventory
-    std::vector<std::pair<indexItem*, int> > inventory;
-
     //will it be pushed away from semisolid entities.
     int pushable = 0;
 
@@ -1748,16 +1731,6 @@ class entity:public actor {
     //for the behemoths as a team
     //really, it has nothing to do with distance, but rather the topology of the map (routes)
 
-    //functions for inv
-    //add an item to an entities
-    int getItem(indexItem* a, int count); 
-
-    //returns 0 if the transaction was successful, and 1 otherwise
-    int loseItem(indexItem* a, int count); 
-
-    //returns 0 if the entity has the nummer of items
-    //returns 1 if the entity does not have the proper nummer
-    int checkItem(indexItem* a, int count); 
 };
 
 //search entity by name
@@ -1825,33 +1798,6 @@ public:
 
   //add levels from a file
   void addLevels(string filename); 
-
-};
-
-//A usable is basically a texture, a script, a cooldown
-class usable {
-  public:
-    string filepath = "";
-    string internalName = "";
-    string name = "";
-
-    SDL_Texture* texture;
-
-    entity* ent = nullptr;
-
-    int maxCooldownMs = 0;
-    int cooldownMs = 0;
-
-    int specialAction = 0; //for hooking up items directly to engine code, namely spindashing
-                           //0 - nothing
-                           //1 - spin
-                           //2 - openInventory
-    
-    string aboutTxt = "";
-
-    usable(string fname); 
-
-    ~usable(); 
 
 };
 
@@ -2285,10 +2231,6 @@ public:
 
   int level;
 
-  float attack;
-  float defense;
-  float critical;
-
   SDL_Texture * texture;
   float width;
   float height;
@@ -2296,7 +2238,15 @@ public:
   int maxHealth;
   int health;
 
+  //for drawing enemies
+  int opacity = 0;
+  SDL_Rect renderQuad = {-1,-1,-1,-1};
+
   turnSerialization serial;
+
+  std::vector<int> inventory;
+
+  int itemToUse = -1;
 
   combatant(string filename, int level);
 

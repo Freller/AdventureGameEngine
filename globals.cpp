@@ -15,13 +15,10 @@
 #include <string>
 #include <map> //saves
 #include <ctime> //clock display
-//#include "windows.h"
 #include "stdio.h"
-//#include "tchar.h"
 #include "physfs.h"
 #include "unistd.h"
 #include "stdio.h"
-//#include "unistd.h"
 
 // this is unique to the windowsport
 //#include "windowsinclude.h"
@@ -113,8 +110,6 @@ vector<attack *> g_attacks;
 vector<weapon *> g_weapons;
 
 vector<worldItem *> g_worldItems;
-
-vector<indexItem *> g_indexItems;
 
 vector<particle *> g_particles;
 
@@ -953,6 +948,10 @@ submode g_submode = submode::TEXT;
 combatUI* combatUIManager;
 
 int curCombatantIndex = 0; //the party combatant for which the player currently builds the turnserial
+
+vector<int> g_combatInventory;
+
+int g_maxInventorySize = 14;
 
 bool fileExists(const std::string &name)
 {

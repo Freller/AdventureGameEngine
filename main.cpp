@@ -1574,12 +1574,12 @@ void ExplorationLoop() {
     {
       // !!! segfaults on mapload sometimes
       
-      SDL_Color useThisColor = g_healthtextcolor;
-      if(protag->hp < 5) {
-        useThisColor = g_healthtextlowcolor;
-      }
-      adventureUIManager->healthText->updateText(to_string(int(protag->hp)) + '/' + to_string(int(protag->maxhp)), -1, 0.9,  useThisColor);
-      adventureUIManager->healthText->show = 1;
+//      SDL_Color useThisColor = g_healthtextcolor;
+//      if(protag->hp < 5) {
+//        useThisColor = g_healthtextlowcolor;
+//      }
+//      adventureUIManager->healthText->updateText(to_string(int(protag->hp)) + '/' + to_string(int(protag->maxhp)), -1, 0.9,  useThisColor);
+//      adventureUIManager->healthText->show = 1;
 
       //adventureUIManager->hungerText->updateText(to_string((int)((float)(min(g_foodpoints, g_maxVisibleFoodpoints) * 100) / (float)g_maxVisibleFoodpoints)) + '%', -1, 0.9);
       //adventureUIManager->hungerText->show = 0;
@@ -1694,7 +1694,7 @@ void ExplorationLoop() {
     }
     else
     {
-      adventureUIManager->healthText->show = 0;
+      //adventureUIManager->healthText->show = 0;
       //adventureUIManager->hungerText->show = 0;
     }
 
@@ -1912,96 +1912,6 @@ void ExplorationLoop() {
           g_itemsInInventory = g_alphabet.size();
 
 
-        } else {
-          //populate boxes based on inventory
-          for (auto it = mainProtag->inventory.rbegin(); it != mainProtag->inventory.rend(); ++it)
-          {
-    
-            if (i < itemsPerRow * inventoryScroll)
-            {
-              // this item won't be rendered
-              i++;
-              continue;
-            }
-    
-            SDL_Rect drect = {(int)x, (int)y, (int)itemWidth, (int)itemWidth};
-            if (it->second > 0)
-            {
-              SDL_RenderCopy(renderer, it->first->texture, NULL, &drect);
-            }
-            // draw number
-            if (it->second > 1)
-            {
-              inventoryText->show = 1;
-              inventoryText->updateText(to_string(it->second), -1, 100);
-              inventoryText->boxX = (x + (itemWidth * 0.8)) / WIN_WIDTH;
-              inventoryText->boxY = (y + (itemWidth - inventoryText->boxHeight / 2) * 0.6) / WIN_HEIGHT;
-              inventoryText->worldspace = 1;
-              inventoryText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-            }
-            else
-            {
-              inventoryText->show = 0;
-            }
-    
-            if (i == inventorySelection || g_firstFrameOfPauseMenu)
-            {
-              // this item should have the marker
-              inventoryMarker->show = 1;
-
-              float biggen = 0.01; // !!! resolutions : might have problems with diff resolutions
-              if(g_firstFrameOfPauseMenu) {
-                inventoryMarker->x = x / WIN_WIDTH;
-                inventoryMarker->y = y / WIN_HEIGHT;
-                inventoryMarker->x -= biggen;
-                inventoryMarker->y -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                //now that it's a hand
-                inventoryMarker->x += 0.015 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                inventoryMarker->y += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                inventoryMarker->targetx = inventoryMarker->x;
-                inventoryMarker->targety = inventoryMarker->y;
-                g_firstFrameOfPauseMenu = 0;
-              } else {
-                inventoryMarker->targetx = x / WIN_WIDTH;
-                inventoryMarker->targety = y / WIN_HEIGHT;
-                inventoryMarker->targetx -= biggen;
-                inventoryMarker->targety -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                //now that it's a hand
-                inventoryMarker->targetx += 0.015 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                inventoryMarker->targety += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              }
-
-              inventoryMarker->width = itemWidth / WIN_WIDTH;
-              inventoryMarker->width += biggen * 2;
-              inventoryMarker->height = inventoryMarker->width * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-            }
-    
-            x += itemWidth + padding;
-            if (x > maxX)
-            {
-              x = defaultX;
-              y += itemWidth + padding;
-              if (y > maxY)
-              {
-                // we filled up the entire inventory, so lets leave
-                break;
-              }
-            }
-            i++;
-          }
-          g_itemsInInventory = mainProtag->inventory.size();
-    
-          if (mainProtag->inventory.size() > 0 && mainProtag->inventory.size() - 1 - inventorySelection < mainProtag->inventory.size())
-          {
-            string description = mainProtag->inventory[mainProtag->inventory.size() - 1 - inventorySelection].first->script[0];
-            // first line is a comment so take off the //
-            description = description.substr(2);
-            adventureUIManager->escText->updateText(description, -1, 0.9);
-          }
-          else
-          {
-            adventureUIManager->escText->updateText("No consumables.", -1, 0.9);
-          }
         }
       } else {
           //populate the UI based on the loaded level sequence.
@@ -3783,30 +3693,6 @@ int interact(float elapsed, entity *protag)
 
     if (g_entities[i] != protag && RectOverlap(hisrect, srect))
     {
-      if (g_entities[i]->isWorlditem)
-      {
-        // add item to inventory
-
-        // if the item exists, dont make a new one
-        indexItem *a = nullptr;
-        for (auto x : g_indexItems)
-        {
-          // substr because worlditems have the name "ITEM-" + whatever their file is called
-          if (g_entities[i]->name.substr(5) == x->name)
-          {
-            a = x;
-          }
-        }
-        // no resource found, so lets just make one
-        if (a == nullptr)
-        {
-          a = new indexItem(g_entities[i]->name.substr(5), 0);
-        }
-
-        mainProtag->getItem(a, 1);
-        delete g_entities[i];
-        return 0;
-      }
       if(g_entities[i]->tangible && g_entities[i]->identity != 0) {
         specialObjectsInteract(g_entities[i]);
         //can do a special object interaction AND execute a script (but I haven't done it yet)
@@ -4952,27 +4838,6 @@ void getExplorationInput(float &elapsed)
 
         }
 
-      } else {
-      // select item in pausemenu
-      // only if we arent running a script
-      if (protag_can_move && adventureUIManager->sleepingMS <= 0 && mainProtag->inventory.size() > 0 && mainProtag->inventory[mainProtag->inventory.size() - 1 - inventorySelection].first->script.size() > 0 && !g_firstFrameOfPauseMenu)
-      {
-        // call the item's script
-        // D(mainProtag->inventory[mainProtag->inventory.size()- 1 -inventorySelection].first->name);
-        adventureUIManager->blip = g_ui_voice;
-        adventureUIManager->ownScript = mainProtag->inventory[mainProtag->inventory.size() - 1 - inventorySelection].first->script;
-        adventureUIManager->talker = protag;
-        adventureUIManager->dialogue_index = -1;
-        protag->sayings = mainProtag->inventory[mainProtag->inventory.size() - 1 - inventorySelection].first->script;
-        adventureUIManager->continueDialogue();
-        // if we changed maps/died/whatever, close the inventory
-        if (transition)
-        {
-          inPauseMenu = 0;
-          adventureUIManager->hideInventoryUI();
-        }
-        old_z_value = 1;
-      }
       }
     } else {
       //if this level is unlocked, travel to its map

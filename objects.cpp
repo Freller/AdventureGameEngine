@@ -2079,42 +2079,6 @@ void mapObject::render(SDL_Renderer * renderer, camera fcamera) {
   }
 }
 
-indexItem::indexItem(string fname, bool fisKeyItem) : name(fname), isKeyItem(fisKeyItem) {
-
-  //search worlditems for an item with the same texture
-  string lstr;
-
-  lstr = "resources/static/items/" + fname + "-inv.qoi";
-
-
-  bool storeThis = true;
-  for(auto x : g_indexItems) {
-    //M(x->name);
-    if(this->name == x->name) {
-      storeThis = false;
-    }
-  }
-  if(storeThis) {
-    texture = loadTexture(renderer, lstr);
-    g_indexItems.push_back(this);
-  }
-
-  //script
-  ifstream stream;
-
-  //check local dir
-  string loadstr = "resources/static/items/" + fname + ".txt";
-
-  vector<string> script = loadText(loadstr);
-
-  parseScriptForLabels(script);
-}
-
-indexItem::~indexItem() {
-  g_indexItems.erase(remove(g_indexItems.begin(), g_indexItems.end(), this), g_indexItems.end());
-  SDL_DestroyTexture(texture);
-}
-
 void fancychar::setIndex(int findex) {
   auto entry = g_fancyAlphabet[findex];
   texture = entry.first;
@@ -3665,12 +3629,6 @@ entity::~entity() {
   for(auto x : this->children) {
     x->tangible = 0;
   }
-
-    //delete inventory
-    for(auto x : inventory) {
-      delete x.first;
-    }
-    inventory.clear();
 
   g_entities.erase(remove(g_entities.begin(), g_entities.end(), this), g_entities.end());
 
@@ -6749,63 +6707,6 @@ void entity::BasicNavigate(navNode* ultimateTargetNode) {
   
 }
 
-//I want something like BasicNavigate, but increase node cost in some way to 
-//penalize going near other entities
-//the idea is that two entities blocking the same route is a poor allocation of resources, 
-//for the behemoths as a team
-//really, it has nothing to do with distance, but rather the topology of the map (routes)
-
-//functions for inv
-//add an item to an entities
-int entity::getItem(indexItem* a, int count) {
-  for(auto& x : inventory) {
-    if(x.first->name == a->name) {
-      x.second += count;
-      return 0;
-    }
-  }
-  pair<indexItem*, int> pushMeBack{ a, count };
-
-  inventory.push_back( pushMeBack );
-  return 0;
-}
-
-    //returns 0 if the transaction was successful, and 1 otherwise
-int entity::loseItem(indexItem* a, int count) {
-  for(auto& x : inventory) {
-    if(x.first->name == a->name) {
-      if(x.second > count) {
-        x.second-=count;
-        return 0;
-      } else {
-
-        for(auto y : inventory) {
-        }
-        delete x.first;
-        x.second = 0;
-
-        inventory.erase(remove(inventory.begin(), inventory.end(), x), inventory.end());
-        return 0;
-      }
-    }
-  }
-  return 1;
-}
-
-//returns 0 if the entity has the nummer of items
-//returns 1 if the entity does not have the proper nummer
-int entity::checkItem(indexItem* a, int count) {
-  for(auto x : inventory) {
-    if(x.first == a) {
-      if(x.second >= count) {
-        return 0;
-      }
-    }
-  }
-  return 1;
-}
-
-
 //search entity by name
 entity* searchEntities(string fname, entity* caller) {
   if(fname == "protag") {
@@ -7010,63 +6911,6 @@ void levelSequence::addLevels(string filename) {
   }
 }
 
-
-
-
-
-usable::usable(string fname) {
-  internalName = fname;
-  string loadstr;
-
-  string filepath = "resources/static/usables/" + fname + "/";
-
-  //open specs file
-  loadstr = filepath + "specs_" + fname + ".txt";
-
-  istringstream file(loadTextAsString(loadstr));
-  
-  string comment;
-  string line;
-  string empty;
-
-  //display name
-  getline(file, comment);
-  getline(file, name);
-  getline(file, empty);
-
-  //cooldownMs
-  getline(file, comment);
-  getline(file, line);
-  maxCooldownMs = stoi(line);
-  getline(file, empty);
-
-  //specialAction
-  getline(file, comment);
-  getline(file, line);
-  specialAction = stoi(line);
-  getline(file, empty);
-
-  //about
-  getline(file, comment);
-  getline(file, aboutTxt);
-  //getline(file, empty);
-
-
-  //load sprite
-  loadstr = filepath + "img_" + fname + ".qoi";
-
-  texture = loadTexture(renderer, loadstr);
-
-}
-
-
-
-usable::~usable() {
-  SDL_DestroyTexture(texture);
-  usableItemOnUnload(this);
-}
-
-
 int loadSave() {
   g_save.clear();
   g_saveStrings.clear();
@@ -7144,12 +6988,13 @@ int loadSave() {
 
     combatant* b = new combatant(name, level);
     b->maxHealth = b->baseHealth + (b->healthGain * b->level);
+    b->health = currentHP;
+    g_partyCombatants.push_back(b);
+    b = new combatant(name, level);
+    b->name = "Munnip";
+    b->maxHealth = b->baseHealth + (b->healthGain * b->level);
     b->health = b->maxHealth;
     g_partyCombatants.push_back(b);
-//    b = new combatant(name, level);
-//    b->maxHealth = b->baseHealth + (b->healthGain * b->level);
-//    b->health = b->maxHealth;
-//    g_partyCombatants.push_back(b);
 
     if(a->essential) {
       mainProtag = a;
@@ -7188,26 +7033,6 @@ int loadSave() {
 //    g_protag_s_ent = new entity(renderer, shadowEntFilename);
 //  }
 
-
-
-  int indexItemsSize = g_indexItems.size();
-  for(int i = 0; i < indexItemsSize; i++) {
-    delete g_indexItems[0];
-  }
-
-  inventorySelection = 0;
-
-  //load inventory
-  while(getline(file, line)) {
-    if(line[0] == '&') { break;}
-
-    field = line.substr(0, line.find(' '));
-    value = line.substr(line.find(" "), line.length()-1);
-    indexItem* a = new indexItem(field, 0);
-    protag->getItem(a, stoi(value));
-  }
-
-
   //load which levels are unlocked, as a list of lowercase names
   //
   //unlocked levels should have '-' instead of ' ' in the name, for parsing reasons
@@ -7228,24 +7053,17 @@ int loadSave() {
 
   }
 
-  file.close();
-
-  for(auto x : g_entities) {
-    x->children.clear(); // might be a leak here
-  }
-
-  //re-attach persistent orbitals
-  for(auto x : g_entities) {
-    if(x->persistentGeneral && x->parentName != "null") {
-      entity* hopeful = searchEntities(x->parentName);
-      if(hopeful != nullptr) {
-        x->isOrbital = 1;
-        x->parent = hopeful;
-        x->parent->children.push_back(x);
-      }
-
+  g_combatInventory.clear();
+  //load combatItems
+  while(getline(file, line)) {
+    if(line[0] == '&') { break;}
+    if(g_combatInventory.size() < g_maxInventorySize) {
+      g_combatInventory.push_back(stoi(line));
     }
   }
+
+
+  file.close();
 
   return 0;
 }
@@ -7288,13 +7106,6 @@ int writeSave() {
     file << x->name << " " << x->level << " " << x->hp << endl;
   }
   file << "&" << endl;
- 
-  //write protag's inventory
-  extern entity* protag;
-  for(auto x : protag->inventory) {
-    file << x.first->name << " " << x.second << endl;
-  }
-  file << "&" << endl; //token to stop writing inventory
   
   for(int i = 0; i < g_levelSequence->levelNodes.size(); i++) {
     if(g_levelSequence->levelNodes[i]->locked == 0) {
@@ -8450,15 +8261,15 @@ void clear_map(camera& cameraToReset) {
 
 
       //ui
-      if(!inPauseMenu && g_showHUD) {
-      	// !!! segfaults on mapload sometimes
-      	adventureUIManager->healthText->updateText( to_string(int(protag->hp)) + '/' + to_string(int(protag->maxhp)), WIN_WIDTH * g_minifontsize, 0.9);
-      	adventureUIManager->healthText->show = 1;
-
-      } else {
-      	adventureUIManager->healthText->show = 0;
-
-      }
+//      if(!inPauseMenu && g_showHUD) {
+//      	// !!! segfaults on mapload sometimes
+//      	adventureUIManager->healthText->updateText( to_string(int(protag->hp)) + '/' + to_string(int(protag->maxhp)), WIN_WIDTH * g_minifontsize, 0.9);
+//      	adventureUIManager->healthText->show = 1;
+//
+//      } else {
+//      	adventureUIManager->healthText->show = 0;
+//
+//      }
 
       // //move the healthbar properly to the protagonist
       // rect obj; // = {( , (((protag->y - ((protag->height))) - protag->z * XtoZ) - g_camera.y) * g_camera.zoom, (protag->width * g_camera.zoom), (protag->height * g_camera.zoom))};
@@ -8548,162 +8359,86 @@ void clear_map(camera& cameraToReset) {
   
         int i = 0;
   
-        if (g_inventoryUiIsLevelSelect == 0) {
-          //populate boxes based on inventory
-          for (auto it = mainProtag->inventory.rbegin(); it != mainProtag->inventory.rend(); ++it)
+        //populate the UI based on the loaded level sequence.
+        for(int j = 0; j < g_levelSequence->levelNodes.size(); j++) {
+          if( i < itemsPerRow * inventoryScroll) {
+            i++;
+            continue;
+          }
+          SDL_Rect drect = {(int)x, (int)y, (int)itemWidth, (int)itemWidth}; 
+          int boosh = 5;
+          drect.w += boosh * 2;
+          drect.h += boosh * 2;
+          drect.x -= boosh;
+          drect.y -= boosh;
+  
+          //should we draw the locked graphic?
+          if(g_levelSequence->levelNodes[j]->locked) {
+            SDL_RenderCopy(renderer, g_locked_level_texture, NULL, &drect);
+          } else {
+            SDL_RenderCopy(renderer, g_levelSequence->levelNodes[j]->sprite, NULL, &drect);
+          }
+  
+          if (i == inventorySelection)
           {
-    
-            if (i < itemsPerRow * inventoryScroll)
-            {
-              // this item won't be rendered
-              i++;
-              continue;
+  
+            if(g_levelSequence->levelNodes[i]->locked) {
+              adventureUIManager->escText->updateText("Locked", -1, 0.9);
+            } else {
+              string dispText = g_levelSequence->levelNodes[i]->name;
+              std::replace(dispText.begin(), dispText.end(),'_',' ');
+              adventureUIManager->escText->updateText(g_levelSequence->levelNodes[i]->name, -1, 0.9);
+  
             }
-    
-            SDL_Rect drect = {(int)x, (int)y, (int)itemWidth, (int)itemWidth};
-            if (it->second > 0)
-            {
-              SDL_RenderCopy(renderer, it->first->texture, NULL, &drect);
-            }
-            // draw number
-            if (it->second > 1)
-            {
-              inventoryText->show = 1;
-              inventoryText->updateText(to_string(it->second), -1, 100);
-              inventoryText->boxX = (x + (itemWidth * 0.8)) / WIN_WIDTH;
-              inventoryText->boxY = (y + (itemWidth - inventoryText->boxHeight / 2) * 0.6) / WIN_HEIGHT;
-              inventoryText->worldspace = 1;
-              inventoryText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-            }
-            else
-            {
-              inventoryText->show = 0;
-            }
-    
-            if (i == inventorySelection)
-            {
-              // this item should have the marker
-              inventoryMarker->show = 1;
+  
+            // this item should have the marker
+            inventoryMarker->show = 1;
+            float biggen = 0.01; // !!! resolutions : might have problems with diff resolutions
+                                 
+            if(g_firstFrameOfPauseMenu) {
               inventoryMarker->x = x / WIN_WIDTH;
               inventoryMarker->y = y / WIN_HEIGHT;
-              inventoryMarker->x += 0.02 * 40 * ((float)WIN_WIDTH / (float)WIN_HEIGHT); 
-              inventoryMarker->y += 0.03 * 40 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              inventoryMarker->width = itemWidth / WIN_WIDTH;
-    
-              float biggen = 0.01; // !!! resolutions : might have problems with diff resolutions
               inventoryMarker->x -= biggen;
               inventoryMarker->y -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              inventoryMarker->width += biggen * 2;
-              inventoryMarker->height = inventoryMarker->width * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-            }
-    
-            x += itemWidth + padding;
-            if (x > maxX)
-            {
-              x = defaultX;
-              y += itemWidth + padding;
-              if (y > maxY)
-              {
-                // we filled up the entire inventory, so lets leave
-                break;
-              }
-            }
-            i++;
-          }
-          g_itemsInInventory = mainProtag->inventory.size();
-    
-          if (mainProtag->inventory.size() > 0 && mainProtag->inventory.size() - 1 - inventorySelection < mainProtag->inventory.size())
-          {
-            string description = mainProtag->inventory[mainProtag->inventory.size() - 1 - inventorySelection].first->script[0];
-            // first line is a comment so take off the //
-            description = description.substr(2);
-            adventureUIManager->escText->updateText(description, -1, 0.9);
-          }
-          else
-          {
-            adventureUIManager->escText->updateText("No items in inventory", -1, 0.9);
-          }
-        } else {
-          //populate the UI based on the loaded level sequence.
-          for(int j = 0; j < g_levelSequence->levelNodes.size(); j++) {
-            if( i < itemsPerRow * inventoryScroll) {
-              i++;
-              continue;
-            }
-            SDL_Rect drect = {(int)x, (int)y, (int)itemWidth, (int)itemWidth}; 
-            int boosh = 5;
-            drect.w += boosh * 2;
-            drect.h += boosh * 2;
-            drect.x -= boosh;
-            drect.y -= boosh;
-  
-            //should we draw the locked graphic?
-            if(g_levelSequence->levelNodes[j]->locked) {
-              SDL_RenderCopy(renderer, g_locked_level_texture, NULL, &drect);
+              //now that it's a hand
+              inventoryMarker->x += 0.02 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+              inventoryMarker->y += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+              inventoryMarker->targetx = inventoryMarker->x;
+              inventoryMarker->targety = inventoryMarker->y;
+              g_firstFrameOfPauseMenu = 0;
             } else {
-              SDL_RenderCopy(renderer, g_levelSequence->levelNodes[j]->sprite, NULL, &drect);
+              inventoryMarker->targetx = x / WIN_WIDTH;
+              inventoryMarker->targety = y / WIN_HEIGHT;
+              inventoryMarker->targetx -= biggen;
+              inventoryMarker->targety -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+              //now that it's a hand
+              inventoryMarker->targetx += 0.02 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+              inventoryMarker->targety += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
             }
-  
-            if (i == inventorySelection)
-            {
-  
-              if(g_levelSequence->levelNodes[i]->locked) {
-                adventureUIManager->escText->updateText("Locked", -1, 0.9);
-              } else {
-                string dispText = g_levelSequence->levelNodes[i]->name;
-                std::replace(dispText.begin(), dispText.end(),'_',' ');
-                adventureUIManager->escText->updateText(g_levelSequence->levelNodes[i]->name, -1, 0.9);
-  
-              }
-  
-              // this item should have the marker
-              inventoryMarker->show = 1;
-              float biggen = 0.01; // !!! resolutions : might have problems with diff resolutions
-                                   
-              if(g_firstFrameOfPauseMenu) {
-                inventoryMarker->x = x / WIN_WIDTH;
-                inventoryMarker->y = y / WIN_HEIGHT;
-                inventoryMarker->x -= biggen;
-                inventoryMarker->y -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                //now that it's a hand
-                inventoryMarker->x += 0.02 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                inventoryMarker->y += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                inventoryMarker->targetx = inventoryMarker->x;
-                inventoryMarker->targety = inventoryMarker->y;
-                g_firstFrameOfPauseMenu = 0;
-              } else {
-                inventoryMarker->targetx = x / WIN_WIDTH;
-                inventoryMarker->targety = y / WIN_HEIGHT;
-                inventoryMarker->targetx -= biggen;
-                inventoryMarker->targety -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                //now that it's a hand
-                inventoryMarker->targetx += 0.02 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-                inventoryMarker->targety += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              }
 
-              inventoryMarker->width = itemWidth / WIN_WIDTH;
+            inventoryMarker->width = itemWidth / WIN_WIDTH;
     
-              inventoryMarker->width += biggen * 2;
-              inventoryMarker->height = inventoryMarker->width * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-            }
-    
-            x += itemWidth + padding;
-            if (x > maxX)
-            {
-              x = defaultX;
-              y += itemWidth + padding;
-              if (y > maxY)
-              {
-                // we filled up the entire inventory, so lets leave
-                break;
-              }
-            }
-            i++;
-  
+            inventoryMarker->width += biggen * 2;
+            inventoryMarker->height = inventoryMarker->width * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
           }
-          g_itemsInInventory = g_levelSequence->levelNodes.size();
-          
+    
+          x += itemWidth + padding;
+          if (x > maxX)
+          {
+            x = defaultX;
+            y += itemWidth + padding;
+            if (y > maxY)
+            {
+              // we filled up the entire inventory, so lets leave
+              break;
+            }
+          }
+          i++;
+  
         }
+        g_itemsInInventory = g_levelSequence->levelNodes.size();
+          
+        
   
         //re-render inventory reticle so it goes on top of the items/level icons
         inventoryMarker->render(renderer, g_camera, 0);
@@ -9208,7 +8943,6 @@ settingsUI::~settingsUI() {
 }
 
 void settingsUI::show() {
-  M("settingsUI::show()");
   ninePatch->show = 1;
   uiSelecting();
   backButton->show = 1;
@@ -9456,20 +9190,17 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     seeingDetectable->show = 1;
     seeingDetectable->priority = -2;
 
-    M("Made seeingDetectable");
-
-
-    healthText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
-    healthText->boxWidth = 0.95;
-    healthText->width = 0.95;
-    healthText->boxHeight = 0;
-    healthText->boxX = 0.05;
-    healthText->boxY = 0.15; //0.3 to get it under the heart
-    healthText->worldspace = 1;
-    healthText->show = 1;
-    healthText->align = 0;
-    healthText->dropshadow = 1;
-    healthText->layer0 = 1;
+//    healthText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
+//    healthText->boxWidth = 0.95;
+//    healthText->width = 0.95;
+//    healthText->boxHeight = 0;
+//    healthText->boxX = 0.05;
+//    healthText->boxY = 0.15; //0.3 to get it under the heart
+//    healthText->worldspace = 1;
+//    healthText->show = 1;
+//    healthText->align = 0;
+//    healthText->dropshadow = 1;
+//    healthText->layer0 = 1;
 
 //    hungerText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
 //    hungerText->boxWidth = 0.95;
@@ -9571,16 +9302,16 @@ void adventureUI::initFullUI() {
   adventureUIManager->stomachShakeDurationMs = adventureUIManager->maxstomachShakeDurationMs;
   adventureUIManager->stomachShakeIntervalMs = adventureUIManager->maxstomachShakeIntervalMs + rand() % adventureUIManager->stomachShakeIntervalRandomMs;
 
-  healthPicture = new ui(renderer, "resources/static/ui/health.qoi", -0.04, -0.09, 0.25, 1, -15);
-  healthPicture->persistent = 1;
-  healthPicture->heightFromWidthFactor = 1;
-  healthPicture->show = 1;
-  healthPicture->framewidth = 410;
-  healthPicture->frameheight = 465;
-  healthPicture->layer0 = 1;
-  healthPicture->glideSpeed = 0.1;
-  healthPicture->widthGlideSpeed = 0.1;
-  healthPicture->priority = -10; //health is behind everything
+//  healthPicture = new ui(renderer, "resources/static/ui/health.qoi", -0.04, -0.09, 0.25, 1, -15);
+//  healthPicture->persistent = 1;
+//  healthPicture->heightFromWidthFactor = 1;
+//  healthPicture->show = 1;
+//  healthPicture->framewidth = 410;
+//  healthPicture->frameheight = 465;
+//  healthPicture->layer0 = 1;
+//  healthPicture->glideSpeed = 0.1;
+//  healthPicture->widthGlideSpeed = 0.1;
+//  healthPicture->priority = -10; //health is behind everything
 
   emotion = new ui(renderer, "resources/static/ui/emoticons.qoi", 0, 0, 0.05, 0.05, -15);
   emotion->persistent = 1;
@@ -9929,6 +9660,8 @@ void adventureUI::continueDialogue()
   {
     g_gamemode = gamemode::COMBAT;
     g_submode = submode::TEXT;
+    combatUIManager->partyHealthBox->show = 1;
+    combatUIManager->partyText->show = 1;
     combatUIManager->finalText = "It's an enemy encounter!";
     combatUIManager->currentText = "";
     combatUIManager->queuedStrings.push_back("Second line of combat dialog!");
@@ -10038,68 +9771,12 @@ void adventureUI::continueDialogue()
     return;
   }
 
-  // item prompt
-  //$
-  //Would confict with string variables, so I added a second check
-  if (scriptToUse->at(dialogue_index + 1).at(0) == '$' && scriptToUse->at(dialogue_index + 1).at(1) != '$')
-  {
-    int j = 1;
-    // parse which block of memory we are interested in
-    string s = scriptToUse->at(dialogue_index + 1);
-    s.erase(0, 1);
-
-    int numberOfItem = 0;
-    // indexItem* itemref = 0;
-    for (auto x : mainProtag->inventory)
-    {
-      if (x.first->name == s)
-      {
-        numberOfItem = x.second;
-        // itemref = x.first;
-      }
-    }
-
-    string res = scriptToUse->at(dialogue_index + 1 + j);
-    while (res.find('*') != std::string::npos)
-    {
-
-      // parse option
-      //  *15 29 -> if data is 15, go to line 29
-      string s = scriptToUse->at(dialogue_index + 1 + j);
-      s.erase(0, 1);
-      int condition = stoi(s.substr(0, s.find(':')));
-      s.erase(0, s.find(':') + 1);
-      int jump = stoi(s);
-      if (numberOfItem >= condition)
-      {
-        dialogue_index = jump - 3;
-        this->continueDialogue();
-        return;
-      }
-      j++;
-      res = scriptToUse->at(dialogue_index + 1 + j);
-    }
-    dialogue_index++;
-    this->continueDialogue();
-    return;
-  }
-
   // give item
   if (scriptToUse->at(dialogue_index + 1).substr(0, 5) == "/give")
   {
     string s = scriptToUse->at(dialogue_index + 1);
     s.erase(0, 6);
     vector<string> x = splitString(s, ' ');
-
-    indexItem *a = new indexItem(x[0], 0);
-
-    // if you just type the name of the item, it's assumed that we are giving one
-    if ((int)x.size() < 2)
-    {
-      x.push_back("1");
-    }
-
-    mainProtag->getItem(a, stoi(x[1]));
 
     dialogue_index++;
     this->continueDialogue();
@@ -10112,15 +9789,6 @@ void adventureUI::continueDialogue()
     s.erase(0, 6);
     vector<string> x = splitString(s, ' ');
 
-    indexItem *a = new indexItem(x[0], 0);
-
-    // if you just type the name of the item, it's assumed that we are giving one
-    if ((int)x.size() < 2)
-    {
-      x.push_back("1");
-    }
-
-    mainProtag->loseItem(a, stoi(x[1]));
 
     dialogue_index++;
     this->continueDialogue();
@@ -12227,15 +11895,15 @@ void adventureUI::positionInventory() {
 //hide heart and other stuff if the player is in the menus
 void adventureUI::hideHUD() {
   showHud = 0;
-  healthPicture->show = 0;
-  healthText->show = 0;
+  //healthPicture->show = 0;
+  //healthText->show = 0;
   //systemClock->show = 0;
 }
 
 void adventureUI::showHUD() {
   showHud = 1;
-  healthPicture->show = 1;
-  healthText->show = 1;
+//  healthPicture->show = 1;
+//  healthText->show = 1;
   //systemClock->show = 1;
 }
 

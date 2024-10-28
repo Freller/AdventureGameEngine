@@ -8,6 +8,25 @@
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_mixer.h>
 #include <string>
+#include <unordered_map>
+
+struct itemInfo {
+  std::string name = "";
+  int targeting = 0; //0 - target enemy
+                     //1 - target teammate
+                     //2 - no target
+  
+  bool usedByWhom = -1; //Which party member is using this item
+                        //used to stop displaying an item
+                        //if another member is using it
+  itemInfo(std::string a, int b);
+  itemInfo();
+};
+
+//extern std::vector<std::pair<int, std::string>> itemNamesTable;
+extern std::unordered_map<int, itemInfo> itemsTable;
+
+void initItemsTable();
 
 class ui;
 class textbox;
@@ -19,13 +38,19 @@ enum turn {
 
 //for handing menuing in turn based combat code
 enum class submode {
-  TEXT, //text box has focus, writing message to player
+  TEXT, //entry text box
   MAIN, //player chooses between Fight, Items, Spirit, Defend, Run
   SPIRITCHOOSE, //player chooses which spirit move to use
   ITEMCHOOSE, //player chooses which item to use
   TARGETING, //player chooses which enemy to target
+  ALLYTARGETING, 
   CONTINUE, //go to next party member, or maybe to execute
-  EXECUTE //take serialization and play out the player's and enemy's turns
+  EXECUTE_P, //take serialization and play out the player's turns
+  TEXT_P, //Feedback about player's turns
+  EXECUTE_E, //play the enemies's turns
+  TEXT_E, //Feedback about the enemies's turns
+  FINAL,
+  FINALTEXT // Feedback about the battle
 };
 
 enum class turnAction {
@@ -70,6 +95,13 @@ public:
   int targetingColorMod = 0;
   float tcm_accumulator = 0;
 
+  int executePIndex = 0;
+  int executeEIndex = 0;
+
+  //int itemIndex = 0;
+  ui* inventoryPanel = 0;
+  textbox* inventoryText = 0;
+  int currentInventoryOption = 0;
 
   combatUI(SDL_Renderer* renderer);
 
