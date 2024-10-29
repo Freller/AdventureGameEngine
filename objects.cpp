@@ -6976,23 +6976,19 @@ int loadSave() {
 
     auto tokens = splitString(line, ' ');
     string name = tokens[0];
-    float level = stoi(tokens[1]);
+    float exp = stoi(tokens[1]);
     float currentHP = stof(tokens[2]);
 
     entity* a = new entity(renderer, name);
-    a->level = level;
-    a->hp = currentHP;
     party.push_back(a);
     a->tangible = 0;
     a->inParty = 1;
 
-    combatant* b = new combatant(name, level);
-    b->maxHealth = b->baseHealth + (b->healthGain * b->level);
-    b->health = currentHP;
+    combatant* b = new combatant(name, exp);
+    b->health = b->maxHealth;
     g_partyCombatants.push_back(b);
-    b = new combatant(name, level);
+    b = new combatant(name, exp);
     b->name = "Munnip";
-    b->maxHealth = b->baseHealth + (b->healthGain * b->level);
     b->health = b->maxHealth;
     g_partyCombatants.push_back(b);
 
@@ -11944,7 +11940,7 @@ void ribbon::render(SDL_Renderer* renderer, camera fcamera) {
   SDL_RenderCopyEx(renderer, texture, NULL, &drect, angle, &center, SDL_FLIP_NONE);
 }
 
-combatant::combatant(string filename, int flevel) {
+combatant::combatant(string filename, int fxp) {
   string loadstr;
   loadstr = "resources/static/combatfiles/" + filename + ".cmb";
   istringstream file(loadTextAsString(loadstr));
@@ -11963,6 +11959,10 @@ combatant::combatant(string filename, int flevel) {
   spritefilevar = "resources/static/combatsprites/" + temp + ".qoi";
   const char* spritefile = spritefilevar.c_str();
   texture = loadTexture(renderer, spritefile);
+
+  file >> temp;
+  file >> temp;
+  type = stringToType(temp);
 
   file >> temp;
   file >> baseAttack;
@@ -11988,7 +11988,24 @@ combatant::combatant(string filename, int flevel) {
   file >> temp;
   file >> criticalGain;
 
-  level = flevel;
+  file >> temp;
+  file >> baseSkill;
+
+  file >> temp;
+  file >> skillGain;
+
+  file >> temp;
+  file >> deathText;
+  for (char &ch : deathText) {
+    if(ch == '_') {
+      ch = ' ';
+    }
+  }
+
+  xp = fxp;
+  level = xpToLevel(xp);
+
+  maxHealth = baseHealth + (healthGain * level);
 
   int fw, fh;
   SDL_QueryTexture(texture, NULL, NULL, &fw, &fh);

@@ -2224,19 +2224,36 @@ public:
   float defenseGain;
 
   float baseHealth;
-  float healthGain; //should this be an int?
+  float healthGain;
 
-  float baseCritical;
+  float baseCritical; //chance to dodge/crit
   float criticalGain;
 
+  float baseSkill; //effectiveness of items
+  float skillGain;
+
+  float baseSoul; //power of spirit moves
+  float soulGain;
+
+  float baseMind; //max spirit points
+  float mindGain;
+
+  type type;
+
+  int xp;
   int level;
+
+  string deathText;
 
   SDL_Texture * texture;
   float width;
   float height;
 
-  int maxHealth;
   int health;
+  int maxHealth;
+
+  int sp;
+  int maxSp;
 
   //for drawing enemies
   int opacity = 0;
@@ -2247,6 +2264,8 @@ public:
   std::vector<int> inventory;
 
   int itemToUse = -1;
+
+  std::vector<int> spiritMoves;
 
   combatant(string filename, int level);
 

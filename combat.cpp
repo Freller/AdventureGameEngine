@@ -20,17 +20,123 @@ itemInfo::itemInfo() {
   targeting = 0;
 }
 
+spiritInfo::spiritInfo(string a, int b) {
+  name = a;
+  targeting = b;
+}
+
+spiritInfo::spiritInfo() {
+  name = "";
+  targeting = 0;
+}
+
+type stringToType(const std::string& str) {
+  static std::unordered_map<std::string, type> typeMap = {
+    {"none", NONE},
+    {"animal", ANIMAL},
+    {"plant", PLANT},
+    {"bug", BUG},
+    {"flying", FLYING},
+    {"swimming", SWIMMING},
+    {"robot", ROBOT},
+    {"alien", ALIEN},
+    {"undead", UNDEAD},
+    {"ghost", GHOST}
+  };
+
+  auto it = typeMap.find(str);
+  if (it != typeMap.end()) {
+    return it->second;
+  } else {
+    return NONE; // Default value if string not found
+  }
+}
+
 std::unordered_map<int, itemInfo> itemsTable;
 
-void initItemsTable() {
-  itemsTable[0] = itemInfo("Bandage", 1);
-  itemsTable[1] = itemInfo("Bomb", 0);
-  itemsTable[2] = itemInfo("Glasses", 2);
+std::unordered_map<int, spiritInfo> spiritTable;
+
+void initTables() {
+  {
+    itemsTable[0] = itemInfo("Bandage", 1);
+    itemsTable[1] = itemInfo("Bomb", 0);
+    itemsTable[2] = itemInfo("Glasses", 2);
+  }
+  
+  {
+    spiritTable[0] = spiritInfo("Poison", 0); //good damage over time
+    spiritTable[1] = spiritInfo("Shock", 0); //does crappy damage but great damage to robots
+    spiritTable[2] = spiritInfo("Focus", 2); //
+  }
+}
+
+void initCombat() {
+}
+
+int xpToLevel(int xp) {
+  int baseXP = 100;
+  int level = 0;
+  int totalXP = baseXP;
+
+  while(xp >= totalXP) {
+    level++;
+    totalXP+= static_cast<int>(baseXP * pow(1.5, level - 1));
+  }
+  
+  return level;
+}
+
+void useItem(int item, int target, combatant* user) {
+  switch(item) {
+    case 0:
+    {
+      //Bandage
+      int mag = 50.0f * frng(0.70, 1.30) * (float)((float)user->baseSkill + ((float)user->skillGain * user->level));
+      g_partyCombatants[target]->health += mag;
+      string message = user->name + " healed " + g_partyCombatants[target]->name + " for " + to_string(mag) + ".";
+      combatUIManager->finalText = message;
+      combatUIManager->currentText = "";
+      combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+      if(g_partyCombatants[target]->health >= g_partyCombatants[target]->maxHealth) {
+        g_partyCombatants[target]->health = g_partyCombatants[target]->maxHealth;
+      }
+      combatUIManager->dialogProceedIndicator->y = 0.25;
+      break;
+    }
+    case 1:
+    {
+      //Bomb
+      int mag = 50.0f * frng(0.70, 1.30) * (float)((float)user->baseSkill + ((float)user->skillGain * user->level));
+      g_enemyCombatants[target]->health -= mag;
+      string message = user->name + " hurt " + g_enemyCombatants[target]->name + " for " + to_string(mag) + ".";
+      combatUIManager->finalText = message;
+      combatUIManager->currentText = "";
+      combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+      combatUIManager->dialogProceedIndicator->y = 0.25;
+      combatant* e = g_enemyCombatants[target];
+      if(e->health < 0) {
+        D(e->deathText);
+        string deathmessage = e->name + " " +  e->deathText;
+        combatUIManager->queuedStrings.push_back(deathmessage);
+        g_enemyCombatants.erase(g_enemyCombatants.begin() + target);
+      }
+      break;
+      
+      break;
+    }
+    case 2:
+    {
+      //Glasses
+      //raise damage of next spririt attack by 300%
+      
+      break;
+    }
+  }
 }
 
 
 combatUI::combatUI(SDL_Renderer* renderer) {
-  initItemsTable();
+  initTables();
 
   partyHealthBox = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0, 0.65, 1, 0.35, 0);
   partyHealthBox->patchwidth = 213;
@@ -47,9 +153,17 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   partyText->boxY = 1-0.1;
   partyText->align = 0;
   partyText->dropshadow = 1;
-  //partyText->layer0 = 1;
   partyText->show = 1;
 
+  partyMiniText = new textbox(renderer, "Hey", 800 * g_fontsize, 0, 0, 0.9);
+  partyMiniText->boxWidth = 0;
+  partyMiniText->width = 0.95;
+  partyMiniText->boxHeight = 0;
+  partyMiniText->boxX = 0.2;
+  partyMiniText->boxY = 1-0.1;
+  partyMiniText->align = 1;
+  partyMiniText->dropshadow = 1;
+  partyMiniText->show = 1;
 
   mainPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0, 0.65, 1, 0.35, 0);
   mainPanel->patchwidth = 213;
@@ -88,6 +202,16 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   optionsText->boxY = 0.05;
   optionsText->dropshadow = 1;
 
+  optionsMiniText = new textbox(renderer, "Hey", 800 * g_fontsize, 0, 0, 0.9);
+  optionsMiniText->boxWidth = 0;
+  optionsMiniText->width = 0.95;
+  optionsMiniText->boxHeight = 0;
+  optionsMiniText->boxX = 0.19;
+  optionsMiniText->boxY = 0.07;
+  optionsMiniText->align = 1;
+  optionsMiniText->dropshadow = 1;
+  optionsMiniText->show = 1;
+
   menuPicker = new ui(renderer, "resources/static/ui/menu_picker.qoi", 0.92, 0.88, 0.04, 1, 0);
   menuPicker->heightFromWidthFactor = 1;
   menuPicker->persistent = true;
@@ -104,8 +228,9 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   targetText = new textbox(renderer, "Disaster", 1600 * g_fontsize, 0, 0, 0.9);
   targetText->boxWidth = 0.3;
   targetText->boxHeight = 0.12;
-  targetText->boxX = 0.45;
+  targetText->boxX = 0.55;
   targetText->boxY = 0.22;
+  targetText->align = 2;
   targetText->dropshadow = 1;
 
   inventoryPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.4, 0.05, 0.5, 0.65, 0);
@@ -121,6 +246,19 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   inventoryText->boxY = 0.22;
   inventoryText->dropshadow = 1;
 
+  spiritPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.4, 0.05, 0.25, 0.42, 0);
+  spiritPanel->patchwidth = 213;
+  spiritPanel->patchscale = 0.4;
+  spiritPanel->is9patch = true;
+  spiritPanel->persistent = true;
+
+  spiritText = new textbox(renderer, "Envenom", 1600 * g_fontsize, 0, 0, 0.9);
+  spiritText->boxWidth = 0.3;
+  spiritText->boxHeight = 0.12;
+  spiritText->boxX = 0.45;
+  spiritText->boxY = 0.22;
+  spiritText->dropshadow = 1;
+
 }
 
 combatUI::~combatUI() {
@@ -134,6 +272,9 @@ combatUI::~combatUI() {
 
 void drawOptionsPanel() {
   combatUIManager->optionsPanel->render(renderer, g_camera, elapsed);
+
+  combatUIManager->optionsMiniText->updateText(g_partyCombatants[curCombatantIndex]->name, -1, 0.85, g_textcolor, g_font);
+  combatUIManager->optionsMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
   const int rows = 2;
   const int columns = 3;
   const float width = 0.18;
@@ -169,11 +310,14 @@ void combatUI::hideAll() {
   mainText->show = 0;
   optionsPanel->show = 0;
   optionsText->show = 0;
+  optionsMiniText->show = 0;
   menuPicker->show = 0;
   targetPanel->show = 0;
   targetText->show = 0;
   inventoryPanel->show = 0;
   inventoryText->show = 0;
+  spiritPanel->show = 0;
+  spiritText->show = 0;
 }
 
 void getCombatInput() {
@@ -304,7 +448,8 @@ void drawCombatants() {
       if(g_submode == submode::MAIN ||
           g_submode == submode::TARGETING ||
           g_submode == submode::ITEMCHOOSE ||
-          g_submode == submode::ALLYTARGETING) {
+          g_submode == submode::ALLYTARGETING ||
+          g_submode == submode::SPIRITCHOOSE) {
         if(i == curCombatantIndex){
           bonusY = -0.05;
         }
@@ -313,7 +458,7 @@ void drawCombatants() {
 
       if(g_submode == submode::ALLYTARGETING) {
         if(i == combatUIManager->currentTarget) {
-          combatUIManager->partyText->textcolor = { 124, 92, 92};
+          combatUIManager->partyText->textcolor = { 108, 80, 80};
         } else {
           combatUIManager->partyText->textcolor = { 155, 115, 115};
         }
@@ -345,14 +490,23 @@ void drawCombatants() {
       combatUIManager->partyText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
 
       combatUIManager->partyText->boxY += 0.07;
-      combatUIManager->partyText->updateText(to_string(combatant->health) + '/' + to_string(combatant->maxHealth), -1, 34, combatUIManager->partyText->textcolor);
+      combatUIManager->partyText->updateText(to_string(combatant->health), -1, 34, combatUIManager->partyText->textcolor);
       combatUIManager->partyText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
 
 
+      combatUIManager->partyMiniText->boxX = x + 0.02 + 0.15;
+      combatUIManager->partyMiniText->boxY = 0.7 + 0.02 + bonusY + 0.028;
+      combatUIManager->partyMiniText->boxWidth = actual_width;
+      combatUIManager->partyMiniText->boxHeight = actual_height;
+
+      combatUIManager->partyMiniText->boxY += 0.07;
+      combatUIManager->partyMiniText->updateText('/' + to_string(combatant->maxHealth), -1, 34, combatUIManager->partyMiniText->textcolor);
+      combatUIManager->partyMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
 
   
   }
   combatUIManager->partyHealthBox->show = 0;
+
 
 }
 
@@ -415,6 +569,7 @@ void CombatLoop() {
             combatUIManager->dialogProceedIndicator->show = 0;
             combatUIManager->optionsPanel->show = 1;
             g_submode = submode::MAIN;
+            combatUIManager->currentOption = 0;
           }
         }
       }
@@ -537,6 +692,7 @@ void CombatLoop() {
 
       if(input[8] && !oldinput[8]) {
         g_submode = submode::MAIN;
+        combatUIManager->currentOption = 0;
         if(curCombatantIndex > 0) {
           curCombatantIndex--;
           combatUIManager->currentOption = 0;
@@ -547,6 +703,7 @@ void CombatLoop() {
       combatUIManager->optionsPanel->show = 1;
       combatUIManager->menuPicker->show = 1;
       combatUIManager->optionsText->show = 1;
+      combatUIManager->optionsMiniText->show = 1;
 
       drawOptionsPanel();
       break;
@@ -596,6 +753,7 @@ void CombatLoop() {
 
       if(input[8] && !oldinput[8]) {
         g_submode = submode::MAIN;
+        combatUIManager->currentOption = 0;
       }
 
 
@@ -622,6 +780,7 @@ void CombatLoop() {
         curCombatantIndex = 0;
       } else {
         g_submode = submode::MAIN;
+        combatUIManager->currentOption = 0;
         curCombatantIndex++;
       }
 
@@ -648,10 +807,9 @@ void CombatLoop() {
           string message = c->name + " deals " + to_string(damage) + " to " + e->name + "!";
   
           if(e->health < 0) {
-            string deathmessage = e->name + " turns into dust!";
+            string deathmessage = e->name + " " +  e->deathText;
             combatUIManager->queuedStrings.push_back(deathmessage);
             g_enemyCombatants.erase(g_enemyCombatants.begin() + c->serial.target);
-  
           }
   
           combatUIManager->finalText = message;
@@ -664,10 +822,11 @@ void CombatLoop() {
         combatant* com = g_partyCombatants[combatUIManager->executePIndex];
         int a = com->serial.actionIndex; //which item
         int b = com->serial.target; //which ally/enemy
-        int c = itemsTable[com->itemToUse].targeting; //target allies or enemies or neither
+        D(com->serial.actionIndex);
+        //int c = itemsTable[com->itemToUse].targeting; //target allies or enemies or neither
         com->itemToUse = -1;
 
-        useItem(a, b, c, com);
+        useItem(a, b, com);
 
         g_submode = submode::TEXT_P;
 
@@ -829,6 +988,7 @@ void CombatLoop() {
             combatUIManager->mainText->show = 0;
             combatUIManager->dialogProceedIndicator->show = 0;
             g_submode = submode::MAIN;
+            combatUIManager->currentOption = 0;
           } else {
             combatUIManager->executeEIndex++;
             g_submode = submode::EXECUTE_E;
@@ -996,6 +1156,7 @@ void CombatLoop() {
 
       if(input[8] && !oldinput[8]) {
         g_submode = submode::MAIN;
+        combatUIManager->currentOption = 0;
         combatUIManager->inventoryPanel->show = 0;
         combatUIManager->inventoryText->show = 0;
       }
@@ -1006,20 +1167,20 @@ void CombatLoop() {
           case 0:
             //enemy
             g_partyCombatants[curCombatantIndex]->serial.action = turnAction::ITEM;
-            g_partyCombatants[curCombatantIndex]->serial.actionIndex = combatUIManager->currentInventoryOption;
+            g_partyCombatants[curCombatantIndex]->serial.actionIndex = g_combatInventory[combatUIManager->currentInventoryOption];
             
             g_submode = submode::TARGETING;
             break;
           case 1:
             //teamate
             g_partyCombatants[curCombatantIndex]->serial.action = turnAction::ITEM;
-            g_partyCombatants[curCombatantIndex]->serial.actionIndex = combatUIManager->currentInventoryOption;
+            g_partyCombatants[curCombatantIndex]->serial.actionIndex = g_combatInventory[combatUIManager->currentInventoryOption];
             g_submode = submode::ALLYTARGETING;
             break;
           case 2:
             //none
             g_partyCombatants[curCombatantIndex]->serial.action = turnAction::ITEM;
-            g_partyCombatants[curCombatantIndex]->serial.actionIndex = combatUIManager->currentInventoryOption;
+            g_partyCombatants[curCombatantIndex]->serial.actionIndex = g_combatInventory[combatUIManager->currentInventoryOption];
             g_submode = submode::CONTINUE;
             break;
         }
@@ -1100,6 +1261,7 @@ void CombatLoop() {
 
       if(input[8] && !oldinput[8]) {
         g_submode = submode::MAIN;
+        combatUIManager->currentOption = 0;
       }
 
 
@@ -1111,6 +1273,123 @@ void CombatLoop() {
       combatUIManager->targetText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
       
 
+
+      break;
+    }
+    case submode::SPIRITCHOOSE:
+    {
+      combatUIManager->mainPanel->show = 0;
+      combatUIManager->dialogProceedIndicator->show = 0;
+      combatUIManager->mainText->show = 0;
+
+      combatUIManager->optionsPanel->show = 1;
+      combatUIManager->menuPicker->show = 1;
+      combatUIManager->optionsText->show = 1;
+
+      combatUIManager->targetPanel->show = 0;
+      combatUIManager->targetText->show = 0;
+
+      combatUIManager->spiritPanel->show = 1;
+      combatUIManager->spiritText->show = 1;
+
+      drawOptionsPanel();
+
+      combatUIManager->spiritPanel->render(renderer, g_camera, elapsed);
+
+      if(input[0] && !oldinput[0]) {
+        if(combatUIManager->currentInventoryOption != 0 &&
+           combatUIManager->currentInventoryOption != 7) {
+          combatUIManager->currentInventoryOption --;
+        }
+      }
+
+      if(input[1] && !oldinput[1]) {
+        if(combatUIManager->currentInventoryOption != 6 &&
+           combatUIManager->currentInventoryOption != 13) {
+          if(combatUIManager->currentInventoryOption + 1 < g_combatInventory.size()) {
+            combatUIManager->currentInventoryOption ++;
+          }
+        }
+      }
+
+      if(input[2] && !oldinput[2]) {
+        if(combatUIManager->currentInventoryOption >= 7) {
+          combatUIManager->currentInventoryOption -= 7;
+        }
+      }
+
+      if(input[3] && !oldinput[3]) {
+        if(combatUIManager->currentInventoryOption <= 6) {
+          if(combatUIManager->currentInventoryOption + 7 < g_combatInventory.size()) {
+            combatUIManager->currentInventoryOption += 7;
+          }
+        }
+      }
+      
+
+      if(input[8] && !oldinput[8]) {
+        g_submode = submode::MAIN;
+        combatUIManager->currentOption = 0;
+        combatUIManager->spiritPanel->show = 0;
+        combatUIManager->spiritText->show = 0;
+      }
+
+      if(input[11] && !oldinput[11] && g_combatInventory.size() > 0) {
+        g_partyCombatants[curCombatantIndex]->itemToUse = g_combatInventory[combatUIManager->currentInventoryOption];
+        switch(itemsTable[g_combatInventory[combatUIManager->currentInventoryOption]].targeting) {
+          case 0:
+            //enemy
+            g_partyCombatants[curCombatantIndex]->serial.action = turnAction::ITEM;
+            g_partyCombatants[curCombatantIndex]->serial.actionIndex = g_combatInventory[combatUIManager->currentInventoryOption];
+            
+            g_submode = submode::TARGETING;
+            break;
+          case 1:
+            //teamate
+            g_partyCombatants[curCombatantIndex]->serial.action = turnAction::ITEM;
+            g_partyCombatants[curCombatantIndex]->serial.actionIndex = g_combatInventory[combatUIManager->currentInventoryOption];
+            g_submode = submode::ALLYTARGETING;
+            break;
+          case 2:
+            //none
+            g_partyCombatants[curCombatantIndex]->serial.action = turnAction::ITEM;
+            g_partyCombatants[curCombatantIndex]->serial.actionIndex = g_combatInventory[combatUIManager->currentInventoryOption];
+            g_submode = submode::CONTINUE;
+            break;
+        }
+        g_combatInventory.erase(g_combatInventory.begin() + combatUIManager->currentInventoryOption);
+
+      }
+
+      const int rows = 7;
+      const int columns = 2;
+      const float width = 0.22;
+      const float height = 0.08;
+      const float initialX = 0.45;
+      const float initialY = 0.1;
+      int index = 0;
+      for(int i = 0; i < columns; i++) {
+        for(int j = 0; j < rows; j++) {
+          combatUIManager->spiritText->boxX = initialX + (i * width);
+          combatUIManager->spiritText->boxY = initialY + (j * height);
+          int itemIndex = g_combatInventory[index];
+          string itemName = "";
+          itemName = itemsTable[itemIndex].name;
+          combatUIManager->spiritText->updateText(itemName, -1, 0.85, g_textcolor, g_font);
+          if(index == combatUIManager->currentInventoryOption) {
+            combatUIManager->menuPicker->x = initialX + (i * width) - 0.035;
+            combatUIManager->menuPicker->y = initialY + (j * height) + 0.005;
+          }
+          if(index < g_combatInventory.size()) {
+            combatUIManager->spiritText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+          }
+     
+     
+          index++;
+        }
+      }
+     
+      combatUIManager->menuPicker->render(renderer, g_camera, elapsed);
 
       break;
     }

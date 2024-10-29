@@ -10,6 +10,8 @@
 #include <string>
 #include <unordered_map>
 
+class combatant;
+
 struct itemInfo {
   std::string name = "";
   int targeting = 0; //0 - target enemy
@@ -23,10 +25,25 @@ struct itemInfo {
   itemInfo();
 };
 
+struct spiritInfo {
+  std::string name = "";
+  int targeting = 0;
+  spiritInfo(std::string a, int b);
+  spiritInfo();
+};
+
 //extern std::vector<std::pair<int, std::string>> itemNamesTable;
 extern std::unordered_map<int, itemInfo> itemsTable;
 
-void initItemsTable();
+extern std::unordered_map<int, spiritInfo> spiritTable;
+
+void initTables();
+
+void initCombat();
+
+int xpToLevel(int xp);
+
+void useItem(int item, int target, combatant* user);
 
 class ui;
 class textbox;
@@ -35,6 +52,21 @@ enum turn {
   PLAYER,
   ENEMY
 };
+
+enum type {
+  NONE,
+  ANIMAL,
+  PLANT,
+  BUG,
+  FLYING,
+  SWIMMING,
+  ROBOT,
+  ALIEN,
+  UNDEAD,
+  GHOST
+};
+
+type stringToType(const std::string& str);
 
 //for handing menuing in turn based combat code
 enum class submode {
@@ -70,6 +102,7 @@ class combatUI {
 public:
   ui* partyHealthBox = 0;
   textbox* partyText = 0;
+  textbox* partyMiniText = 0;
 
   ui* mainPanel = 0;
   ui* dialogProceedIndicator = 0;
@@ -86,6 +119,7 @@ public:
 
   ui* optionsPanel = 0;
   textbox* optionsText = 0;
+  textbox* optionsMiniText = 0;
   ui* menuPicker = 0;
   int currentOption = 0;
 
@@ -98,10 +132,13 @@ public:
   int executePIndex = 0;
   int executeEIndex = 0;
 
-  //int itemIndex = 0;
   ui* inventoryPanel = 0;
   textbox* inventoryText = 0;
   int currentInventoryOption = 0;
+
+  ui* spiritPanel = 0;
+  textbox* spiritText = 0;
+  int currentSpiritOption = 0;
 
   combatUI(SDL_Renderer* renderer);
 
