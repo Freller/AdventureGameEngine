@@ -3148,10 +3148,14 @@ int WinMain()
   PHYSFS_freeList(entries);
 
   srand(time(NULL));
+  
   if (devMode)
   {
     // g_transitionSpeed = 10000;
     
+    entity* a = new entity(renderer, "common/fomm");
+    protag = a;
+    g_focus = protag;
     loadSave();
      
     string filename = g_levelSequence->levelNodes[0]->mapfilename;
@@ -3173,6 +3177,9 @@ int WinMain()
   {
     SDL_ShowCursor(0);
     loadSave();
+    entity* a = new entity(renderer, "common/fomm");
+    protag = a;
+    g_focus = protag;
     g_inTitleScreen = 1;
     load_map(renderer, "resources/maps/base/start.map","a"); //lol
     g_levelFlashing = 1;

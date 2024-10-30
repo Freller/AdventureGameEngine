@@ -10,7 +10,95 @@
 #include <string>
 #include <unordered_map>
 
-class combatant;
+using namespace std;
+
+enum type {
+  NONE,
+  ANIMAL,
+  PLANT,
+  BUG,
+  FLYING,
+  SWIMMING,
+  ROBOT,
+  ALIEN,
+  UNDEAD,
+  GHOST
+};
+
+enum class turnAction {
+  ATTACK,
+  SPIRITMOVE,
+  ITEM,
+  DEFEND
+};
+
+struct turnSerialization {
+  int target;
+  turnAction action;
+  int actionIndex;
+  int rank;
+};
+
+class combatant {
+public:
+
+  std::string name;
+
+  float baseAttack;
+  float attackGain;
+
+  float baseDefense;
+  float defenseGain;
+
+  float baseHealth;
+  float healthGain;
+
+  float baseCritical; //chance to dodge/crit
+  float criticalGain;
+
+  float baseSkill; //effectiveness of items
+  float skillGain;
+
+  float baseSoul; //power of spirit moves
+  float soulGain;
+
+  float baseMind; //max spirit points
+  float mindGain;
+
+  type type;
+
+  int xp;
+  int level;
+
+  std::string deathText;
+
+  SDL_Texture * texture;
+  float width;
+  float height;
+
+  int health;
+  int maxHealth;
+
+  int sp;
+  int maxSp;
+
+  //for drawing enemies
+  int opacity = 0;
+  SDL_Rect renderQuad = {-1,-1,-1,-1};
+
+  turnSerialization serial;
+
+  vector<int> inventory;
+
+  int itemToUse = -1;
+
+  vector<pair<int,int>> spiritMoves;
+
+  combatant(string filename, int level);
+
+  ~combatant();
+
+};
 
 struct itemInfo {
   std::string name = "";
@@ -28,7 +116,8 @@ struct itemInfo {
 struct spiritInfo {
   std::string name = "";
   int targeting = 0;
-  spiritInfo(std::string a, int b);
+  int cost = 0;
+  spiritInfo(std::string a, int b, int c);
   spiritInfo();
 };
 
@@ -53,18 +142,6 @@ enum turn {
   ENEMY
 };
 
-enum type {
-  NONE,
-  ANIMAL,
-  PLANT,
-  BUG,
-  FLYING,
-  SWIMMING,
-  ROBOT,
-  ALIEN,
-  UNDEAD,
-  GHOST
-};
 
 type stringToType(const std::string& str);
 
@@ -82,21 +159,11 @@ enum class submode {
   EXECUTE_E, //play the enemies's turns
   TEXT_E, //Feedback about the enemies's turns
   FINAL,
-  FINALTEXT // Feedback about the battle
+  FINALTEXT, // Feedback about the battle
+  SPWARNING,
+  DODGING
 };
 
-enum class turnAction {
-  ATTACK,
-  SPIRITMOVE,
-  ITEM,
-  DEFEND
-};
-
-struct turnSerialization {
-  int target;
-  turnAction action;
-  int actionIndex;
-};
 
 class combatUI {
 public:

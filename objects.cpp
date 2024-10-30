@@ -561,6 +561,14 @@ bool ElipseOverlap(rect a, rect b) {
   return (Distance(midpointA.x, midpointA.y, midpointB.x, midpointB.y) < (a.width + b.width)/2);
 }
 
+bool FlatEclipseOverlap(rect a, rect b) {
+  //get midpoints
+  coord midpointA = {a.x + a.width/2, a.y + a.height/2};
+  coord midpointB = {b.x + b.width/2, b.y + b.height/2};
+
+  return (Distance(midpointA.x, midpointA.y, midpointB.x, midpointB.y) < (a.width + b.width)/2);
+}
+
 bool CylinderOverlap(rect a, rect b, int skin) {
   //do an elipsecheck - then make sure the heights match up
   return (ElipseOverlap(a, b)) && ( (a.z >= b.z && a.z <= b.z + b.zeight) || (b.z >= a.z && b.z <= a.z + a.zeight));
@@ -6962,7 +6970,7 @@ int loadSave() {
 
 
   party.clear();
-  delete protag;
+  //delete protag;
 
   for(int i = 0; i < g_partyCombatants.size(); i++) {
     delete g_partyCombatants[i];
@@ -6978,38 +6986,46 @@ int loadSave() {
     string name = tokens[0];
     float exp = stoi(tokens[1]);
     float currentHP = stof(tokens[2]);
+    int currentSP = stoi(tokens[3]);
+    int spiritOne = stoi(tokens[4]);
+    int spiritOneRank = stoi(tokens[5]);
+    int spiritTwo = stoi(tokens[6]);
+    int spiritTwoRank = stoi(tokens[7]);
+    int spiritThree = stoi(tokens[8]);
+    int spiritThreeRank = stoi(tokens[9]);
+    int spiritFour = stoi(tokens[10]);
+    int spiritFourRank = stoi(tokens[11]);
 
-    entity* a = new entity(renderer, name);
-    party.push_back(a);
-    a->tangible = 0;
-    a->inParty = 1;
+    //entity* a = new entity(renderer, name);
+    //party.push_back(a);
+    //a->inParty = 1;
 
     combatant* b = new combatant(name, exp);
-    b->health = b->maxHealth;
-    g_partyCombatants.push_back(b);
-    b = new combatant(name, exp);
-    b->name = "Munnip";
-    b->health = b->maxHealth;
+    b->health = currentHP;
+    b->sp = currentSP;
+    b->spiritMoves.push_back(pair<int, int>(spiritOne, spiritOneRank));
+    b->spiritMoves.push_back(pair<int, int>(spiritTwo, spiritTwoRank));
+    b->spiritMoves.push_back(pair<int, int>(spiritThree, spiritThreeRank));
+    b->spiritMoves.push_back(pair<int, int>(spiritFour, spiritFourRank));
     g_partyCombatants.push_back(b);
 
-    if(a->essential) {
-      mainProtag = a;
-      setMainProtag = 1;
-    }
+//    if(a->essential) {
+//      mainProtag = a;
+//      setMainProtag = 1;
+//    }
     
   }
 
-  if(setMainProtag) {
-    protag = mainProtag;
-    protag->tangible = 1;
-  } else {
-    //fick
-    M("No essential entity found in save");
-    protag = party[0];
-    mainProtag = protag;
-  }
+//  if(setMainProtag) {
+//    protag = mainProtag;
+//    protag->tangible = 1;
+//  } else {
+//    //fick
+//    M("No essential entity found in save");
+//    protag = party[0];
+//    mainProtag = protag;
+//  }
 
-  g_focus = protag;
 
   //load spin entity
   if(g_spin_enabled && g_spin_entity == nullptr) {
@@ -11939,87 +11955,3 @@ void ribbon::render(SDL_Renderer* renderer, camera fcamera) {
 
   SDL_RenderCopyEx(renderer, texture, NULL, &drect, angle, &center, SDL_FLIP_NONE);
 }
-
-combatant::combatant(string filename, int fxp) {
-  string loadstr;
-  loadstr = "resources/static/combatfiles/" + filename + ".cmb";
-  istringstream file(loadTextAsString(loadstr));
-
-  string temp;
-  file >> temp;
-  file >> temp;
-
-  name = temp;
-
-  file >> temp;
-  file >> temp;
-
-
-  string spritefilevar;
-  spritefilevar = "resources/static/combatsprites/" + temp + ".qoi";
-  const char* spritefile = spritefilevar.c_str();
-  texture = loadTexture(renderer, spritefile);
-
-  file >> temp;
-  file >> temp;
-  type = stringToType(temp);
-
-  file >> temp;
-  file >> baseAttack;
-
-  file >> temp;
-  file >> attackGain;
-
-  file >> temp;
-  file >> baseDefense;
-
-  file >> temp;
-  file >> defenseGain;
-
-  file >> temp;
-  file >> baseHealth;
-
-  file >> temp;
-  file >> healthGain;
-
-  file >> temp;
-  file >> baseCritical;
-
-  file >> temp;
-  file >> criticalGain;
-
-  file >> temp;
-  file >> baseSkill;
-
-  file >> temp;
-  file >> skillGain;
-
-  file >> temp;
-  file >> deathText;
-  for (char &ch : deathText) {
-    if(ch == '_') {
-      ch = ' ';
-    }
-  }
-
-  xp = fxp;
-  level = xpToLevel(xp);
-
-  maxHealth = baseHealth + (healthGain * level);
-
-  int fw, fh;
-  SDL_QueryTexture(texture, NULL, NULL, &fw, &fh);
-
-  width = fw;
-  height = fh; 
-
-  width /= 1920.0;
-  height /= 1920.0; 
-
-
-}
-
-combatant::~combatant() {
-  SDL_DestroyTexture(texture);
-}
-
