@@ -408,6 +408,18 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   spiritText->boxY = 0.22;
   spiritText->dropshadow = 1;
 
+  float aspect = 16.0f / 10.0f;
+  dodgePanelFullWidth = 0.25;
+  dodgePanelFullHeight = 0.25 * aspect;
+  dodgePanelFullX = 0.5 - dodgePanelFullWidth/2;
+  dodgePanelFullY = 0.5 - dodgePanelFullHeight/2;
+  
+  dodgePanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.5- dodgePanelFullX, dodgePanelFullY, dodgePanelFullWidth, dodgePanelFullHeight, 0);
+  dodgePanel->patchwidth = 213;
+  dodgePanel->patchscale = 0.4;
+  dodgePanel->is9patch = true;
+  dodgePanel->persistent = true;
+
 }
 
 combatUI::~combatUI() {
@@ -468,6 +480,7 @@ void combatUI::hideAll() {
   inventoryText->show = 0;
   spiritPanel->show = 0;
   spiritText->show = 0;
+  dodgePanel->show = 0;
 }
 
 void getCombatInput() {
@@ -561,7 +574,7 @@ void getCombatInput() {
 
 void drawCombatants() {
   int count = g_enemyCombatants.size();
-  int gap = 0.01 * WIN_WIDTH; // Space between combatants
+  int gap = -0.01 * WIN_WIDTH; // Space between combatants
   
   for (int i = 0; i < count; ++i) {
       combatant* combatant = g_enemyCombatants[i];
@@ -1087,16 +1100,40 @@ void CombatLoop() {
         //by an identity field
 
       if(c->serial.action == turnAction::ATTACK) {
+//        combatant* e = g_partyCombatants[rng(0, g_partyCombatants.size() - 1)];
+//        int damage = c->baseAttack + (c->attackGain * c->level) - (e->baseDefense + (e->defenseGain * e->level));
+//        damage *= frng(0.70,1.30);
+//        e->health -= damage;
+//        string message = c->name + " deals " + to_string(damage) + " to " + e->name + "!";
+//        g_submode = submode::TEXT_E;
+//        combatUIManager->finalText = message;
+//        combatUIManager->currentText = "";
+//        combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+//        combatUIManager->dialogProceedIndicator->y = 0.25;
+        combatUIManager->mainPanel->show = 0;
+        combatUIManager->dialogProceedIndicator->show = 0;
+        combatUIManager->mainText->show = 0;
         combatant* e = g_partyCombatants[rng(0, g_partyCombatants.size() - 1)];
         int damage = c->baseAttack + (c->attackGain * c->level) - (e->baseDefense + (e->defenseGain * e->level));
         damage *= frng(0.70,1.30);
-        e->health -= damage;
-        string message = c->name + " deals " + to_string(damage) + " to " + e->name + "!";
-        g_submode = submode::TEXT_E;
+        combatUIManager->damageFromEachHit = damage;
+        combatUIManager->dodgePanel->x = combatUIManager->dodgePanelSmallX;
+        combatUIManager->dodgePanel->y = combatUIManager->dodgePanelSmallY;
+        combatUIManager->dodgePanel->width = combatUIManager->dodgePanelSmallWidth;
+        combatUIManager->dodgePanel->height = combatUIManager->dodgePanelSmallHeight;
+        combatUIManager->dodgePanel->show = 1;
+        combatUIManager->incrementDodgeTimer = 0;
+        combatUIManager->dodgeTimer = 0;
+        combatUIManager->damageTakenFromDodgingPhase = 0;
+        
+        //g_submode = submode::DODGING;
+        string message = c->name + " attacks " + e->name + " for " + to_string(damage) + " damage!";
         combatUIManager->finalText = message;
         combatUIManager->currentText = "";
         combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
         combatUIManager->dialogProceedIndicator->y = 0.25;
+        g_submode = submode::TEXT_E;
+
       }
 
       break;
@@ -1145,17 +1182,7 @@ void CombatLoop() {
           combatUIManager->finalText = combatUIManager->queuedStrings.at(0);
           combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
         } else {
-          if(combatUIManager->executeEIndex + 1 ==  g_enemyCombatants.size()) {
-            input[8] = 0;
-            combatUIManager->mainPanel->show = 0;
-            combatUIManager->mainText->show = 0;
-            combatUIManager->dialogProceedIndicator->show = 0;
-            g_submode = submode::MAIN;
-            combatUIManager->currentOption = 0;
-          } else {
-            combatUIManager->executeEIndex++;
-            g_submode = submode::EXECUTE_E;
-          }
+          g_submode = submode::DODGING;
         }
       }
 
@@ -1676,6 +1703,58 @@ void CombatLoop() {
 
       break;
     }
+    case submode::DODGING:
+    {
+      combatUIManager->dialogProceedIndicator->show = 0;
+      float rate = 2;
+      if(combatUIManager->dodgePanel->x > combatUIManager->dodgePanelFullX) {
+        combatUIManager->dodgePanel->x -= 0.01 * rate;
+      }
+      if(combatUIManager->dodgePanel->x <= combatUIManager->dodgePanelFullX) {
+        combatUIManager->dodgePanel->x = combatUIManager->dodgePanelFullX;
+        combatUIManager->incrementDodgeTimer = 1;
+      }
+
+      if(combatUIManager->dodgePanel->y > combatUIManager->dodgePanelFullY) {
+        combatUIManager->dodgePanel->y -= 0.01 * rate * (16.0f / 10.0f);;
+      }
+      if(combatUIManager->dodgePanel->y < combatUIManager->dodgePanelFullY) {
+        combatUIManager->dodgePanel->y = combatUIManager->dodgePanelFullY;
+      }
+
+      if(combatUIManager->dodgePanel->width < combatUIManager->dodgePanelFullWidth) {
+        combatUIManager->dodgePanel->width += 0.02 * rate;
+      }
+      if(combatUIManager->dodgePanel->width > combatUIManager->dodgePanelFullWidth) {
+        combatUIManager->dodgePanel->width = combatUIManager->dodgePanelFullWidth;
+      }
+
+      if(combatUIManager->dodgePanel->height < combatUIManager->dodgePanelFullHeight) {
+        combatUIManager->dodgePanel->height += 0.02 * rate * (16.0f / 10.0f);
+      }
+      if(combatUIManager->dodgePanel->height > combatUIManager->dodgePanelFullHeight) {
+        combatUIManager->dodgePanel->height = combatUIManager->dodgePanelFullHeight;
+      }
+
+      if(combatUIManager->incrementDodgeTimer) {
+        combatUIManager->dodgeTimer += elapsed;
+
+      }
+
+      if(combatUIManager->dodgeTimer > combatUIManager->maxDodgeTimer) {
+        if(combatUIManager->executeEIndex + 1 ==  g_enemyCombatants.size()) {
+          combatUIManager->mainPanel->show = 0;
+          combatUIManager->mainText->show = 0;
+          combatUIManager->dialogProceedIndicator->show = 0;
+          g_submode = submode::MAIN;
+          combatUIManager->currentOption = 0;
+        } else {
+          combatUIManager->executeEIndex++;
+          g_submode = submode::EXECUTE_E;
+        }
+      }
+      break;
+    }
   }
 
   combatUIManager->mainPanel->render(renderer, g_camera, elapsed);
@@ -1683,7 +1762,9 @@ void CombatLoop() {
   combatUIManager->dialogProceedIndicator->render(renderer, g_camera, elapsed);
 
 
-
+  if(g_submode == submode::DODGING) {
+    combatUIManager->dodgePanel->render(renderer, g_camera, elapsed);
+  }
 
 
 

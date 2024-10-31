@@ -207,6 +207,21 @@ public:
   textbox* spiritText = 0;
   int currentSpiritOption = 0;
 
+  float dodgePanelFullX;
+  float dodgePanelFullY;
+  float dodgePanelFullWidth;
+  float dodgePanelFullHeight;
+  float dodgePanelSmallX = 0.5;
+  float dodgePanelSmallY = 0.5;
+  float dodgePanelSmallWidth = 0;
+  float dodgePanelSmallHeight = 0;
+  ui* dodgePanel = 0;
+  int incrementDodgeTimer = 0;
+  int damageTakenFromDodgingPhase = 0;
+  int damageFromEachHit = 0;
+  int dodgeTimer = 0;
+  const int maxDodgeTimer = 15000;
+
   combatUI(SDL_Renderer* renderer);
 
   ~combatUI();
