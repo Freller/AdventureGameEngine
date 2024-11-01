@@ -127,6 +127,10 @@ vector<combatant *> g_enemyCombatants;
 
 vector<combatant *> g_partyCombatants;
 
+vector<miniEnt *> g_miniEnts;
+
+vector<miniBullet *> g_miniBullets;
+
 map<string, int> enemiesMap; // stores (file,cost) for enemies to be spawned procedurally in the map
 int g_budget = 0;						 // how many points this map can spend on enemies;
 
@@ -1324,6 +1328,10 @@ int rng(int min, int max) {
 float frng(float min, float max) {
   if(max == min) {return min;}
   return min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(max-min)));
+}
+
+float clamp(float value, float min, float max) {
+  return std::max(min, std::min(max, value));
 }
 
 void hurtProtag(int dmg) {

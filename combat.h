@@ -10,6 +10,11 @@
 #include <string>
 #include <unordered_map>
 
+const int SCREEN_WIDTH = 1024;
+const int SCREEN_HEIGHT = 1024;
+const float SPAWN_MARGIN = 50.0f;
+
+
 using namespace std;
 
 enum type {
@@ -221,6 +226,16 @@ public:
   int damageFromEachHit = 0;
   int dodgeTimer = 0;
   const int maxDodgeTimer = 15000;
+  float dodgerSpeed = 14;
+  float aspect = 1;
+  float dodgerX = 512;
+  float dodgerY = 512;
+  float dodgerWidth = 100;
+  float dodgerHeight = 100;
+  SDL_Texture* dodgerTexture = 0;
+  SDL_Texture* rendertarget = 0;
+  SDL_Texture* bulletTexture = 0;
+  float bulletTimerAccumulator = 0;
 
   combatUI(SDL_Renderer* renderer);
 
@@ -234,5 +249,29 @@ void drawCombatants();
 void getCombatInput();
 
 void CombatLoop();
+
+class miniEnt {
+public:
+  float x = 0;
+  float y = 0;
+  float w = 0;
+  float h = 0;
+  float velocity = 0;
+  float angle = 0;
+  SDL_Texture* texture;
+  void update(float elapsed);
+  void render();
+  miniEnt();
+  ~miniEnt();
+};
+
+class miniBullet:public miniEnt {
+public:
+  miniBullet(float f_angle, float f_velocity);
+  miniBullet();
+  ~miniBullet();
+};
+
+
 
 #endif

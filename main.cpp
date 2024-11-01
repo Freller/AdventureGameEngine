@@ -114,11 +114,6 @@ void updateWindowResolution() {
     WIN_WIDTH /= scalex;
     WIN_HEIGHT = WIN_WIDTH * 0.625;
   }
-
-  //SDL_RenderSetLogicalSize(renderer, 600, 480);
-//  WIN_WIDTH = 600 / scalex;
-//  WIN_HEIGHT = 480 / scalex;
-
 }
 
 

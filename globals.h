@@ -127,6 +127,10 @@ class combatant;
 
 class combatUI;
 
+class miniEnt;
+
+class miniBullet;
+
 class camera
 {
   public:
@@ -251,6 +255,10 @@ extern vector<ribbon *> g_ribbons;
 extern vector<combatant *> g_enemyCombatants;
 
 extern vector<combatant *> g_partyCombatants;
+
+extern vector<miniEnt *> g_miniEnts;
+
+extern vector<miniBullet *> g_miniBullets;
 
 struct cmpCoord
 {
@@ -919,7 +927,6 @@ enum gamemode {
 
 extern gamemode g_gamemode;
 
-
 extern turn g_turn;
 
 extern submode g_submode;
@@ -979,6 +986,8 @@ int yesNoPrompt(string msg);
 int rng(int min, int max);
 
 float frng(float min, float max);
+
+float clamp(float value, float min, float max);
 
 void hurtProtag(int dmg);
 

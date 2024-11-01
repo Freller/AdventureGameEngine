@@ -4,13 +4,6 @@
 #include "utils.h"
 #include <unordered_map>
 
-//std::vector<std::pair<int, std::string>> itemNamesTable = {
-//  {0, ""},
-//  {1, "Bandage"},
-//  {2, "Bomb"},
-//  {3, "Glasses"}
-//};
-
 combatant::combatant(string filename, int fxp) {
   string loadstr;
   loadstr = "resources/static/combatfiles/" + filename + ".cmb";
@@ -236,7 +229,6 @@ void useItem(int item, int target, combatant* user) {
       combatUIManager->dialogProceedIndicator->y = 0.25;
       combatant* e = g_enemyCombatants[target];
       if(e->health < 0) {
-        D(e->deathText);
         string deathmessage = e->name + " " +  e->deathText;
         combatUIManager->queuedStrings.push_back(deathmessage);
         g_enemyCombatants.erase(g_enemyCombatants.begin() + target);
@@ -408,7 +400,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   spiritText->boxY = 0.22;
   spiritText->dropshadow = 1;
 
-  float aspect = 16.0f / 10.0f;
+  aspect = 16.0f / 10.0f;
   dodgePanelFullWidth = 0.25;
   dodgePanelFullHeight = 0.25 * aspect;
   dodgePanelFullX = 0.5 - dodgePanelFullWidth/2;
@@ -420,6 +412,14 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   dodgePanel->is9patch = true;
   dodgePanel->persistent = true;
 
+  const char* file = "resources/static/sprites/minigame/fomm.qoi";
+  dodgerTexture = loadTexture(renderer, file);
+ 
+  file = "resources/static/sprites/minigame/bullet.qoi";
+  bulletTexture = loadTexture(renderer, file);
+
+  rendertarget = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, 1024, 1024);
+  SDL_SetTextureBlendMode(rendertarget, SDL_BLENDMODE_BLEND);
 }
 
 combatUI::~combatUI() {
@@ -694,7 +694,7 @@ void CombatLoop() {
       combatUIManager->mainText->show = 1;
       combatUIManager->optionsPanel->show = 0;
 
-      if(input[8]) {
+      if(input[11]) {
         text_speed_up = 50;
       } else {
         text_speed_up = 1;
@@ -1016,7 +1016,7 @@ void CombatLoop() {
       combatUIManager->mainText->show = 1;
       combatUIManager->optionsPanel->show = 0;
 
-      if(input[8]) {
+      if(input[11]) {
         text_speed_up = 50;
       } else {
         text_speed_up = 1;
@@ -1110,9 +1110,9 @@ void CombatLoop() {
 //        combatUIManager->currentText = "";
 //        combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
 //        combatUIManager->dialogProceedIndicator->y = 0.25;
-        combatUIManager->mainPanel->show = 0;
-        combatUIManager->dialogProceedIndicator->show = 0;
-        combatUIManager->mainText->show = 0;
+//        combatUIManager->mainPanel->show = 0;
+//        combatUIManager->dialogProceedIndicator->show = 0;
+//        combatUIManager->mainText->show = 0;
         combatant* e = g_partyCombatants[rng(0, g_partyCombatants.size() - 1)];
         int damage = c->baseAttack + (c->attackGain * c->level) - (e->baseDefense + (e->defenseGain * e->level));
         damage *= frng(0.70,1.30);
@@ -1144,7 +1144,7 @@ void CombatLoop() {
       combatUIManager->mainText->show = 1;
       combatUIManager->optionsPanel->show = 0;
 
-      if(input[8]) {
+      if(input[11]) {
         text_speed_up = 50;
       } else {
         text_speed_up = 1;
@@ -1183,6 +1183,9 @@ void CombatLoop() {
           combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
         } else {
           g_submode = submode::DODGING;
+          combatUIManager->bulletTimerAccumulator = 0;
+          combatUIManager->dodgerX = 512;
+          combatUIManager->dodgerY = 512;
         }
       }
 
@@ -1221,7 +1224,7 @@ void CombatLoop() {
       combatUIManager->mainText->show = 1;
       combatUIManager->optionsPanel->show = 0;
 
-      if(input[8]) {
+      if(input[11]) {
         text_speed_up = 50;
       } else {
         text_speed_up = 1;
@@ -1738,7 +1741,31 @@ void CombatLoop() {
 
       if(combatUIManager->incrementDodgeTimer) {
         combatUIManager->dodgeTimer += elapsed;
-
+        if(input[0]) {
+          combatUIManager->dodgerY -= combatUIManager->dodgerSpeed;
+        }
+        if(input[1]) {
+          combatUIManager->dodgerY += combatUIManager->dodgerSpeed;
+        }
+        if(input[2]) {
+          combatUIManager->dodgerX -= combatUIManager->dodgerSpeed;
+        }
+        if(input[3]) {
+          combatUIManager->dodgerX += combatUIManager->dodgerSpeed;
+        }
+        float margin = 50;
+        if(combatUIManager->dodgerX < 0 + margin) {
+          combatUIManager->dodgerX = 0 + margin;
+        }
+        if(combatUIManager->dodgerY < 0 + margin) {
+          combatUIManager->dodgerY = margin;
+        }
+        if(combatUIManager->dodgerX > 1024 - margin) {
+          combatUIManager->dodgerX = 1024 - margin;
+        }
+        if(combatUIManager->dodgerY > 1024 - margin) {
+          combatUIManager->dodgerY = 1024 - margin;
+        }
       }
 
       if(combatUIManager->dodgeTimer > combatUIManager->maxDodgeTimer) {
@@ -1764,6 +1791,64 @@ void CombatLoop() {
 
   if(g_submode == submode::DODGING) {
     combatUIManager->dodgePanel->render(renderer, g_camera, elapsed);
+    SDL_SetRenderTarget(renderer, combatUIManager->rendertarget);
+    SDL_SetRenderDrawColor(renderer, 6, 7, 6, 255);
+    SDL_RenderClear(renderer);
+
+    combatUIManager->bulletTimerAccumulator += elapsed;
+    if(combatUIManager->bulletTimerAccumulator >= 1000) {
+      combatUIManager->bulletTimerAccumulator = 0;
+      for(int i = 0; i < 11; i++) {
+        miniBullet* a = new miniBullet();
+        a->texture = combatUIManager->bulletTexture;
+      }
+    }
+    
+    {
+      for(auto x : g_miniEnts) {
+        x->update(elapsed);
+      }
+      for(int i = 0; i < g_miniEnts.size(); i++) {
+        if(g_miniEnts[i]->x < -SPAWN_MARGIN || g_miniEnts[i]->x > SCREEN_WIDTH + SPAWN_MARGIN ||
+        g_miniEnts[i]->y < -SPAWN_MARGIN || g_miniEnts[i]->y > SCREEN_HEIGHT + SPAWN_MARGIN) {
+          delete g_miniEnts[i];
+          i--;
+        }
+      }
+      for(auto x : g_miniEnts) {
+        x->render();
+        SDL_Rect brect;
+        brect.x = x->x - x->w/2;
+        brect.y = x->y - x->h/2;
+        brect.w = x->w;
+        brect.h = x->h;
+
+        SDL_RenderCopy(renderer, combatUIManager->bulletTexture, NULL, &brect);
+
+      }
+      SDL_Rect drect;
+      drect.x = combatUIManager->dodgerX - combatUIManager->dodgerWidth/2;
+      drect.y = combatUIManager->dodgerY - combatUIManager->dodgerHeight/2;
+      drect.w = combatUIManager->dodgerWidth;
+      drect.h = combatUIManager->dodgerHeight;
+      SDL_RenderCopy(renderer, combatUIManager->dodgerTexture, NULL, &drect);
+    }
+
+
+
+
+
+
+
+    SDL_SetRenderTarget(renderer, NULL);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_Rect dstrect;
+    float padding = 0.04;
+    dstrect.x = (combatUIManager->dodgePanel->x + padding/2) * WIN_WIDTH;
+    dstrect.y = (combatUIManager->dodgePanel->y + (padding*combatUIManager->aspect)/2) * WIN_HEIGHT;
+    dstrect.w = (combatUIManager->dodgePanel->width - padding) * WIN_WIDTH;
+    dstrect.h = (combatUIManager->dodgePanel->height - (padding*combatUIManager->aspect))* WIN_HEIGHT;
+    SDL_RenderCopy(renderer, combatUIManager->rendertarget, NULL, &dstrect);
   }
 
 
@@ -1773,3 +1858,70 @@ void CombatLoop() {
   SDL_RenderPresent(renderer);
 }
 
+miniEnt::miniEnt() {
+  g_miniEnts.push_back(this);
+}
+
+miniEnt::~miniEnt() {
+  g_miniEnts.erase(remove(g_miniEnts.begin(), g_miniEnts.end(), this), g_miniEnts.end());
+}
+
+void miniEnt::update(float elapsed) {
+  x += velocity * cos(angle) * elapsed;
+  y += velocity * sin(angle) * elapsed;
+}
+
+void miniEnt::render() {
+  M("miniEnt::render()");
+  SDL_Rect renderQuad = {
+    (int)x - w/2,
+    (int)y - h/2,
+    (int)w,
+    (int)h
+  };
+  SDL_RenderCopy(renderer, texture, NULL, &renderQuad);
+}
+
+miniBullet::miniBullet(float f_angle, float f_velocity) {
+  angle = f_angle;
+  velocity = f_velocity;
+  x = 512.0f + SPAWN_MARGIN * cos(angle);
+  y = 512.0f + SPAWN_MARGIN * sin(angle);
+  g_miniBullets.push_back(this);
+}
+
+miniBullet::miniBullet() {
+  float spawnX, spawnY;
+  float targetX, targetY;
+  targetX = rng(0, SCREEN_WIDTH);
+  targetY = rng(0, SCREEN_HEIGHT);
+  int side = rand() % 4;
+  switch(side) {
+    case 0:
+      spawnX = -SPAWN_MARGIN;
+      spawnY = rng(0, SCREEN_HEIGHT);
+      break;
+    case 1:
+      spawnX = SCREEN_WIDTH + SPAWN_MARGIN;
+      spawnY = rng(0, SCREEN_HEIGHT);
+      break;
+    case 2:
+      spawnX = rng(0, SCREEN_WIDTH);
+      spawnY = -SPAWN_MARGIN;
+      break;
+    case 3:
+      spawnX = rng(0, SCREEN_WIDTH);
+      spawnY = SCREEN_HEIGHT + SPAWN_MARGIN;
+      break;
+  }
+  x = spawnX;
+  y = spawnY;
+  w = 100;
+  h = 100;
+  angle = atan2(targetY - spawnY, targetX - spawnX);
+  velocity = 0.5;
+}
+
+miniBullet::~miniBullet() {
+  g_miniBullets.erase(remove(g_miniBullets.begin(), g_miniBullets.end(), this), g_miniBullets.end());
+}
