@@ -19,6 +19,7 @@
 #include "specialobjects.h"
 #include "utils.h"
 #include "combat.h"
+#include "title.h"
 
 using namespace std;
 
@@ -115,7 +116,6 @@ void updateWindowResolution() {
     WIN_HEIGHT = WIN_WIDTH * 0.625;
   }
 }
-
 
 void ExplorationLoop() {
     // cooldowns
@@ -2734,7 +2734,7 @@ int WinMain()
   SDL_RenderSetLogicalSize(renderer, 16, 10);
   SDL_SetWindowMinimumSize(window, 100, 100);
 
-  SDL_SetWindowPosition(window, 1280, 720);
+  SDL_SetWindowPosition(window, 1280, 800);
 
   Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
   SDL_RenderSetIntegerScale(renderer, SDL_FALSE);
@@ -2809,6 +2809,8 @@ int WinMain()
 
   combatUIManager = new combatUI(renderer);
   combatUIManager->hideAll();
+
+  titleUIManager = new titleUI(renderer);
 
 
   if (canSwitchOffDevMode)
@@ -3148,39 +3150,45 @@ int WinMain()
   {
     // g_transitionSpeed = 10000;
     
-    entity* a = new entity(renderer, "common/fomm");
-    protag = a;
-    g_focus = protag;
-    loadSave();
+//    entity* a = new entity(renderer, "common/fomm");
+//    protag = a;
+//    a->essential = 1;
+//    a->inParty = 1;
+//    party.push_back(a);
+//    g_focus = protag;
+    //loadSave();
      
-    string filename = g_levelSequence->levelNodes[0]->mapfilename;
+    //string filename = g_levelSequence->levelNodes[0]->mapfilename;
 
-    protag->x = 100000;
-    protag->y = 100000;
+//    protag->x = 100000;
+//    protag->y = 100000;
 
-    filename = "resources/maps/crypt/g.map"; //temporary
-    g_mapdir = "crypt"; //temporary
+//    filename = "resources/maps/crypt/g.map"; //temporary
+//    g_mapdir = "crypt"; //temporary
     
-    load_map(renderer, filename,"a");
-    vector<string> x = splitString(filename, '/');
-    g_mapdir = x[1];
-
-    g_mapdir = "crypt"; //temporary
+    //load_map(renderer, filename,"a");
+//    vector<string> x = splitString(filename, '/');
+//    g_mapdir = x[1];
+//
+//    g_mapdir = "crypt"; //temporary
     
   }
   else
   {
     SDL_ShowCursor(0);
-    loadSave();
-    entity* a = new entity(renderer, "common/fomm");
-    protag = a;
-    g_focus = protag;
-    g_inTitleScreen = 1;
-    load_map(renderer, "resources/maps/base/start.map","a"); //lol
-    g_levelFlashing = 1;
-    clear_map(g_camera); 
-    g_levelFlashing = 0;
-    load_map(renderer, "resources/maps/base/start.map","a");
+    //loadSave();
+//    entity* a = new entity(renderer, "common/fomm");
+//    protag = a;
+//    a->essential = 1;
+//    ->inParty = 1;
+//    party.push_back(a);
+//    g_focus = protag;
+    //g_inTitleScreen = 1;
+    //load_map(renderer, "resources/maps/base/start.map","a"); //lol
+    //g_levelFlashing = 1;
+    //clear_map(g_camera); 
+    //g_levelFlashing = 0;
+    //load_map(renderer, "resources/maps/base/start.map","a");
   }
 
   inventoryMarker = new ui(renderer, "resources/static/ui/finger_selector_angled.qoi", 0, 0, 0.1, 0.1, 2);
@@ -3540,6 +3548,11 @@ int WinMain()
     elapsed = 16.6666666667;
 
     switch(g_gamemode) {
+      case gamemode::TITLE:
+      {
+        TitleLoop();
+        break;
+      }
       case gamemode::EXPLORATION: 
       {
         ExplorationLoop();
@@ -3558,6 +3571,7 @@ int WinMain()
   clear_map(g_camera);
   delete adventureUIManager;
   delete combatUIManager;
+  delete titleUIManager;
   close_map_writing();
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
@@ -4536,11 +4550,14 @@ void getExplorationInput(float &elapsed)
         if(g_escapeUI->positionOfCursor == 3) {
           //quit = 1;  //to desktop
           clear_map(g_camera);
-          g_inTitleScreen = 1;
-          g_mapdir = "sp-title";
+          //g_inTitleScreen = 1;
+          //g_mapdir = "sp-title";
+          g_gamemode = gamemode::TITLE;
+          titleUIManager->showAll();
+          transition = 1;
           
 
-          load_map(renderer, "resources/maps/sp-title/g.map","a"); //to menu
+          //load_map(renderer, "resources/maps/sp-title/g.map","a"); //to menu
           
         }
 

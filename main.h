@@ -3,4 +3,12 @@
 
 void updateWindowResolution();
 
+void TitleLoop();
+
+void ExplorationLoop();
+
+void CombatLoop();
+
+void toggleFullscreen();
+
 #endif

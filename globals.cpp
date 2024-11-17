@@ -19,9 +19,8 @@
 #include "physfs.h"
 #include "unistd.h"
 #include "stdio.h"
+#include "title.h"
 
-// this is unique to the windowsport
-//#include "windowsinclude.h"
 #include "objects.h"
 
 #undef M_PI
@@ -545,7 +544,7 @@ void camera::resetCamera()
 
 // zoom is really g_defaultZoom when screenwidth is STANDARD_SCREENWIDTH
 int WIN_WIDTH = 640;
-int WIN_HEIGHT = 480;
+int WIN_HEIGHT = 400;
 // theres some warping if STANDARD_SCREENWIDTH < WIN_WIDTH but that shouldn't ever happen
 // if in the future kids have screens with 10 million pixels across feel free to mod the game
 const int STANDARD_SCREENWIDTH = 1080;
@@ -943,7 +942,7 @@ vector<pair<int, Mix_Chunk*>> g_loadPlaySounds;
 //for preventing the player from begining dialog after closing a menu
 int g_menuTalkReset = 0;
 
-gamemode g_gamemode = gamemode::EXPLORATION; //exploration, combat, gameover
+gamemode g_gamemode = gamemode::TITLE; //exploration, combat, gameover
 
 turn g_turn = turn::PLAYER;
 
@@ -956,6 +955,8 @@ int curCombatantIndex = 0; //the party combatant for which the player currently 
 vector<int> g_combatInventory;
 
 int g_maxInventorySize = 14;
+
+titleUI* titleUIManager;
 
 bool fileExists(const std::string &name)
 {

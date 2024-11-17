@@ -14,20 +14,20 @@ const int SCREEN_WIDTH = 1024;
 const int SCREEN_HEIGHT = 1024;
 const float SPAWN_MARGIN = 50.0f;
 
-
 using namespace std;
+
+void loadPalette(SDL_Renderer* renderer, const char* filePath, std::vector<Uint32>& palette);
 
 enum type {
   NONE,
   ANIMAL,
   PLANT,
   BUG,
-  FLYING,
-  SWIMMING,
   ROBOT,
   ALIEN,
   UNDEAD,
-  GHOST
+  GHOST,
+  DEMON
 };
 
 enum class turnAction {
@@ -37,11 +37,36 @@ enum class turnAction {
   DEFEND
 };
 
+struct bground {
+  int texture = 1;
+  bool interleaved = 0;
+
+  float horizontalIntensity = 150;
+  float horizontalPeriod = 1000;
+  float verticalIntensity = 25;
+  float verticalPeriod = 50;
+  float scrollXMagnitude = 100;
+  float scrollYMagnitude = 100;
+  std::vector<Uint32> palette = {};
+
+  int texture2 = 1;
+  bool interleaved2 = 0;
+  float horizontalIntensity2 = 20;
+  float horizontalPeriod2 = 20;
+  float verticalIntensity2 = 55;
+  float vertialPeriod2 = 10;
+  float scrollXMagnitude2 = 120;
+  float scrollYMagnitude2 = 130;
+  std::vector<Uint32> palette2 = {};
+  bground();
+  bground(SDL_Renderer* renderer, const char* configFilePath);
+  
+};
+
 struct turnSerialization {
   int target;
   turnAction action;
   int actionIndex;
-  int rank;
 };
 
 class combatant {
@@ -70,7 +95,7 @@ public:
   float baseMind; //max spirit points
   float mindGain;
 
-  type type;
+  type myType;
 
   int xp;
   int level;
@@ -94,10 +119,11 @@ public:
   turnSerialization serial;
 
   vector<int> inventory;
+  vector<vector<int>> attackPatterns;
 
   int itemToUse = -1;
 
-  vector<pair<int,int>> spiritMoves;
+  vector<int> spiritMoves;
 
   combatant(string filename, int level);
 
@@ -130,6 +156,8 @@ struct spiritInfo {
 extern std::unordered_map<int, itemInfo> itemsTable;
 
 extern std::unordered_map<int, spiritInfo> spiritTable;
+
+void spawnBullets(int pattern, int& accumulator);
 
 void initTables();
 
@@ -184,7 +212,7 @@ public:
   int c_dpiAsendTarget = 0.9;
   bool c_dpiAsending = 0;
   const float dpiAsendSpeed = 0.0002;
-  std::vector<std::string> options = {"Attack", "Spirit", "Bag", "Defend", "Run", "Auto"};
+  std::vector<std::string> options = {"Attack", "Spirit", "Bag", "Shrink", "Run", "Auto"};
   std::string finalText = "";
   std::string currentText = "";
   std::vector<std::string> queuedStrings;
@@ -226,7 +254,11 @@ public:
   int damageFromEachHit = 0;
   int dodgeTimer = 0;
   const int maxDodgeTimer = 15000;
-  float dodgerSpeed = 14;
+  int invincibleMs = 0;
+  const int maxInvincibleMs = 1000;
+  int blinkMs = 0;
+  bool drawDodger = 1;
+  float dodgerSpeed = 10;
   float aspect = 1;
   float dodgerX = 512;
   float dodgerY = 512;
@@ -235,11 +267,26 @@ public:
   SDL_Texture* dodgerTexture = 0;
   SDL_Texture* rendertarget = 0;
   SDL_Texture* bulletTexture = 0;
-  float bulletTimerAccumulator = 0;
+  int accuA = 0;
+  int accuB = 0;
+  int accuC = 0;
+  vector<int> curPatterns;
+
+  vector<bool> dodgingThisTurn = {0, 0, 0, 0};
+  bool shrink = 0;
+
+  bground loadedBackground;
+  SDL_Surface* sb1 = 0;
+  SDL_Surface* db1 = 0;
+  SDL_Texture* tb1 = 0;
+
+  float time = 0.0f;
+  float cycleTime = 0;
 
   combatUI(SDL_Renderer* renderer);
 
   ~combatUI();
+
 
   void hideAll();
 };
@@ -257,12 +304,37 @@ public:
   float w = 0;
   float h = 0;
   float velocity = 0;
+  float acceleration = 0;
   float angle = 0;
+  int red = 255, blue = 255, green = 255;
+  bool homing = 0;
+  int exploding = 0;
+  bool exploded = 0;
+  int explosionTimer = 0;
+  int numFragments = 0;
+  bool randomExplodeAngle = 0;
+  bool completelyRandomExplodeAngle = 0;
+  float fragSize = 1;
+
+  float centerX = 512;
+  float centerY = 512;
+  float spinSpeed = 0;
+  float spinAngle = 0;
+  float radius = 0;
+
+  bool isInPlayArea = 0;
+  bool canBounce = 0;
+
+  float gravityVX = 0;
+  float gravityAccelX = 0;
+  float gravityVY = 0;
+  float gravityAccelY = 0;
+
   SDL_Texture* texture;
   void update(float elapsed);
   void render();
   miniEnt();
-  ~miniEnt();
+  virtual ~miniEnt();
 };
 
 class miniBullet:public miniEnt {
@@ -270,7 +342,11 @@ public:
   miniBullet(float f_angle, float f_velocity);
   miniBullet();
   ~miniBullet();
+  void bulletUpdate(float elapsed);
+  void explode(int numFragments, int exploding, float fragSize);
 };
+
+void drawBackground();
 
 
 

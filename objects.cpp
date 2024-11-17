@@ -24,6 +24,7 @@
 #include "specialobjects.h"
 #include "utils.h"
 #include "combat.h"
+#include "main.h"
 
 #include <utility>
 
@@ -32,6 +33,8 @@
 using namespace std;
 
 class usable;
+
+void cyclePalette(SDL_Surface* source, SDL_Surface* destination, std::vector<Uint32>& palette);
 
 navNode* getNodeByPos(vector<navNode*> array, int x, int y) {
   float min_dist = 0;
@@ -2902,7 +2905,6 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
     texture = loadTexture(renderer, spritefile);
     if(texture == nullptr) {
       E("Error loading texture for entity " + name);
-      D(spritefile);
     }
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "3");
@@ -3100,8 +3102,6 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
     } else {
       txtfilename = "resources/static/scripts/" + boardingScriptName + ".txt";
     }
-    D(name);
-    D(txtfilename);
 
     boardingScript = loadText(txtfilename);
     parseScriptForLabels(boardingScript);
@@ -4641,7 +4641,6 @@ door* entity::update(vector<door*> doors, float elapsed) {
             if(jiggleOptionIndex > jiggleOptions.size() -1) {
               if(g_showCRMessages) {
                 E("Couldn't jiggle an entity, it's stuck in collisionboxes with solid entities/map geo.");
-                D(this->name);
               }
               break;
   
@@ -6970,7 +6969,7 @@ int loadSave() {
 
 
   party.clear();
-  //delete protag;
+  delete protag;
 
   for(int i = 0; i < g_partyCombatants.size(); i++) {
     delete g_partyCombatants[i];
@@ -6988,43 +6987,47 @@ int loadSave() {
     float currentHP = stof(tokens[2]);
     int currentSP = stoi(tokens[3]);
     int spiritOne = stoi(tokens[4]);
-    int spiritOneRank = stoi(tokens[5]);
-    int spiritTwo = stoi(tokens[6]);
-    int spiritTwoRank = stoi(tokens[7]);
-    int spiritThree = stoi(tokens[8]);
-    int spiritThreeRank = stoi(tokens[9]);
-    int spiritFour = stoi(tokens[10]);
-    int spiritFourRank = stoi(tokens[11]);
+    int spiritTwo = stoi(tokens[5]);
+    int spiritThree = stoi(tokens[6]);
+    int spiritFour = stoi(tokens[7]);
 
-    //entity* a = new entity(renderer, name);
-    //party.push_back(a);
-    //a->inParty = 1;
+    entity* a = new entity(renderer, name);
+    party.push_back(a);
+    a->inParty = 1;
 
     combatant* b = new combatant(name, exp);
     b->health = currentHP;
     b->sp = currentSP;
-    b->spiritMoves.push_back(pair<int, int>(spiritOne, spiritOneRank));
-    b->spiritMoves.push_back(pair<int, int>(spiritTwo, spiritTwoRank));
-    b->spiritMoves.push_back(pair<int, int>(spiritThree, spiritThreeRank));
-    b->spiritMoves.push_back(pair<int, int>(spiritFour, spiritFourRank));
+    if(spiritOne != -1) {
+      b->spiritMoves.push_back(spiritOne);
+    }
+    if(spiritTwo != -1) {
+      b->spiritMoves.push_back(spiritTwo);
+    }
+    if(spiritThree != -1) {
+      b->spiritMoves.push_back(spiritThree);
+    }
+    if(spiritFour != -1) {
+      b->spiritMoves.push_back(spiritFour);
+    }
     g_partyCombatants.push_back(b);
 
-//    if(a->essential) {
-//      mainProtag = a;
-//      setMainProtag = 1;
-//    }
+    if(a->essential) {
+      mainProtag = a;
+      setMainProtag = 1;
+    }
     
   }
 
-//  if(setMainProtag) {
-//    protag = mainProtag;
-//    protag->tangible = 1;
-//  } else {
-//    //fick
-//    M("No essential entity found in save");
-//    protag = party[0];
-//    mainProtag = protag;
-//  }
+  if(setMainProtag) {
+    protag = mainProtag;
+    protag->tangible = 1;
+    g_focus = protag;
+  } else {
+    //fick
+    protag = party[0];
+    mainProtag = protag;
+  }
 
 
   //load spin entity
@@ -7039,11 +7042,6 @@ int loadSave() {
     g_spin_entity->canFight = 0;
 
   }
-
-//  if(g_protag_s_ent == nullptr) {
-//    string shadowEntFilename = "common/fomm-shadow";
-//    g_protag_s_ent = new entity(renderer, shadowEntFilename);
-//  }
 
   //load which levels are unlocked, as a list of lowercase names
   //
@@ -8114,359 +8112,23 @@ void clear_map(camera& cameraToReset) {
     //to stop the clock and the goal text from rendering
 
     //render current frame to texture -- this is gonna get weird
-    {
-
-      if(g_backgroundLoaded && g_useBackgrounds) { //if the level has a background and the user would like to see it
-        SDL_RenderCopy(renderer, background, NULL, NULL);
-      }
-
-      for(auto n : g_entities) {
-        n->cooldown -= elapsed;
-      }
-
-
-      //tiles
-      for(long long unsigned int i=0; i < g_tiles.size(); i++){
-        if(g_tiles[i]->z ==0) {
-          g_tiles[i]->render(renderer, g_camera);
-        }
-      }
-
-      for(long long unsigned int i=0; i < g_tiles.size(); i++){
-        if(g_tiles[i]->z ==1) {
-          g_tiles[i]->render(renderer, g_camera);
-        }
-      }
-
-
-      SDL_Rect FoWrect;
-
-      //sort
-      sort_by_y(g_actors);
-      for(long long unsigned int i=0; i < g_actors.size(); i++){
-        g_actors[i]->render(renderer, g_camera);
-      }
-
-      for(long long unsigned int i=0; i < g_tiles.size(); i++){
-        if(g_tiles[i]->z == 2) {
-          g_tiles[i]->render(renderer, g_camera);
-        }
-      }
-
-
-
-
-      //Fogofwar
-      if(g_fogofwarEnabled && !devMode) {
-
-        // int functionalX = g_focus->getOriginX();
-        // int functionalY = g_focus->getOriginY();
-
-        // functionalX -= functionalX % 64;
-        // functionalX += 32;
-        // functionalY -= functionalY % 55;
-        // functionalY += 26;
-
-        // if(functionalX != g_lastFunctionalX || functionalY != g_lastFunctionalY) {
-        // 	bool flipper = 0;
-        // 	for(int i = 0; i < g_fogcookies.size(); i++) {
-        // 		for(int j = 0; j < g_fogcookies[0].size(); j++) {
-        // 			flipper = !flipper;
-        // 			int xpos = ((i - g_fogMiddleX) * 64) + functionalX;
-        // 			int ypos = ((j - g_fogMiddleY) * 55) + functionalY;
-        // 			if(LineTrace(functionalX, functionalY, xpos, ypos, 0, 15, 0, 15, 1)) {
-        // 				g_fogcookies[i][j] = 1;
-        // 				g_fc[i][j] = 1;
-
-        // 				g_sc[i][j] = 1;
-        // 			} else {
-        // 				g_fogcookies[i][j] = 0;
-
-        // 				g_fc[i][j] = 0;
-        // 				g_sc[i][j] = 0;
-        // 			}
-        // 		}
-        // 	}
-        // }
-
-        //save cookies that are just dark because they are inside of walls to g_savedcookies
-        // for(int i = 0; i < g_fogcookies.size(); i++) {
-        // 	for(int j = 0; j < g_fogcookies[0].size(); j++) {
-        // 		int xpos = ((i - 10) * 64) + functionalX;
-        // 		int ypos = ((j - 9) * 55) + functionalY;
-        // 		//is this cookie in a wall? or behind a wall
-        // 		if(!LineTrace(xpos, ypos, xpos, ypos, 0, 15, 0, 2, 1)) {
-        // 			g_fc[i][j] = 1;
-
-        // 		}
-        // 		if(!LineTrace(xpos, ypos + 55, xpos, ypos +55, 0, 15, 0, 2, 1)) {
-        // 			g_fc[i][j] = 1;
-        // 		}
-        // 	}
-        // }
-
-        // g_lastFunctionalX = functionalX;
-        // g_lastFunctionalY = functionalY;
-
-        //these are the corners and the center
-        // g_fogcookies[0][0] = 1;
-        // g_fogcookies[20][0] = 1;
-        // g_fogcookies[20][17] = 1;
-        // g_fogcookies[0][17] = 1;
-        // g_fogcookies[10][9] = 1;
-
-        int px = -(int)g_focus->getOriginX() % 64;
-
-        //offset us to the protag's location
-        //int yoffset =  ((g_focus->y- (g_focus->z + g_focus->zeight) * XtoZ)) * g_camera.zoom;
-        //the zeight is constant at level 2  for now
-        int yoffset =  (g_focus->getOriginY() ) * g_camera.zoom;
-
-        //and then subtract half of the screen
-        yoffset -= yoffset % 55;
-        yoffset -= (g_fogheight * 55 + 12)/2;
-        yoffset -= g_camera.y;
-
-        //we do this nonsense to keep the offset on the grid
-        //yoffset -= yoffset % 55;
-
-        //px = 64 - px - 64;
-        //py = 55 - py - 55;
-        // 50 50
-        SDL_SetRenderTarget(renderer, NULL);
-        addTextures(renderer, g_fc, canvas, light, 500, 500, 250, 250, 0);
-
-
-        TextureC = IlluminateTexture(renderer, TextureA, canvas, result);
-
-        //render graphics
-        FoWrect = {px - 23, yoffset +15, g_fogwidth * 64 + 50, g_fogheight * 55 + 18};
-        SDL_SetRenderTarget(renderer, frame);
-        SDL_RenderCopy(renderer, TextureC, NULL, &FoWrect);
-
-        //do it for z = 64
-        FoWrect.y -= 64 * XtoZ;
-        SDL_RenderCopy(renderer, TextureC, NULL, &FoWrect);
-
-
-        SDL_SetRenderTarget(renderer, NULL);
-        addTextures(renderer, g_sc, canvas, light, 500, 500, 250, 250, 1);
-
-
-        TextureC = IlluminateTexture(renderer, TextureA, canvas, result);
-        SDL_SetRenderTarget(renderer, frame);
-
-        //render graphics
-        FoWrect.y -= 67 * XtoZ;
-        SDL_RenderCopy(renderer, TextureC, NULL, &FoWrect);
-
-        //black bars
-        SDL_Rect topbar = {px, FoWrect.y - 5000, 1500, 5000};
-        SDL_RenderCopy(renderer, blackbarTexture, NULL, &topbar);
-
-        SDL_Rect botbar = {px, FoWrect.y +  g_fogheight * 55 + 12, 1500, 5000};
-        SDL_RenderCopy(renderer, blackbarTexture, NULL, &botbar);
-        SDL_RenderPresent(renderer);
-
-      }
-
-
-
-      //ui
-//      if(!inPauseMenu && g_showHUD) {
-//      	// !!! segfaults on mapload sometimes
-//      	adventureUIManager->healthText->updateText( to_string(int(protag->hp)) + '/' + to_string(int(protag->maxhp)), WIN_WIDTH * g_minifontsize, 0.9);
-//      	adventureUIManager->healthText->show = 1;
-//
-//      } else {
-//      	adventureUIManager->healthText->show = 0;
-//
-//      }
-
-      // //move the healthbar properly to the protagonist
-      // rect obj; // = {( , (((protag->y - ((protag->height))) - protag->z * XtoZ) - g_camera.y) * g_camera.zoom, (protag->width * g_camera.zoom), (protag->height * g_camera.zoom))};
-      // obj.x = ((protag->x -g_camera.x) * g_camera.zoom);
-      // obj.y = (((protag->y - ((floor(protag->height)* 0.9))) - protag->z * XtoZ) - g_camera.y) * g_camera.zoom;
-      // obj.width = (protag->width * g_camera.zoom);
-      // obj.height = (floor(protag->height) * g_camera.zoom);
-
-      // protagHealthbarA->x = (((float)obj.x + obj.width/2) / (float)WIN_WIDTH) - protagHealthbarA->width/2.0;
-      // protagHealthbarA->y = ((float)obj.y) / (float)WIN_HEIGHT;
-      // protagHealthbarB->x = protagHealthbarA->x;
-      // protagHealthbarB->y = protagHealthbarA->y;
-
-      // protagHealthbarC->x = protagHealthbarA->x;
-      // protagHealthbarC->y = protagHealthbarA->y;
-      // protagHealthbarC->width = (protag->hp / protag->maxhp) * 0.05;
-      // adventureUIManager->healthText->boxX = protagHealthbarA->x + protagHealthbarA->width/2;
-      // adventureUIManager->healthText->boxY = protagHealthbarA->y - 0.005;
-
-      for (long long unsigned int i = 0; i < g_ui.size(); i++)
+    switch(g_gamemode) {
+      case gamemode::TITLE:
       {
-        if(!g_ui[i]->renderOverText) {
-          g_ui[i]->render(renderer, g_camera, 0);
-        }
+        TitleLoop();
+        break;
       }
-      for (long long unsigned int i = 0; i < g_textboxes.size(); i++)
+      case gamemode::EXPLORATION: 
       {
-        g_textboxes[i]->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+        ExplorationLoop();
+        break;
       }
-  
-      //some ui are rendered over text
-      for (long long unsigned int i = 0; i < g_ui.size(); i++)
-      {
-        if(g_ui[i]->renderOverText) {
-          g_ui[i]->render(renderer, g_camera, 0);
-        }
+      case gamemode::COMBAT:
+      { 
+        CombatLoop();
+        break;
       }
 
-      //this is the menu for quitting or going back to the "overworld"
-      if (g_inEscapeMenu) 
-      {
-        //move reticle to the correct position
-        g_escapeUI->handMarker->targety
-          = g_escapeUI->optionTextboxes[g_escapeUI->positionOfCursor]->boxY
-          + (g_escapeUI->handOffset);
-  
-        g_escapeUI->handMarker->targetx
-          = g_escapeUI->markerHandX;
-  
-        g_escapeUI->fingerMarker->targety
-          = g_escapeUI->optionTextboxes[g_escapeUI->positionOfCursor]->boxY
-          + (g_escapeUI->fingerOffset);
-  
-        float ww = WIN_WIDTH;
-        float fwidth = g_escapeUI->optionTextboxes[g_escapeUI->positionOfCursor]->width;
-        g_escapeUI->fingerMarker->targetx
-          = g_escapeUI->optionTextboxes[g_escapeUI->positionOfCursor]->boxX + 
-            fwidth / ww / 2;
-        
-  
-  
-        if(g_firstFrameOfSettingsMenu) {
-          g_firstFrameOfSettingsMenu = 0;
-          g_escapeUI->handMarker->x = g_escapeUI->handMarker->targetx;
-          g_escapeUI->handMarker->y = g_escapeUI->handMarker->targety;
-          g_escapeUI->fingerMarker->x = g_escapeUI->fingerMarker->targetx;
-          g_escapeUI->fingerMarker->y = g_escapeUI->fingerMarker->targety;
-  
-        }
-  
-      }
-
-      // draw pause screen
-      if (inPauseMenu)
-      {
-        adventureUIManager->crosshair->x = 5;
-  
-        // iterate thru inventory and draw items on screen
-        float defaultX = WIN_WIDTH * 0.05;
-        float defaultY = WIN_HEIGHT * adventureUIManager->inventoryYStart;
-        float x = defaultX;
-        float y = defaultY;
-        float maxX = WIN_WIDTH * 0.9;
-        float maxY = WIN_HEIGHT * adventureUIManager->inventoryYEnd;
-        float itemWidth = WIN_WIDTH * 0.07;
-        float padding = WIN_WIDTH * 0.01;
-  
-        int i = 0;
-  
-        //populate the UI based on the loaded level sequence.
-        for(int j = 0; j < g_levelSequence->levelNodes.size(); j++) {
-          if( i < itemsPerRow * inventoryScroll) {
-            i++;
-            continue;
-          }
-          SDL_Rect drect = {(int)x, (int)y, (int)itemWidth, (int)itemWidth}; 
-          int boosh = 5;
-          drect.w += boosh * 2;
-          drect.h += boosh * 2;
-          drect.x -= boosh;
-          drect.y -= boosh;
-  
-          //should we draw the locked graphic?
-          if(g_levelSequence->levelNodes[j]->locked) {
-            SDL_RenderCopy(renderer, g_locked_level_texture, NULL, &drect);
-          } else {
-            SDL_RenderCopy(renderer, g_levelSequence->levelNodes[j]->sprite, NULL, &drect);
-          }
-  
-          if (i == inventorySelection)
-          {
-  
-            if(g_levelSequence->levelNodes[i]->locked) {
-              adventureUIManager->escText->updateText("Locked", -1, 0.9);
-            } else {
-              string dispText = g_levelSequence->levelNodes[i]->name;
-              std::replace(dispText.begin(), dispText.end(),'_',' ');
-              adventureUIManager->escText->updateText(g_levelSequence->levelNodes[i]->name, -1, 0.9);
-  
-            }
-  
-            // this item should have the marker
-            inventoryMarker->show = 1;
-            float biggen = 0.01; // !!! resolutions : might have problems with diff resolutions
-                                 
-            if(g_firstFrameOfPauseMenu) {
-              inventoryMarker->x = x / WIN_WIDTH;
-              inventoryMarker->y = y / WIN_HEIGHT;
-              inventoryMarker->x -= biggen;
-              inventoryMarker->y -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              //now that it's a hand
-              inventoryMarker->x += 0.02 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              inventoryMarker->y += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              inventoryMarker->targetx = inventoryMarker->x;
-              inventoryMarker->targety = inventoryMarker->y;
-              g_firstFrameOfPauseMenu = 0;
-            } else {
-              inventoryMarker->targetx = x / WIN_WIDTH;
-              inventoryMarker->targety = y / WIN_HEIGHT;
-              inventoryMarker->targetx -= biggen;
-              inventoryMarker->targety -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              //now that it's a hand
-              inventoryMarker->targetx += 0.02 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              inventoryMarker->targety += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-            }
-
-            inventoryMarker->width = itemWidth / WIN_WIDTH;
-    
-            inventoryMarker->width += biggen * 2;
-            inventoryMarker->height = inventoryMarker->width * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-          }
-    
-          x += itemWidth + padding;
-          if (x > maxX)
-          {
-            x = defaultX;
-            y += itemWidth + padding;
-            if (y > maxY)
-            {
-              // we filled up the entire inventory, so lets leave
-              break;
-            }
-          }
-          i++;
-  
-        }
-        g_itemsInInventory = g_levelSequence->levelNodes.size();
-          
-        
-  
-        //re-render inventory reticle so it goes on top of the items/level icons
-        inventoryMarker->render(renderer, g_camera, 0);
-        inventoryMarker->show = 0;
-      }
-      else
-      {
-        if(inventoryMarker != nullptr) {
-          inventoryMarker->show = 0;
-          inventoryText->show = 0;
-        }
-      }
-
-
-      SDL_RenderCopy(renderer, g_shade, NULL, NULL);
-      //SDL_RenderPresent(renderer);
     }
 
     //to stop the clock and the goal text from rendering
@@ -8536,6 +8198,7 @@ void clear_map(camera& cameraToReset) {
     SDL_DestroyTexture(transitionTexture);
     transition = 1;
     SDL_GL_SetSwapInterval(1);
+    SDL_DestroyTexture(frame);
   }
 
   cameraToReset.resetCamera();
@@ -8589,6 +8252,7 @@ void clear_map(camera& cameraToReset) {
   }
 
   //push back any entities that were in the party
+  
   for (long long unsigned int i = 0; i < party.size(); i++) {
     g_entities.push_back(party[i]);
     g_actors.push_back(party[i]);
@@ -9666,21 +9330,42 @@ void adventureUI::continueDialogue()
     return;
   }
 
+  //load a combat background
+  if (scriptToUse->at(dialogue_index + 1).substr(0,9) == "/combatbg") {
+    string s = scriptToUse->at(dialogue_index + 1);
+    vector<string> x = splitString(s, ' ');
+
+    string loadme = "resources/static/backgrounds/json/" + to_string(0) + ".json";
+    combatUIManager->loadedBackground = bground(renderer, loadme.c_str());
+
+    if(combatUIManager->sb1 != 0) {
+      SDL_FreeSurface(combatUIManager->sb1);
+    }
+
+    loadme = "resources/static/backgrounds/textures/" + to_string(combatUIManager->loadedBackground.texture) + ".qoi";
+    combatUIManager->sb1 = IMG_Load(loadme.c_str());
+
+
+    cyclePalette(combatUIManager->sb1, combatUIManager->db1, combatUIManager->loadedBackground.palette);
+
+    dialogue_index++;
+    this->continueDialogue();
+    return;
+  }
+
   //begin a combat encounter
   // /combat
   if (scriptToUse->at(dialogue_index + 1).substr(0,7) == "/combat")
   {
     g_gamemode = gamemode::COMBAT;
     g_submode = submode::TEXT;
+
     combatUIManager->partyHealthBox->show = 1;
     combatUIManager->partyText->show = 1;
     combatUIManager->finalText = "It's an enemy encounter!";
     combatUIManager->currentText = "";
-    combatUIManager->queuedStrings.push_back("Second line of combat dialog!");
     combatUIManager->dialogProceedIndicator->y = 0.25;
 
-    dialogue_index++;
-    this->continueDialogue();
     return;
   }
 

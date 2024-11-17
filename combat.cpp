@@ -4,6 +4,196 @@
 #include "utils.h"
 #include <unordered_map>
 
+void loadPalette(SDL_Renderer* renderer, const char* filePath, std::vector<Uint32>& palette) {
+    // Load the image into a surface
+    SDL_Surface* surface = IMG_Load(filePath);
+    if (!surface) {
+        std::cout << "Unable to load image! SDL_image Error: " << IMG_GetError() << std::endl;
+    }
+
+    SDL_PixelFormat* format = SDL_AllocFormat(SDL_PIXELFORMAT_RGBA8888); 
+    for (int x = 0; x < 16; ++x) { 
+      Uint32 pixel = ((Uint32*)surface->pixels)[x]; 
+      Uint8 r, g, b, a; 
+      SDL_GetRGBA(pixel, surface->format, &r, &g, &b, &a); 
+      Uint32 mappedColor = SDL_MapRGBA(format, a, r, g, b); 
+      palette.push_back(mappedColor); 
+    }
+
+    SDL_FreeSurface(surface);
+}
+
+bground::bground() {};
+
+bground::bground(SDL_Renderer* renderer, const char* configFilePath) {
+        std::ifstream configFile(configFilePath);
+        if (!configFile) {
+            std::cerr << "Unable to open config file!" << std::endl;
+            return;
+        }
+
+        std::string line;
+        while (std::getline(configFile, line)) {
+            std::istringstream iss(line);
+            std::string key;
+            if (std::getline(iss, key, ':')) {
+                std::string value;
+                if (std::getline(iss, value)) {
+                    if (key == "texture") texture = std::stoi(value);
+                    else if (key == "interleaved") interleaved = std::stoi(value);
+                    else if (key == "horizontalIntensity") horizontalIntensity = std::stof(value);
+                    else if (key == "horizontalPeriod") horizontalPeriod = std::stof(value);
+                    else if (key == "verticalIntensity") verticalIntensity = std::stof(value);
+                    else if (key == "verticalPeriod") verticalPeriod = std::stof(value);
+                    else if (key == "scrollXMagnitude") scrollXMagnitude = std::stof(value);
+                    else if (key == "scrollYMagnitude") scrollYMagnitude = std::stof(value);
+                    else if (key == "paletteFile") {
+                        std::string paletteFilePath = "resources/static/backgrounds/pallets/" + value + ".qoi";
+                        loadPalette(renderer, paletteFilePath.c_str(), palette);
+                    }
+                    else if (key == "texture2") texture2 = std::stoi(value);
+                    else if (key == "interleaved2") interleaved2 = std::stoi(value);
+                    else if (key == "horizontalIntensity2") horizontalIntensity2 = std::stof(value);
+                    else if (key == "horizontalPeriod2") horizontalPeriod2 = std::stof(value);
+                    else if (key == "verticalIntensity2") verticalIntensity2 = std::stof(value);
+                    else if (key == "vertialPeriod2") vertialPeriod2 = std::stof(value);
+                    else if (key == "scrollXMagnitude2") scrollXMagnitude2 = std::stof(value);
+                    else if (key == "scrollYMagnitude2") scrollYMagnitude2 = std::stof(value);
+                    else if (key == "paletteFile2") {
+                        std::string paletteFilePath2 = "resources/static/backgrounds/pallets/" + value + ".qoi";
+                        loadPalette(renderer, paletteFilePath2.c_str(), palette2);
+                    }
+                }
+            }
+        }
+    }
+
+
+// Warp effect function implementation
+void applyWarpEffect(SDL_Texture* texture, SDL_Renderer* renderer, float time, bool interleaved, float horizontalWaveIntensity, float horizontalWavePeriod, float verticalWaveIntensity, float verticalWavePeriod, float scrollXMagnitude, float scrollYMagnitude) {
+    int width, height;
+    SDL_QueryTexture(texture, NULL, NULL, &width, &height);
+
+    SDL_Texture* warpedTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width, height);
+    SDL_SetRenderTarget(renderer, warpedTexture);
+    SDL_SetTextureBlendMode(warpedTexture, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_RenderClear(renderer);
+
+    int scrollX = static_cast<int>((time * scrollXMagnitude)) % width;
+    int scrollY = static_cast<int>((time * scrollYMagnitude)) % height;
+
+    for (int y = 0; y < height; ++y) {
+        float scaleY = verticalWaveIntensity * sinf(((y) * 0.01f) + time * verticalWavePeriod);
+        int srcY = (static_cast<int>((y + scrollY) - scaleY)) % height;
+        if (srcY < 0) srcY += height;
+
+        float offsetX = horizontalWaveIntensity * sinf((srcY + time * horizontalWavePeriod) * (2 * M_PI / width));
+        if (interleaved && y % 2 == 0) {
+            offsetX = -offsetX;
+        }
+
+        int srcX = (static_cast<int>(offsetX + scrollX)) % width;
+        if (srcX < 0) srcX += width;
+
+        SDL_Rect srcRect1 = {srcX, srcY, width - srcX, 1};
+        SDL_Rect destRect1 = {0, y, width - srcX, 1};
+        SDL_RenderCopy(renderer, texture, &srcRect1, &destRect1);
+
+        if (srcX > 0) {
+            SDL_Rect srcRect2 = {0, srcY, srcX, 1};
+            SDL_Rect destRect2 = {width - srcX, y, srcX, 1};
+            SDL_RenderCopy(renderer, texture, &srcRect2, &destRect2);
+        }
+    }
+
+    SDL_SetRenderTarget(renderer, NULL);
+    SDL_RenderCopy(renderer, warpedTexture, NULL, NULL);
+    SDL_DestroyTexture(warpedTexture);
+}
+
+// Palette-cycling function
+void cyclePalette(SDL_Surface* source, SDL_Surface* destination, std::vector<Uint32>& palette) {
+    // Rotate the palette by one color
+    Uint32 firstColor = palette[0];
+    for (size_t i = 0; i < palette.size() - 1; ++i) {
+        palette[i] = palette[i + 1];
+    }
+    palette.back() = firstColor;
+
+    SDL_LockSurface(source);
+    SDL_LockSurface(destination);
+    Uint32* srcPixels = (Uint32*)source->pixels;
+    Uint32* dstPixels = (Uint32*)destination->pixels;
+    int width = source->w;
+    int height = source->h;
+    int paletteSize = palette.size();
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            uint8_t red = (srcPixels[y * width + x] >> 16) & 0xFF;
+            int index = (int)red;
+            //std::cout << index << std::endl;
+            int currentColorIndex = index % paletteSize;
+            dstPixels[y * width + x] = palette[currentColorIndex];
+        }
+    }
+
+    // Blur dstPixels
+    std::vector<Uint32> tempPixels(width * height);
+    
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int r = 0, g = 0, b = 0, a = 0, count = 0;
+            for (int dy = -2; dy <= 2; ++dy) {
+                for (int dx = -2; dx <= 2; ++dx) {
+                    int ix = x + dx;
+                    int iy = y + dy;
+                    if (ix >= 0 && ix < width && iy >= 0 && iy < height) {
+                        Uint32 pixel = dstPixels[iy * width + ix];
+                        r += (pixel & 0x00FF0000) >> 16;
+                        g += (pixel & 0x0000FF00) >> 8;
+                        b += (pixel & 0x000000FF);
+                        a += (pixel & 0xFF000000) >> 24;
+                        count++;
+                    }
+                }
+            }
+            Uint32 avgR = r / count;
+            Uint32 avgG = g / count;
+            Uint32 avgB = b / count;
+            Uint32 avgA = a / count;
+            tempPixels[y * width + x] = (avgA << 24) | (avgR << 16) | (avgG << 8) | avgB;
+        }
+    }
+    
+    // Copy the blurred pixels back to dstPixels
+    std::copy(tempPixels.begin(), tempPixels.end(), dstPixels);
+
+
+    SDL_UnlockSurface(source);
+    SDL_UnlockSurface(destination);
+}
+
+void drawBackground() {
+  combatUIManager->time += elapsed;
+
+  // Cycle the palette every 0.5 seconds
+  if (combatUIManager->time - combatUIManager->cycleTime >= 500) {
+      cyclePalette(combatUIManager->sb1, combatUIManager->db1, combatUIManager->loadedBackground.palette);
+      combatUIManager->cycleTime = combatUIManager->time;
+  }
+
+  if(combatUIManager->tb1 != 0) {
+    SDL_DestroyTexture(combatUIManager->tb1);
+  }
+  combatUIManager->tb1 = SDL_CreateTextureFromSurface(renderer, combatUIManager->db1);
+
+
+
+  applyWarpEffect(combatUIManager->tb1, renderer, combatUIManager->time/10000.0f, combatUIManager->loadedBackground.interleaved, combatUIManager->loadedBackground.horizontalIntensity, combatUIManager->loadedBackground.horizontalPeriod, combatUIManager->loadedBackground.verticalIntensity, combatUIManager->loadedBackground.verticalPeriod, combatUIManager->loadedBackground.scrollXMagnitude, combatUIManager->loadedBackground.scrollYMagnitude);
+}
+
 combatant::combatant(string filename, int fxp) {
   string loadstr;
   loadstr = "resources/static/combatfiles/" + filename + ".cmb";
@@ -26,7 +216,7 @@ combatant::combatant(string filename, int fxp) {
 
   file >> temp;
   file >> temp;
-  type = stringToType(temp);
+  myType = stringToType(temp);
 
   file >> temp;
   file >> baseAttack;
@@ -78,11 +268,27 @@ combatant::combatant(string filename, int fxp) {
     }
   }
 
+  file >> temp;
+  file >> temp; // Read the '{'
+  while (true) {
+    std::getline(file, temp);
+    temp.erase(std::remove(temp.begin(), temp.end(), '\r'), temp.end()); // Remove carriage return if present
+    if(temp.empty()) {continue;}
+    if (temp == "}") break;
+    vector<string> x = splitString(temp, ' ');
+    attackPatterns.push_back({});
+    for(auto y : x) {
+      attackPatterns[attackPatterns.size()-1].push_back(stoi(y));
+    }
+  }
+
+
   xp = fxp;
   level = xpToLevel(xp);
 
   maxHealth = baseHealth + (healthGain * level);
   maxSp = baseMind + (mindGain * level);
+  
 
   int fw, fh;
   SDL_QueryTexture(texture, NULL, NULL, &fw, &fh);
@@ -127,12 +333,11 @@ type stringToType(const std::string& str) {
     {"animal", ANIMAL},
     {"plant", PLANT},
     {"bug", BUG},
-    {"flying", FLYING},
-    {"swimming", SWIMMING},
     {"robot", ROBOT},
     {"alien", ALIEN},
     {"undead", UNDEAD},
-    {"ghost", GHOST}
+    {"ghost", GHOST},
+    {"demon", DEMON}
   };
 
   auto it = typeMap.find(str);
@@ -147,10 +352,658 @@ std::unordered_map<int, itemInfo> itemsTable;
 
 std::unordered_map<int, spiritInfo> spiritTable;
 
+void spawnBullets(int pattern, int& accumulator) {
+  switch(pattern) {
+    case 0:
+      {
+        int cooldown = 2000;
+        if(accumulator >= cooldown) {
+          accumulator = 0;
+          for(int i = 0; i < 3; i++) {
+            miniBullet* a = new miniBullet();
+            a->texture = combatUIManager->bulletTexture;
+            a->red = 0;
+          }
+        }
+        break;
+      }
+    case 1:
+      {
+        int cooldown = 2000;
+        if(accumulator >= cooldown) {
+          accumulator = 0;
+          for(int i = 0; i < 1; i++) {
+            miniBullet* a = new miniBullet();
+            a->angle = atan2(combatUIManager->dodgerY - a->y, combatUIManager->dodgerX - a->x);
+            a->texture = combatUIManager->bulletTexture;
+            a->homing = 1;
+            a->blue = 0;
+          }
+        }
+      }
+    case 2:
+      {
+        int cooldown = 2000;
+        if(accumulator >= cooldown) {
+          accumulator = 0;
+          for(int i = 0; i < 3; i++) {
+            miniBullet* a = new miniBullet();
+            a->x = SCREEN_WIDTH + SPAWN_MARGIN;
+            a->y = rng(0, SCREEN_HEIGHT);
+            a->angle = M_PI;
+            a->texture = combatUIManager->bulletTexture;
+            a->green = 0;
+          }
+        }
+        break;
+      }
+         case 3:
+            {
+                int cooldown = 2000;
+                if (accumulator >= cooldown) {
+                    accumulator = 0;
+                    int numBullets = 6; // Number of bullets in the sine wave
+                    float amplitude = 0.5f; // Amplitude of the sine wave
+                    float frequency = 0.1f; // Frequency of the sine wave
+
+                    for (int i = 0; i < numBullets; i++) {
+                        miniBullet* a = new miniBullet();
+                        a->x = -SPAWN_MARGIN; // Start from the left side, slightly off-screen
+                        a->y = -SPAWN_MARGIN; // Start from the bottom left corner
+
+                        // Calculate the angle using the sine function
+                        float offsetAngle = amplitude * sin(frequency * accumulator + i);
+                        a->angle = M_PI/4 + offsetAngle; // Sweep up and down
+
+                        a->texture = combatUIManager->bulletTexture;
+                        a->green = 128; // Set a different color for sine-pattern bullets
+                    }
+                }
+                break;
+            }
+case 4:
+            {
+                // Stream bullets with sweeping angle pattern
+                int cooldown = 600; // Short cooldown for continuous stream
+                static float sweepTime = 0;
+                if (accumulator >= cooldown) {
+                    accumulator = 0;
+                    float amplitude = 0.7f; // Amplitude of the sweep (radians)
+                    float frequency = 0.6f; // Frequency of the sweep (adjust as needed)
+                    float baseAngle = -M_PI / 2 + M_PI/4; // Base angle (straight up)
+
+                    miniBullet* a = new miniBullet();
+                    a->x = -SPAWN_MARGIN; // Start from the left side, slightly off-screen
+                    a->y = SCREEN_HEIGHT + SPAWN_MARGIN; // Start from the bottom left corner
+
+                    // Calculate the sweeping angle using the sine function
+                    float sweepAngle = baseAngle + amplitude * sin(frequency * sweepTime);
+                    a->angle = sweepAngle;
+
+                    a->texture = combatUIManager->bulletTexture;
+                    a->red = 128; // Set a different color for sine-pattern bullets
+                    a->blue = 128;
+                    sweepTime += 1; // Increment sweep time
+                }
+                break;
+            }
+case 5:
+{
+    // Shotgun blast pattern
+    int cooldown = 1500; // Cooldown between each blast
+    int numBullets = 3; // Number of bullets in the shotgun blast
+    float spreadAngle = M_PI / 4; // Total spread angle (in radians)
+
+    if (accumulator >= cooldown) {
+        accumulator = 0;
+        
+        // Center point of the blast (e.g., from the bottom left corner)
+        float startX = SCREEN_WIDTH + SPAWN_MARGIN;
+        float startY = -SPAWN_MARGIN;
+
+        for (int i = 0; i < numBullets; i++) {
+            miniBullet* a = new miniBullet();
+            a->x = startX;
+            a->y = startY;
+            a->velocity = frng(0.2, 0.7);
+            a->w = frng(80, 120);
+            a->h = a->w;
+            
+            // Calculate the angle for each bullet
+            float angle = M_PI* (3.0/4.0) - spreadAngle / 2 + (spreadAngle / (numBullets - 1)) * i;
+            angle += frng(-M_PI/6.0, M_PI/6.0);
+            a->angle = angle;
+
+            // Set the texture and color for the bullets
+            a->texture = combatUIManager->bulletTexture;
+            
+            a->red = 255;
+            a->blue = 128;
+            a->green = 128;
+        }
+    }
+    break;
+}
+case 6:
+{
+    // Pattern using exploding bullets
+    int cooldown = 2000; // Cooldown between each shot
+
+    if (accumulator >= cooldown) {
+        accumulator = 0;
+
+        miniBullet* a = new miniBullet();
+        a->x = SCREEN_WIDTH + SPAWN_MARGIN; // Spawn off-screen
+        a->y = rng(0, SCREEN_HEIGHT); // Random y position
+        a->angle = -M_PI; // Shoot left
+        a->velocity = 0.3; // Set bullet velocity
+        a->exploding = true; // Enable explosion feature
+        a->numFragments = 6;
+        a->explosionTimer = rng(1000, 3000); // Set explosion timer
+        a->texture = combatUIManager->bulletTexture;
+        a->red = 255;   // Set color for initial bullet
+        a->green = 0;
+        a->blue = 0;
+    }
+    break;
+}
+case 7:
+{
+    // Pattern using exploding bullets
+    int cooldown = 3000; // Cooldown between each shot
+
+    if (accumulator >= cooldown) {
+        accumulator = 0;
+
+        miniBullet* a = new miniBullet();
+        a->x = SCREEN_WIDTH + SPAWN_MARGIN; // Spawn off-screen
+        a->y = rng(0, SCREEN_HEIGHT); // Random y position
+        a->angle = -M_PI; // Shoot left
+        a->velocity = 0.3; // Set bullet velocity
+        a->exploding = 2; // Enable explosion feature
+        a->numFragments = 3;
+        a->fragSize = 0.75;
+        a->explosionTimer = rng(1000, 3000); // Set explosion timer
+        a->texture = combatUIManager->bulletTexture;
+        a->red = 128;   // Set color for initial bullet
+        a->green = 128;
+        a->blue = 128;
+        a->randomExplodeAngle = 1;
+    }
+    break;
+}
+case 8:
+{
+    int cooldown = 800;
+
+    if (accumulator >= cooldown) {
+        accumulator = 0;
+
+        miniBullet* a = new miniBullet();
+        a->x = rng(0, SCREEN_WIDTH);
+        a->y = -SPAWN_MARGIN;
+        a->angle = M_PI/2;
+        a->velocity = 0;
+        a->acceleration = 0.003;
+        a->texture = combatUIManager->bulletTexture;
+        a->red = 0;
+        a->green = 128;
+        a->blue = 128;
+    }
+    break;
+}
+case 9:
+{
+    int cooldown = 1200;
+
+    if (accumulator >= cooldown) {
+        accumulator = 0;
+
+        miniBullet* a = new miniBullet();
+        a->x = rng(0, SCREEN_WIDTH);
+        a->y = -SPAWN_MARGIN;
+        a->angle = M_PI/2;
+        a->velocity = 2;
+        a->acceleration = -0.002;
+        a->texture = combatUIManager->bulletTexture;
+        a->red = 128;
+        a->green = 128;
+        a->blue = 0;
+    }
+    break;
+}
+case 10:
+{
+    int cooldown = 1200;
+
+    if (accumulator >= cooldown) {
+        accumulator = 0;
+
+        miniBullet* a = new miniBullet();
+        a->velocity = 1.6;
+        a->acceleration = -0.0015;
+        a->texture = combatUIManager->bulletTexture;
+        a->red = 0;
+        a->green = 128;
+        a->blue = 128;
+    }
+    break;
+}
+case 11:
+      {
+        // Offscreen radial burst pattern
+        int cooldown = 2500;
+        if (accumulator >= cooldown) {
+          accumulator = 0;
+          int numBullets = 18; // Number of bullets in the radial burst
+          float spawnX, spawnY;
+          // Ensure bullets spawn completely offscreen
+          if (rng(0, 1)) {
+            spawnX = (rng(0, 1)) ? -SPAWN_MARGIN : SCREEN_WIDTH + SPAWN_MARGIN;
+            spawnY = rng(-SPAWN_MARGIN, SCREEN_HEIGHT + SPAWN_MARGIN);
+          } else {
+            spawnX = rng(-SPAWN_MARGIN, SCREEN_WIDTH + SPAWN_MARGIN);
+            spawnY = (rng(0, 1)) ? -SPAWN_MARGIN : SCREEN_HEIGHT + SPAWN_MARGIN;
+          }
+
+          for (int i = 0; i < numBullets; i++) {
+            miniBullet* a = new miniBullet();
+            a->x = spawnX;
+            a->y = spawnY;
+            a->angle = i * (2 * M_PI / numBullets); // Spread bullets evenly in a circle
+            a->texture = combatUIManager->bulletTexture;
+            a->red = 255;
+            a->green = 255;
+            a->blue = 0;
+          }
+        }
+        break;
+      }
+
+    case 12:
+      {
+        // Offscreen radial burst pattern
+        int cooldown = 2500;
+        if (accumulator >= cooldown) {
+          accumulator = 0;
+          int numBullets = 12; // Number of bullets in the radial burst
+          float spawnX, spawnY;
+          // Ensure bullets spawn completely offscreen
+          if (rng(0, 1)) {
+            spawnX = (rng(0, 1)) ? -SPAWN_MARGIN : SCREEN_WIDTH + SPAWN_MARGIN;
+            spawnY = rng(-SPAWN_MARGIN, SCREEN_HEIGHT + SPAWN_MARGIN);
+          } else {
+            spawnX = rng(-SPAWN_MARGIN, SCREEN_WIDTH + SPAWN_MARGIN);
+            spawnY = (rng(0, 1)) ? -SPAWN_MARGIN : SCREEN_HEIGHT + SPAWN_MARGIN;
+          }
+
+          for (int i = 0; i < numBullets; i++) {
+            miniBullet* a = new miniBullet();
+            a->x = spawnX;
+            a->y = spawnY;
+            a->angle = i * (2 * M_PI / numBullets); // Spread bullets evenly in a circle
+            a->texture = combatUIManager->bulletTexture;
+            a->red = 255;
+            a->green = 255;
+            a->blue = 0;
+          }
+          for (int i = 0; i < numBullets; i++) {
+            miniBullet* a = new miniBullet();
+            a->x = spawnX;
+            a->y = spawnY;
+            a->velocity = 0.2;
+            a->angle = i * (2 * M_PI / numBullets); // Spread bullets evenly in a circle
+            a->angle += M_PI/numBullets;
+            a->texture = combatUIManager->bulletTexture;
+            a->red = 255;
+            a->green = 255;
+            a->blue = 0;
+          }
+        }
+        break;
+      }
+
+    case 13:
+      {
+        // Wave pattern
+        int cooldown = 1800;
+        static float waveTime = 0;
+        if (accumulator >= cooldown) {
+          accumulator = 0;
+          int numBullets = 5; // Number of bullets in the wave
+          for (int i = 0; i < numBullets; i++) {
+            miniBullet* a = new miniBullet();
+            // Ensure bullets spawn completely offscreen
+            a->x = SCREEN_WIDTH + SPAWN_MARGIN;
+            a->y = (SCREEN_HEIGHT / numBullets) * i;
+            a->angle = -M_PI; // Move left
+            // Calculate wave offset
+            a->velocity = 0.3 + 0.4 * sin(waveTime + i * M_PI / numBullets);
+            a->texture = combatUIManager->bulletTexture;
+            a->red = 128;
+            a->green = 0;
+            a->blue = 255;
+          }
+          waveTime += 0.5;
+        }
+        break;
+      }
+
+    case 14:
+      {
+        // Zigzag pattern
+        int cooldown = 1500;
+        static bool direction = true; // Direction of the zigzag
+        if (accumulator >= cooldown) {
+          accumulator = 0;
+          miniBullet* a = new miniBullet();
+          // Ensure bullets spawn completely offscreen
+          a->x = direction ? SCREEN_WIDTH + SPAWN_MARGIN : -SPAWN_MARGIN;
+          a->y = rng(-SPAWN_MARGIN, SCREEN_HEIGHT + SPAWN_MARGIN);
+          a->angle = direction ? -M_PI : 0; // Move left or right
+          a->velocity = 0.5;
+          a->texture = combatUIManager->bulletTexture;
+          a->red = 255;
+          a->green = 255;
+          a->blue = 128;
+          direction = !direction; // Toggle direction
+        }
+        break;
+      }
+
+
+    case 15:
+      {
+        // Random scatter pattern
+        int cooldown = 2500;
+        if (accumulator >= cooldown) {
+          accumulator = 0;
+          int numBullets = 20; // Number of bullets to scatter
+          for (int i = 0; i < numBullets; i++) {
+            miniBullet* a = new miniBullet();
+            // Ensure bullets spawn completely offscreen
+            if (rng(0, 1)) {
+              a->x = (rng(0, 1)) ? -SPAWN_MARGIN : SCREEN_WIDTH + SPAWN_MARGIN;
+              a->y = rng(-SPAWN_MARGIN, SCREEN_HEIGHT + SPAWN_MARGIN);
+            } else {
+              a->x = rng(-SPAWN_MARGIN, SCREEN_WIDTH + SPAWN_MARGIN);
+              a->y = (rng(0, 1)) ? -SPAWN_MARGIN : SCREEN_HEIGHT + SPAWN_MARGIN;
+            }
+            a->angle = rng(0, 2 * M_PI); // Random direction
+            a->velocity = frng(0.1, 0.5);
+            a->texture = combatUIManager->bulletTexture;
+            a->red = rng(0, 255);
+            a->green = rng(0, 255);
+            a->blue = rng(0, 255);
+          }
+        }
+        break;
+      }
+
+    case 16:
+      {
+        // Converging pattern
+        int cooldown = 3000;
+        if (accumulator >= cooldown) {
+          accumulator = 0;
+          int numBullets = 5; // Number of bullets converging to a point
+          float targetX = SCREEN_WIDTH / 2;
+          float targetY = SCREEN_HEIGHT / 2;
+          for (int i = 0; i < numBullets; i++) {
+            miniBullet* a = new miniBullet();
+            // Ensure bullets spawn completely offscreen
+            if (rng(0, 1)) {
+              a->x = (rng(0, 1)) ? -SPAWN_MARGIN : SCREEN_WIDTH + SPAWN_MARGIN;
+              a->y = rng(-SPAWN_MARGIN, SCREEN_HEIGHT + SPAWN_MARGIN);
+            } else {
+              a->x = rng(-SPAWN_MARGIN, SCREEN_WIDTH + SPAWN_MARGIN);
+              a->y = (rng(0, 1)) ? -SPAWN_MARGIN : SCREEN_HEIGHT + SPAWN_MARGIN;
+            }
+            a->angle = atan2(targetY - a->y, targetX - a->x); // Aim towards the center
+            a->velocity = frng(0.2, 0.7);
+            a->texture = combatUIManager->bulletTexture;
+            a->red = 255;
+            a->green = 0;
+            a->blue = 255;
+          }
+        }
+        break;
+      }
+
+    case 17:
+      {
+        // L-shaped pattern
+        int cooldown = 1800;
+        if (accumulator >= cooldown) {
+          accumulator = 0;
+          miniBullet* a = new miniBullet();
+          // Ensure bullets spawn completely offscreen
+          a->x = rng(-SPAWN_MARGIN, SCREEN_WIDTH + SPAWN_MARGIN);
+          a->y = -SPAWN_MARGIN;
+          a->angle = M_PI / 2; // Move downward
+          a->velocity = 0.4;
+          a->texture = combatUIManager->bulletTexture;
+          a->red = 128;
+          a->green = 255;
+          a->blue = 0;
+        }
+        break;
+      }
+
+    case 18:
+      {
+        // Star pattern
+        int cooldown = 8000;
+        if (accumulator >= cooldown) {
+          accumulator = 0;
+          int numBullets = 6; // Number of bullets in the star pattern
+          float centerX = SCREEN_WIDTH / 2;
+          float centerY = SCREEN_HEIGHT / 2;
+          for (int i = 0; i < numBullets; i++) {
+            miniBullet* a = new miniBullet();
+            // Ensure bullets spawn completely offscreen
+            a->x = (centerX + cos(i * 2 * M_PI / numBullets) * (SCREEN_WIDTH / 2 + SPAWN_MARGIN));
+            a->y = (centerY + sin(i * 2 * M_PI / numBullets) * (SCREEN_HEIGHT / 2 + SPAWN_MARGIN));
+            //a->angle = atan2(centerY - a->y, centerX - a->x); // Aim towards the center
+            a->velocity = 0.1;
+            a->texture = combatUIManager->bulletTexture;
+            a->red = 255;
+            a->green = 128;
+            a->blue = 128;
+            a->exploding = 1;
+            a->explosionTimer = 5300;
+            a->spinSpeed = 0.001;
+            a->spinAngle = i * 2 * M_PI / numBullets;
+            a->radius = 512;
+          }
+        }
+        break;
+      }
+    case 19:
+      {
+        // Sin wave pattern for the emitter's x position
+        int cooldown = 800; // Time between each bullet
+        static float time = 0; // Time variable for the sine wave
+        float amplitude = SCREEN_WIDTH / 2; // Amplitude of the sine wave
+        float frequency = 0.4f; // Frequency of the sine wave
+
+        if (accumulator >= cooldown) {
+          accumulator = 0;
+
+          miniBullet* a = new miniBullet();
+          a->x = SCREEN_WIDTH / 2 + amplitude * sin(frequency * time); // Sin wave x position
+          a->y = SCREEN_HEIGHT + SPAWN_MARGIN; // Start from the bottom
+          a->angle = -M_PI / 2; // Move upward
+          a->velocity = 0.5;
+          a->texture = combatUIManager->bulletTexture;
+          a->red = 128;
+          a->green = 255;
+          a->blue = 128;
+
+          // Increment time for the next bullet to create the sin wave effect
+          time += 1;
+        }
+        break;
+      }
+          case 20:
+      {
+        // Spinning spiral pattern with bullets spawning offscreen
+        int cooldown = 300;
+        static float phase = 0;
+        if (accumulator >= cooldown) {
+          accumulator = 0;
+          float centerX = SCREEN_WIDTH / 2;
+          float centerY = SCREEN_HEIGHT / 2;
+          int numBullets = 5;
+          for (int i = 0; i < numBullets; i++) {
+            miniBullet* a = new miniBullet();
+            float angle = phase + i * (2 * M_PI / numBullets);
+            float radius = SCREEN_WIDTH / 2 + SPAWN_MARGIN; // Spawn offscreen
+            a->x = centerX + cos(angle) * radius;
+            a->y = centerY + sin(angle) * radius;
+            a->angle = angle + M_PI / 2;
+            a->texture = combatUIManager->bulletTexture;
+            a->red = 128;
+            a->green = 128;
+            a->blue = 255;
+            a->spinSpeed = 0.001;
+            a->spinAngle = angle;
+            a->radius = radius;
+            a->centerX = centerX;
+            a->centerY = centerY;
+          }
+          phase += 0.1;
+        }
+        break;
+      }
+case 21:
+      {
+        // Random wave pattern with bullets spawning offscreen
+        int cooldown = 200; // Time between each bullet
+        static float phase = 0; // Time variable for the sine wave
+        float amplitude = SCREEN_WIDTH / 4; // Amplitude of the sine wave
+        float frequency = 0.05f; // Frequency of the sine wave
+
+        if (accumulator >= cooldown) {
+          accumulator = 0;
+
+          miniBullet* a = new miniBullet();
+          a->x = rng(0, SCREEN_WIDTH); // Random x position along the bottom edge
+          a->y = SCREEN_HEIGHT + SPAWN_MARGIN; // Start from the bottom offscreen
+          a->angle = -M_PI / 2; // Move upward
+          a->velocity = 0.5;
+          a->texture = combatUIManager->bulletTexture;
+          a->red = 128;
+          a->green = 255;
+          a->blue = 128;
+
+          // Increment phase for the next bullet to create the wave effect
+          phase += 1;
+        }
+        break;
+      }
+case 22:
+      {
+        // Concentric circles pattern
+        int cooldown = 3000;
+        if (accumulator >= cooldown) {
+          accumulator = 0;
+          float centerX = SCREEN_WIDTH / 2;
+          float centerY = SCREEN_HEIGHT / 2;
+          int numCircles = 3;
+          int bulletsPerCircle = 4;
+          float initialRadius = 560;
+          for (int j = 0; j < numCircles; j++) {
+            for (int i = 0; i < bulletsPerCircle; i++) {
+              miniBullet* a = new miniBullet();
+              float angle = i * 2 * M_PI / bulletsPerCircle;
+              float radius = initialRadius + j * 50;
+              a->x = centerX + cos(angle) * radius;
+              a->y = centerY + sin(angle) * radius;
+              a->angle = angle + M_PI / 2;
+              a->texture = combatUIManager->bulletTexture;
+              a->red = 50;
+              a->green = 190;
+              a->blue = 180;
+              a->spinSpeed = 0.0001 + j * 0.0002;
+              a->spinAngle = angle;
+              a->radius = radius;
+              a->centerX = centerX;
+              a->centerY = centerY;
+              a->velocity = 0.08;
+            }
+          }
+        }
+        break;
+      }
+case 23:
+      {
+        int cooldown = 100000;
+        if(accumulator >= cooldown) {
+          accumulator = 0;
+          for(int i = 0; i < 3; i++) {
+            miniBullet* a = new miniBullet();
+            a->angle = atan2(512 - a->y, 512 - a->x);
+            a->texture = combatUIManager->bulletTexture;
+            a->blue = 0;
+            a->green = 80;
+            a->canBounce = 1;
+            a->gravityAccelY = 0.02;
+
+          }
+        }
+        break;
+      }
+case 24:
+      {
+        int cooldown = 100000;
+        if(accumulator >= cooldown) {
+          accumulator = 0;
+          for(int i = 0; i < 1; i++) {
+            miniBullet* a = new miniBullet();
+            a->texture = combatUIManager->bulletTexture;
+            a->blue = 80;
+            a->angle = atan2(512 - a->y, 512 - a->x);
+            a->green = 0;
+            a->canBounce = 1;
+            a->velocity = 0.25;
+            a->w = 250;
+            a->h = 250;
+
+          }
+        }
+        break;
+      }
+case 25:
+      {
+        int cooldown = 3500;
+        if(accumulator >= cooldown) {
+          accumulator = 0;
+          for(int i = 0; i < 1; i++) {
+            miniBullet* a = new miniBullet();
+            a->texture = combatUIManager->bulletTexture;
+            a->red = 80;
+            a->blue = 0;
+            a->canBounce = 1;
+            a->velocity = 0.25;
+            a->w = 150;
+            a->h = 150;
+            a->exploding = 2;
+            a->numFragments = 4;
+            a->fragSize = 0.5;
+            a->completelyRandomExplodeAngle =1;
+            a->explosionTimer = rng(700, 2200);
+          }
+        }
+        break;
+      }
+  }
+}
+
 void initTables() {
   {
     itemsTable[0] = itemInfo("Bandage", 1);
-    itemsTable[1] = itemInfo("Bomb", 0);
+    itemsTable[1] = itemInfo("Bomb", 2);
     itemsTable[2] = itemInfo("Glasses", 2);
   }
   
@@ -221,18 +1074,23 @@ void useItem(int item, int target, combatant* user) {
     {
       //Bomb
       int mag = 50.0f * frng(0.70, 1.30) * (float)((float)user->baseSkill + ((float)user->skillGain * user->level));
-      g_enemyCombatants[target]->health -= mag;
-      string message = user->name + " hurt " + g_enemyCombatants[target]->name + " for " + to_string(mag) + ".";
-      combatUIManager->finalText = message;
-      combatUIManager->currentText = "";
-      combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
-      combatUIManager->dialogProceedIndicator->y = 0.25;
-      combatant* e = g_enemyCombatants[target];
-      if(e->health < 0) {
-        string deathmessage = e->name + " " +  e->deathText;
-        combatUIManager->queuedStrings.push_back(deathmessage);
-        g_enemyCombatants.erase(g_enemyCombatants.begin() + target);
+      for(int i = 0; i < g_enemyCombatants.size(); i++) {
+        g_enemyCombatants[i]->health -= mag;
+        string message = g_enemyCombatants[i]->name + " took " + to_string(mag) + " from the bomb.";
+        combatUIManager->queuedStrings.push_back(message);
+        combatUIManager->currentText = "";
+        combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+        combatUIManager->dialogProceedIndicator->y = 0.25;
+        combatant* e = g_enemyCombatants[i];
+        if(e->health < 0) {
+          string deathmessage = e->name + " " +  e->deathText;
+          combatUIManager->queuedStrings.push_back(deathmessage);
+          g_enemyCombatants.erase(g_enemyCombatants.begin() + i);
+          i--;
+        }
       }
+      combatUIManager->finalText = combatUIManager->queuedStrings.at(0);
+      combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
       break;
       
       break;
@@ -247,13 +1105,13 @@ void useItem(int item, int target, combatant* user) {
   }
 }
 
-void useSpiritMove(int spiritNumber, int rank, int target, combatant* user) {
+void useSpiritMove(int spiritNumber, int target, combatant* user) {
   user->sp -= spiritTable[spiritNumber].cost;
   switch(spiritNumber) {
     case 19:
       {
-        float baseDmg = 10 * rank;
-        if(g_enemyCombatants[target]->type == type::SWIMMING) {
+        float baseDmg = 10;
+        if(g_enemyCombatants[target]->myType == type::DEMON) {
           baseDmg *= 2;
         }
 
@@ -414,12 +1272,16 @@ combatUI::combatUI(SDL_Renderer* renderer) {
 
   const char* file = "resources/static/sprites/minigame/fomm.qoi";
   dodgerTexture = loadTexture(renderer, file);
- 
+
   file = "resources/static/sprites/minigame/bullet.qoi";
   bulletTexture = loadTexture(renderer, file);
 
   rendertarget = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, 1024, 1024);
-  SDL_SetTextureBlendMode(rendertarget, SDL_BLENDMODE_BLEND);
+
+  db1 = SDL_CreateRGBSurface(0, 512, 512, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+
+
+
 }
 
 combatUI::~combatUI() {
@@ -574,7 +1436,7 @@ void getCombatInput() {
 
 void drawCombatants() {
   int count = g_enemyCombatants.size();
-  int gap = -0.01 * WIN_WIDTH; // Space between combatants
+  int gap = 0.05 * WIN_WIDTH; // Space between combatants
   
   for (int i = 0; i < count; ++i) {
       combatant* combatant = g_enemyCombatants[i];
@@ -684,6 +1546,11 @@ void CombatLoop() {
   getCombatInput();
 
   SDL_RenderClear(renderer);
+   
+  updateWindowResolution();
+
+  //draw background
+  drawBackground();
 
   drawCombatants();
   switch (g_submode) {
@@ -819,6 +1686,7 @@ void CombatLoop() {
 
             //now, choose a move
             g_submode = submode::SPIRITCHOOSE;
+            combatUIManager->currentInventoryOption = 0;
 
             break;
           }
@@ -831,6 +1699,7 @@ void CombatLoop() {
 
             //now, choose a target
             g_submode = submode::ITEMCHOOSE;
+            combatUIManager->currentInventoryOption = 0;
 
             break;
           }
@@ -1002,9 +1871,14 @@ void CombatLoop() {
       } else if(c->serial.action == turnAction::SPIRITMOVE) {
         combatant* com = g_partyCombatants[combatUIManager->executePIndex];
         int whichSpiritAbility = com->serial.actionIndex; //which spirit ability
-        int spiritRank = com->serial.rank;
         int target = com->serial.target;
-        useSpiritMove(whichSpiritAbility, spiritRank, target, com);
+        useSpiritMove(whichSpiritAbility, target, com);
+        g_submode = submode::TEXT_P;
+      } else if(c->serial.action == turnAction::DEFEND) {
+        combatUIManager->finalText = g_partyCombatants[combatUIManager->executePIndex]->name + " shrank down!";
+        combatUIManager->currentText = "";
+        combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+        combatUIManager->dodgingThisTurn[combatUIManager->executePIndex] = 1;
         g_submode = submode::TEXT_P;
       }
 
@@ -1113,7 +1987,8 @@ void CombatLoop() {
 //        combatUIManager->mainPanel->show = 0;
 //        combatUIManager->dialogProceedIndicator->show = 0;
 //        combatUIManager->mainText->show = 0;
-        combatant* e = g_partyCombatants[rng(0, g_partyCombatants.size() - 1)];
+        int index = rng(0, g_partyCombatants.size() - 1);
+        combatant* e = g_partyCombatants[index];
         int damage = c->baseAttack + (c->attackGain * c->level) - (e->baseDefense + (e->defenseGain * e->level));
         damage *= frng(0.70,1.30);
         combatUIManager->damageFromEachHit = damage;
@@ -1125,9 +2000,16 @@ void CombatLoop() {
         combatUIManager->incrementDodgeTimer = 0;
         combatUIManager->dodgeTimer = 0;
         combatUIManager->damageTakenFromDodgingPhase = 0;
+        combatUIManager->invincibleMs = 0;
         
         //g_submode = submode::DODGING;
         string message = c->name + " attacks " + e->name + " for " + to_string(damage) + " damage!";
+        if(combatUIManager->dodgingThisTurn[index] == 1) {
+          combatUIManager->shrink = 1;
+        } else {
+          combatUIManager->shrink = 0;
+        }
+
         combatUIManager->finalText = message;
         combatUIManager->currentText = "";
         combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
@@ -1183,9 +2065,18 @@ void CombatLoop() {
           combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
         } else {
           g_submode = submode::DODGING;
-          combatUIManager->bulletTimerAccumulator = 0;
+          combatUIManager->accuA = 1000000;
+          combatUIManager->accuB = 1000000;
+          combatUIManager->accuC = 1000000;
           combatUIManager->dodgerX = 512;
           combatUIManager->dodgerY = 512;
+          combatant* e = g_enemyCombatants[combatUIManager->executeEIndex];
+          combatUIManager->curPatterns = e->attackPatterns[rng(0, e->attackPatterns.size()-1)];
+          for(int i = 0; i < g_miniEnts.size(); i++) {
+            delete g_miniEnts[i];
+            i--;
+          }
+          g_miniBullets.clear();
         }
       }
 
@@ -1266,6 +2157,8 @@ void CombatLoop() {
           } else {
             g_gamemode = gamemode::EXPLORATION;
             combatUIManager->hideAll();
+            adventureUIManager->dialogue_index++;
+            adventureUIManager->continueDialogue();
           }
         }
       }
@@ -1388,28 +2281,30 @@ void CombatLoop() {
       const float initialX = 0.45;
       const float initialY = 0.1;
       int index = 0;
-      for(int i = 0; i < columns; i++) {
-        for(int j = 0; j < rows; j++) {
-          combatUIManager->inventoryText->boxX = initialX + (i * width);
-          combatUIManager->inventoryText->boxY = initialY + (j * height);
-          int itemIndex = g_combatInventory[index];
-          string itemName = "";
-          itemName = itemsTable[itemIndex].name;
-          combatUIManager->inventoryText->updateText(itemName, -1, 0.85, g_textcolor, g_font);
-          if(index == combatUIManager->currentInventoryOption) {
-            combatUIManager->menuPicker->x = initialX + (i * width) - 0.035;
-            combatUIManager->menuPicker->y = initialY + (j * height) + 0.005;
+      if(g_combatInventory.size() > 0) {
+        for(int i = 0; i < columns; i++) {
+          for(int j = 0; j < rows; j++) {
+            combatUIManager->inventoryText->boxX = initialX + (i * width);
+            combatUIManager->inventoryText->boxY = initialY + (j * height);
+            int itemIndex = g_combatInventory[index];
+            string itemName = "";
+            itemName = itemsTable[itemIndex].name;
+            combatUIManager->inventoryText->updateText(itemName, -1, 0.85, g_textcolor, g_font);
+            if(index == combatUIManager->currentInventoryOption) {
+              combatUIManager->menuPicker->x = initialX + (i * width) - 0.035;
+              combatUIManager->menuPicker->y = initialY + (j * height) + 0.005;
+            }
+            if(index < g_combatInventory.size()) {
+              combatUIManager->inventoryText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+            }
+       
+       
+            index++;
           }
-          if(index < g_combatInventory.size()) {
-            combatUIManager->inventoryText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-          }
-     
-     
-          index++;
         }
+        combatUIManager->menuPicker->render(renderer, g_camera, elapsed);
       }
      
-      combatUIManager->menuPicker->render(renderer, g_camera, elapsed);
 
       break;
     }
@@ -1529,7 +2424,7 @@ void CombatLoop() {
 
       if(input[11] && !oldinput[11] && g_combatInventory.size() > 0) {
         //does he have enough sp?
-        int cost = spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption].first].cost;
+        int cost = spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption]].cost;
         int currentSp = g_partyCombatants[curCombatantIndex]->sp;
         if(currentSp < cost) {
           M("Not enough SP");
@@ -1540,16 +2435,13 @@ void CombatLoop() {
           g_submode = submode::SPWARNING;
 
         } else {
-          switch(spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption].first].targeting) {
+          switch(spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption]].targeting) {
             case 0:
             {
               //enemy
               g_partyCombatants[curCombatantIndex]->serial.action = turnAction::SPIRITMOVE;
-              pair<int, int> spiritMove = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
-              int spiritNumber = spiritMove.first;
-              int spiritRank = spiritMove.second;
+              int spiritNumber = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
               g_partyCombatants[curCombatantIndex]->serial.actionIndex = spiritNumber;
-              g_partyCombatants[curCombatantIndex]->serial.rank = spiritRank;
   
               g_submode = submode::TARGETING;
               break;
@@ -1558,11 +2450,9 @@ void CombatLoop() {
             {
               //teamate
               g_partyCombatants[curCombatantIndex]->serial.action = turnAction::SPIRITMOVE;
-              pair<int, int> spiritMove = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
-              int spiritNumber = spiritMove.first;
-              int spiritRank = spiritMove.second;
+              int spiritMove = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
+              int spiritNumber = spiritMove;
               g_partyCombatants[curCombatantIndex]->serial.actionIndex = spiritNumber;
-              g_partyCombatants[curCombatantIndex]->serial.rank = spiritRank;
   
               g_submode = submode::ALLYTARGETING;
               break;
@@ -1571,11 +2461,8 @@ void CombatLoop() {
             {
               //none
               g_partyCombatants[curCombatantIndex]->serial.action = turnAction::SPIRITMOVE;
-              pair<int, int> spiritMove = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
-              int spiritNumber = spiritMove.first;
-              int spiritRank = spiritMove.second;
+              int spiritNumber = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
               g_partyCombatants[curCombatantIndex]->serial.actionIndex = spiritNumber;
-              g_partyCombatants[curCombatantIndex]->serial.rank = spiritRank;
               g_submode = submode::CONTINUE;
               break;
             }
@@ -1591,42 +2478,31 @@ void CombatLoop() {
       const float initialX = 0.45;
       const float initialY = 0.1;
       int index = 0;
-      for(int i = 0; i < columns; i++) {
-        for(int j = 0; j < rows; j++) {
-          combatUIManager->spiritText->boxX = initialX + (i * width);
-          combatUIManager->spiritText->boxY = initialY + (j * height);
-          int itemIndex = g_combatInventory[index];
-          string spiritName = "";
-          spiritName = spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[index].first].name;
-
-          int spiritRank = g_partyCombatants[curCombatantIndex]->spiritMoves[index].second;
-          string spiritRankStr = "";
-          if(spiritRank == 1) {
-            spiritRankStr = "I";
-          } else if(spiritRank == 2) {
-            spiritRankStr = "II";
-          } else if(spiritRank == 3) {
-            spiritRankStr = "III";
-          } else if(spiritRank == 4) {
-            spiritRankStr = "IV";
-          } else if(spiritRank == 5) {
-            spiritRankStr = "V";
+      if(g_partyCombatants[curCombatantIndex]->spiritMoves.size() > 0) {
+        for(int i = 0; i < columns; i++) {
+          for(int j = 0; j < rows; j++) {
+            combatUIManager->spiritText->boxX = initialX + (i * width);
+            combatUIManager->spiritText->boxY = initialY + (j * height);
+            string spiritName = "";
+            spiritName = spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[index]].name;
+  
+            combatUIManager->spiritText->updateText(spiritName, -1, 0.85, g_textcolor, g_font);
+            if(index == combatUIManager->currentInventoryOption) {
+              combatUIManager->menuPicker->x = initialX + (i * width) - 0.035;
+              combatUIManager->menuPicker->y = initialY + (j * height) + 0.005;
+            }
+            if(index < g_combatInventory.size()) {
+              combatUIManager->spiritText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+            }
+       
+       
+            index++;
           }
-          combatUIManager->spiritText->updateText(spiritName + " " + spiritRankStr, -1, 0.85, g_textcolor, g_font);
-          if(index == combatUIManager->currentInventoryOption) {
-            combatUIManager->menuPicker->x = initialX + (i * width) - 0.035;
-            combatUIManager->menuPicker->y = initialY + (j * height) + 0.005;
-          }
-          if(index < g_combatInventory.size()) {
-            combatUIManager->spiritText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-          }
-     
-     
-          index++;
         }
+        D(g_partyCombatants[curCombatantIndex]->spiritMoves.size());
+        combatUIManager->menuPicker->render(renderer, g_camera, elapsed);
       }
      
-      combatUIManager->menuPicker->render(renderer, g_camera, elapsed);
 
       break;
     }
@@ -1741,19 +2617,31 @@ void CombatLoop() {
 
       if(combatUIManager->incrementDodgeTimer) {
         combatUIManager->dodgeTimer += elapsed;
-        if(input[0]) {
-          combatUIManager->dodgerY -= combatUIManager->dodgerSpeed;
+        bool movingUp = input[0];
+        bool movingDown = input[1];
+        bool movingLeft = input[2];
+        bool movingRight = input[3];
+        
+        // Determine if diagonal movement is happening
+        bool diagonalMovement = (movingUp || movingDown) && (movingLeft || movingRight);
+        
+        // Normalize speed for diagonal movement
+        float speed = diagonalMovement ? combatUIManager->dodgerSpeed / sqrt(2) : combatUIManager->dodgerSpeed;
+        
+        if (movingUp) {
+            combatUIManager->dodgerY -= speed;
         }
-        if(input[1]) {
-          combatUIManager->dodgerY += combatUIManager->dodgerSpeed;
+        if (movingDown) {
+            combatUIManager->dodgerY += speed;
         }
-        if(input[2]) {
-          combatUIManager->dodgerX -= combatUIManager->dodgerSpeed;
+        if (movingLeft) {
+            combatUIManager->dodgerX -= speed;
         }
-        if(input[3]) {
-          combatUIManager->dodgerX += combatUIManager->dodgerSpeed;
+        if (movingRight) {
+            combatUIManager->dodgerX += speed;
         }
-        float margin = 50;
+
+        float margin = combatUIManager->dodgerWidth/2;
         if(combatUIManager->dodgerX < 0 + margin) {
           combatUIManager->dodgerX = 0 + margin;
         }
@@ -1775,6 +2663,9 @@ void CombatLoop() {
           combatUIManager->dialogProceedIndicator->show = 0;
           g_submode = submode::MAIN;
           combatUIManager->currentOption = 0;
+          for(int i = 0; i < 4; i ++) {
+            combatUIManager->dodgingThisTurn[combatUIManager->executePIndex] = 0;
+          }
         } else {
           combatUIManager->executeEIndex++;
           g_submode = submode::EXECUTE_E;
@@ -1795,43 +2686,91 @@ void CombatLoop() {
     SDL_SetRenderDrawColor(renderer, 6, 7, 6, 255);
     SDL_RenderClear(renderer);
 
-    combatUIManager->bulletTimerAccumulator += elapsed;
-    if(combatUIManager->bulletTimerAccumulator >= 1000) {
-      combatUIManager->bulletTimerAccumulator = 0;
-      for(int i = 0; i < 11; i++) {
-        miniBullet* a = new miniBullet();
-        a->texture = combatUIManager->bulletTexture;
-      }
+    combatUIManager->accuA += elapsed;
+    combatUIManager->accuB += elapsed;
+    combatUIManager->accuC += elapsed;
+    
+    if(combatUIManager->curPatterns.size() > 0) {
+      spawnBullets(combatUIManager->curPatterns[0], combatUIManager->accuA);
+    }
+
+    if(combatUIManager->curPatterns.size() > 1) {
+      spawnBullets(combatUIManager->curPatterns[1], combatUIManager->accuB);
     }
     
+    if(combatUIManager->curPatterns.size() > 2) {
+      spawnBullets(combatUIManager->curPatterns[2], combatUIManager->accuC);
+    }
+
     {
       for(auto x : g_miniEnts) {
         x->update(elapsed);
+      }
+      for(int i = 0; i < g_miniBullets.size(); i++) {
+        g_miniBullets[i]->bulletUpdate(elapsed);
       }
       for(int i = 0; i < g_miniEnts.size(); i++) {
         if(g_miniEnts[i]->x < -SPAWN_MARGIN || g_miniEnts[i]->x > SCREEN_WIDTH + SPAWN_MARGIN ||
         g_miniEnts[i]->y < -SPAWN_MARGIN || g_miniEnts[i]->y > SCREEN_HEIGHT + SPAWN_MARGIN) {
           delete g_miniEnts[i];
           i--;
+          continue;
+        }
+        if(g_miniEnts[i]->exploded) {
+          delete g_miniEnts[i];
+          i--;
+          continue;
         }
       }
       for(auto x : g_miniEnts) {
         x->render();
-        SDL_Rect brect;
-        brect.x = x->x - x->w/2;
-        brect.y = x->y - x->h/2;
-        brect.w = x->w;
-        brect.h = x->h;
-
-        SDL_RenderCopy(renderer, combatUIManager->bulletTexture, NULL, &brect);
-
+      }
+      if(combatUIManager->shrink) {
+        combatUIManager->dodgerWidth = 50;
+        combatUIManager->dodgerHeight = 50;
+      } else {
+        combatUIManager->dodgerWidth = 100;
+        combatUIManager->dodgerHeight = 100;
+      }
+      if(combatUIManager->invincibleMs <= 0) {
+        for(auto x : g_miniBullets) {
+          if(Distance(combatUIManager->dodgerX, combatUIManager->dodgerY, x->x, x->y) < (combatUIManager->dodgerWidth + x->w)/2) {
+            g_partyCombatants[curCombatantIndex]->health -= combatUIManager->damageFromEachHit;
+            combatUIManager->damageTakenFromDodgingPhase += combatUIManager->damageFromEachHit;
+            combatUIManager->invincibleMs = combatUIManager->maxInvincibleMs;
+            break;
+          }
+        }
       }
       SDL_Rect drect;
       drect.x = combatUIManager->dodgerX - combatUIManager->dodgerWidth/2;
       drect.y = combatUIManager->dodgerY - combatUIManager->dodgerHeight/2;
       drect.w = combatUIManager->dodgerWidth;
       drect.h = combatUIManager->dodgerHeight;
-      SDL_RenderCopy(renderer, combatUIManager->dodgerTexture, NULL, &drect);
+
+      if(combatUIManager->invincibleMs > 0) {
+        if(combatUIManager->blinkMs > 50) {
+          combatUIManager->drawDodger = !combatUIManager->drawDodger;
+          combatUIManager->blinkMs = 0;
+        }
+      } else {
+        combatUIManager->drawDodger = 1;
+      }
+      
+      if(combatUIManager->drawDodger) {
+        SDL_SetTextureColorMod(combatUIManager->dodgerTexture, 255*0.7, 255*0.7, 255*0.7);
+        SDL_RenderCopy(renderer, combatUIManager->dodgerTexture, NULL, &drect);
+        SDL_SetTextureColorMod(combatUIManager->dodgerTexture, 255, 255, 255);
+        drect.x += 10;
+        drect.y += 10;
+        drect.w -= 20;
+        drect.h -= 20;
+        SDL_RenderCopy(renderer, combatUIManager->dodgerTexture, NULL, &drect);
+      }
+      
+
+      combatUIManager->invincibleMs -= elapsed;
+      combatUIManager->blinkMs += elapsed;
     }
 
 
@@ -1853,8 +2792,6 @@ void CombatLoop() {
 
 
 
-  updateWindowResolution();
-
   SDL_RenderPresent(renderer);
 }
 
@@ -1867,19 +2804,73 @@ miniEnt::~miniEnt() {
 }
 
 void miniEnt::update(float elapsed) {
-  x += velocity * cos(angle) * elapsed;
-  y += velocity * sin(angle) * elapsed;
+  // Calculate new position based on velocity
+    float deltaX = velocity * cos(angle) * elapsed;
+    float deltaY = velocity * sin(angle) * elapsed;
+    x += deltaX;
+    y += deltaY;
+
+    gravityVX += gravityAccelX * elapsed;
+    x += gravityVX;
+    gravityVY += gravityAccelY * elapsed;
+    y += gravityVY;
+
+    // If spinSpeed is non-zero, apply the spinning motion
+    if (spinSpeed != 0) {
+      spinAngle += spinSpeed * elapsed;
+
+      // Move the bullet along the perpendicular vector
+      x = centerX + radius * cos(spinAngle);
+      y = centerY + radius * sin(spinAngle);
+
+      radius -= velocity * elapsed;
+    }
+
+    if(!isInPlayArea && x -w/2>= 0 && x + w/2 <= SCREEN_WIDTH && y -h/2 >= 0 && y +h/2 <= SCREEN_WIDTH) {
+      isInPlayArea = 1;
+    }
+    if (isInPlayArea && canBounce) {
+      if (x < w / 2 || x > SCREEN_WIDTH - w / 2) {
+        angle = M_PI - angle; // Reflect horizontally
+        if (x < w / 2) { 
+          x = w / 2;
+          gravityVX = -gravityVX;
+
+        }
+        if (x > SCREEN_WIDTH - w / 2) {
+          x = SCREEN_WIDTH - w / 2;
+          gravityVX = -gravityVX;
+        }
+      }
+      if (y < w / 2 || y > SCREEN_HEIGHT - w / 2) {
+        angle = -angle; // Reflect vertically
+        if (y < w / 2)  {
+          y = w / 2;
+          gravityVY = -gravityVY;
+        }
+        if (y > SCREEN_HEIGHT - w / 2) {
+          y = SCREEN_HEIGHT - w / 2;
+          gravityVY = -gravityVY;
+        }
+      }
+    }
 }
 
 void miniEnt::render() {
-  M("miniEnt::render()");
-  SDL_Rect renderQuad = {
+  SDL_Rect drect = {
     (int)x - w/2,
     (int)y - h/2,
     (int)w,
     (int)h
   };
-  SDL_RenderCopy(renderer, texture, NULL, &renderQuad);
+  SDL_SetTextureColorMod(texture, red*0.7, blue*0.7, green*0.7);
+  SDL_RenderCopy(renderer, texture, NULL, &drect);
+  drect.x += 10;
+  drect.y += 10;
+  drect.w -= 20;
+  drect.h -= 20;
+  SDL_SetTextureColorMod(texture, red, blue, green);
+  SDL_RenderCopy(renderer, texture, NULL, &drect);
 }
 
 miniBullet::miniBullet(float f_angle, float f_velocity) {
@@ -1919,9 +2910,66 @@ miniBullet::miniBullet() {
   w = 100;
   h = 100;
   angle = atan2(targetY - spawnY, targetX - spawnX);
-  velocity = 0.5;
+  velocity = 0.3;
+  g_miniBullets.push_back(this);
 }
 
 miniBullet::~miniBullet() {
   g_miniBullets.erase(remove(g_miniBullets.begin(), g_miniBullets.end(), this), g_miniBullets.end());
+}
+
+void miniBullet::explode(int numFragments, int exploding, float fragSize) {
+    // Create smaller bullets upon explosion
+    
+    float baseAngle = 0;
+    if(randomExplodeAngle) {
+      baseAngle = frng(0, M_PI * 2);
+    }
+    for (int i = 0; i < numFragments; i++) {
+        miniBullet* fragment = new miniBullet();
+        fragment->x = x;
+        fragment->y = y;
+        fragment->angle = 2 * M_PI / numFragments * i;
+        fragment->angle += baseAngle;
+        if(completelyRandomExplodeAngle) {
+          fragment->angle = frng(0, 2*M_PI);
+          fragment->completelyRandomExplodeAngle = 1;
+        }
+        fragment->canBounce = canBounce;
+        fragment->velocity = 0.3; // Set velocity of fragments
+        fragment->texture = texture;
+        fragment->red = this->red;
+        fragment->green = this->green;
+        fragment->blue = this->blue;
+	      fragment->texture = this->texture;
+        fragment->exploding = exploding;
+        fragment->explosionTimer = 1000;
+        fragment->w = this->w * fragSize;
+        fragment->h = fragment->w;
+        fragment->numFragments = numFragments;
+        fragment->fragSize = fragSize;
+        fragment->randomExplodeAngle = randomExplodeAngle;
+        if(exploding == 0) {
+          fragment->canBounce = 0;
+        }
+    }
+}
+
+void miniBullet::bulletUpdate(float elapsed) {
+  if(homing) {
+    float dx = combatUIManager->dodgerX - x;
+    float dy = combatUIManager->dodgerY - y;
+    float targetAngle = atan2(dy, dx);
+    float angleDifference = targetAngle - angle;
+    if(angleDifference > M_PI) angleDifference -= 2 * M_PI;
+    if(angleDifference < -M_PI) angleDifference += 2 * M_PI;
+    angle += angleDifference * 0.001f * elapsed;
+  }
+ if (exploding) {
+        explosionTimer -= elapsed;
+        if (explosionTimer <= 0 && exploded == 0) {
+            explode(numFragments, exploding - 1, fragSize);
+            exploded = 1;
+        }
+    }
 }

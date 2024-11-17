@@ -20,6 +20,7 @@
 #include <map> //saves
 #include <ctime> //clock display
 #include "combat.h"
+#include "title.h"
 
 // this is unique to the windowsport
 //#include "windowsinclude.h"
@@ -938,6 +939,8 @@ extern int curCombatantIndex;
 extern vector<int> g_combatInventory;
 
 extern int g_maxInventorySize;
+
+extern titleUI* titleUIManager;
 
 bool fileExists(const std::string &name);
 
