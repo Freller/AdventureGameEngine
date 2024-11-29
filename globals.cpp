@@ -130,6 +130,8 @@ vector<miniEnt *> g_miniEnts;
 
 vector<miniBullet *> g_miniBullets;
 
+vector<tallGrass*> g_tallGrasses;
+
 map<string, int> enemiesMap; // stores (file,cost) for enemies to be spawned procedurally in the map
 int g_budget = 0;						 // how many points this map can spend on enemies;
 
@@ -389,7 +391,7 @@ string g_font;
 float g_fontsize = 0.031; // 0.021 - 0.04
 TTF_Font* g_ttf_font;
 float g_minifontsize = 0.01;
-float g_transitionSpeed = 3; // 3, 9
+float g_transitionSpeed = 1; // 3, 9
 
 // inventory - we're switching things up. This will be the picnic-box, the inventory for consumables
 float use_cooldown = 0; // misleading, its not for attacks at all
@@ -858,6 +860,7 @@ tile *poiIcon;
 tile *doorIcon;
 tile *ddoorIcon;
 tile *triggerIcon;
+SDL_Texture* grassTexture;
 textbox *nodeInfoText;
 string entstring = "oilman"; // last entity spawned;
 
@@ -957,6 +960,15 @@ vector<int> g_combatInventory;
 int g_maxInventorySize = 14;
 
 titleUI* titleUIManager;
+
+//encounter system (pokemon tall grass)
+string g_encountersFile = "";
+vector<vector<pair<string, int>>> loadedEncounters = {};
+int g_lastGrassX = 0;
+int g_lastGrassY = 0;
+float g_encounterChance = 0;
+vector<string> loadedBackgrounds={};
+int g_combatEntryType = 0;
 
 bool fileExists(const std::string &name)
 {

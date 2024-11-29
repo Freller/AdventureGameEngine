@@ -29,6 +29,8 @@
 
 using namespace std;
 
+void cyclePalette(SDL_Surface* source, SDL_Surface* destination, std::vector<Uint32>& palette);
+
 navNode* getNodeByPos(vector<navNode*> array, int x, int y);
 entity* searchEntities(string fname, entity* caller);
 entity* searchEntities(string fname);
@@ -2210,6 +2212,13 @@ struct dungeonBehemothInfo {
 struct dungeonFloorInfo {
   string map;
   char identity; //1, 2, 3, r, s
+};
+
+class tallGrass {
+public:
+  rect bounds;
+  tallGrass();
+  ~tallGrass();
 };
 
 

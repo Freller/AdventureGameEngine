@@ -1211,7 +1211,7 @@ void ExplorationLoop() {
 
     }
 
-    //should we should the visionDetectable?
+    //should we show the visionDetectable?
     adventureUIManager->seeingDetectable->show = 0;
     if(g_protagIsBeingDetectedBySight) {
       adventureUIManager->seeingDetectable->show = 1;
@@ -1353,7 +1353,6 @@ void ExplorationLoop() {
     // map editing
     if (devMode)
     {
-
       nodeInfoText->textcolor = {0, 0, 0};
 
       // draw nodes
@@ -1547,21 +1546,6 @@ void ExplorationLoop() {
 
       }
       
-    }
-
-    if (g_fogofwarEnabled && !devMode)
-    {
-      // black bars
-      SDL_Rect topbar = {px, FoWrect.y - 990, 1500, 1000};
-      SDL_RenderCopy(renderer, blackbarTexture, NULL, &topbar);
-      SDL_Rect botbar = {px, FoWrect.y + g_fogheight * 55 + 10, 2000, 1000};
-      SDL_RenderCopy(renderer, blackbarTexture, NULL, &botbar);
-
-      SDL_Rect leftbar = {px-800, FoWrect.y, 1000, 1500};
-      //SDL_RenderCopy(renderer, blackbarTexture, NULL, &leftbar);
-      SDL_Rect rightbar = {px + 1100, FoWrect.y, 1000, 1500};
-      //SDL_RenderCopy(renderer, blackbarTexture, NULL, &rightbar);
-
     }
 
     // ui
@@ -2093,6 +2077,192 @@ void ExplorationLoop() {
 
     }
 
+    //tallgrass update
+    {
+      int grassX = protag->getOriginX();
+      int grassY = protag->getOriginY();
+      grassX -= grassX % 64;
+      grassY -= grassY % 55;
+      if(grassX != g_lastGrassX || grassY != g_lastGrassY) {
+        for(auto x : g_tallGrasses) {
+          if(RectOverlap(protag->getMovedBounds(), x->bounds)) {
+            if(frng(0,1) <= g_encounterChance) {
+              M("Begin an encounter");
+              int randomIndex = rng(0, loadedEncounters.size()-1);
+              for(auto x : loadedEncounters[randomIndex]) {
+                combatant* a = new combatant(x.first, x.second);
+                a->maxHealth = a->baseHealth + (a->healthGain * a->level);
+                a->health = a->maxHealth;
+                g_enemyCombatants.push_back(a);
+              }
+              D(g_enemyCombatants.size());
+
+              string bgstr;
+              if(loadedBackgrounds.size() > randomIndex) {
+                bgstr = loadedBackgrounds[randomIndex];
+              } else {
+                if(loadedBackgrounds.size() == 0) {E("No loaded combat backgrounds for map " + g_mapdir + "/" + g_map); abort();}
+                bgstr = loadedBackgrounds[0];
+              }
+
+              string loadme = "resources/static/backgrounds/json/" + bgstr + ".json";
+              combatUIManager->loadedBackground = bground(renderer, loadme.c_str());
+            
+              if(combatUIManager->sb1 != 0) {
+                SDL_FreeSurface(combatUIManager->sb1);
+              }
+            
+              loadme = "resources/static/backgrounds/textures/" + to_string(combatUIManager->loadedBackground.texture) + ".qoi";
+              combatUIManager->sb1 = IMG_Load(loadme.c_str());
+            
+              cyclePalette(combatUIManager->sb1, combatUIManager->db1, combatUIManager->loadedBackground.palette);
+
+              {
+                g_gamemode = gamemode::COMBAT;
+                g_submode = submode::INWIPE;
+                writeSave();
+                transitionDelta = transitionImageHeight;
+                g_combatEntryType = 1;
+            
+                combatUIManager->partyHealthBox->show = 1;
+                combatUIManager->partyText->show = 1;
+                combatUIManager->finalText = "It's an enemy encounter!";
+                combatUIManager->currentText = "";
+                combatUIManager->dialogProceedIndicator->y = 0.25;
+            
+                {
+                  //SDL_GL_SetSwapInterval(0);
+                  bool cont = false;
+                  float ticks = 0;
+                  float lastticks = 0;
+                  float transitionElapsed = 5;
+                  float mframes = 60;
+                  float transitionMinFrametime = 5;
+                  transitionMinFrametime = 1/mframes * 1000;
+                
+                
+                  SDL_Surface* transitionSurface = loadSurface("resources/engine/transition.qoi");
+                
+                  int imageWidth = transitionSurface->w;
+                  int imageHeight = transitionSurface->h;
+                
+                  SDL_Texture* transitionTexture = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, transitionSurface->w, transitionSurface->h );
+                  SDL_SetTextureBlendMode(transitionTexture, SDL_BLENDMODE_BLEND);
+                
+                
+                  void* pixelReference;
+                  int pitch;
+                
+                  float offset = imageHeight;
+                
+                  SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
+                  SDL_SetRenderTarget(renderer, frame);
+            
+                  // tiles
+                  for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+                  {
+                    if (g_tiles[i]->z == 0)
+                    {
+                      g_tiles[i]->render(renderer, g_camera);
+                    }
+                  }
+              
+                  for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+                  {
+                    if (g_tiles[i]->z == 1)
+                    {
+                      g_tiles[i]->render(renderer, g_camera);
+                    }
+                  }
+            
+                  // sort
+                  sort_by_y(g_actors);
+                  for (long long unsigned int i = 0; i < g_actors.size(); i++)
+                  {
+                    g_actors[i]->render(renderer, g_camera);
+                  }
+              
+                  for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+                  {
+                    if (g_tiles[i]->z == 2)
+                    {
+                      g_tiles[i]->render(renderer, g_camera);
+                    }
+                  }
+                
+                  SDL_SetRenderTarget(renderer, NULL);
+                  while (!cont) {
+                
+                    //onframe things
+                    SDL_LockTexture(transitionTexture, NULL, &pixelReference, &pitch);
+                
+                    memcpy( pixelReference, transitionSurface->pixels, transitionSurface->pitch * transitionSurface->h);
+                    Uint32 format = SDL_PIXELFORMAT_ARGB8888;
+                    SDL_PixelFormat* mappingFormat = SDL_AllocFormat( format );
+                    Uint32* pixels = (Uint32*)pixelReference;
+                    Uint32 transparent = SDL_MapRGBA( mappingFormat, 0, 0, 0, 255);
+                
+                    offset += g_transitionSpeed + 0.02 * offset;
+                
+                    for(int x = 0;  x < imageWidth; x++) {
+                      for(int y = 0; y < imageHeight; y++) {
+                
+                
+                        int dest = (y * imageWidth) + x;
+                        //int src =  (y * imageWidth) + x;
+                
+                        if(pow(pow(imageWidth/2 - x,2) + pow(imageHeight + y,2),0.5) < offset) {
+                          pixels[dest] = transparent;
+                        } else {
+                          pixels[dest] = 0;
+                        }
+                
+                      }
+                    }
+                
+                
+                
+                
+                
+                    ticks = SDL_GetTicks();
+                    transitionElapsed = ticks - lastticks;
+                    //lock framerate
+                    if(transitionElapsed < transitionMinFrametime) {
+                      SDL_Delay(transitionMinFrametime - transitionElapsed);
+                      ticks = SDL_GetTicks();
+                      transitionElapsed = ticks - lastticks;
+                    }
+                    lastticks = ticks;
+                
+                    SDL_RenderClear(renderer);
+                    //render last frame
+                    SDL_RenderCopy(renderer, frame, NULL, NULL);
+                    SDL_UnlockTexture(transitionTexture);
+                    SDL_RenderCopy(renderer, transitionTexture, NULL, NULL);
+                    SDL_RenderPresent(renderer);
+                
+                    if(offset > imageHeight + pow(pow(imageWidth/2,2) + pow(imageHeight,2),0.5)) {
+                      cont = 1;
+                    }
+                  }
+                  SDL_FreeSurface(transitionSurface);
+                  SDL_DestroyTexture(transitionTexture);
+                  SDL_DestroyTexture(frame);
+                  transition = 1;
+                  titleUIManager->hideAll();
+                  SDL_GL_SetSwapInterval(1);
+                }
+            
+              }
+              
+
+            }
+          }
+        }
+      }
+      g_lastGrassX = grassX;
+      g_lastGrassY = grassY;
+    }
 
 
     // ENTITY MOVEMENT (ENTITY UPDATE)
@@ -2715,6 +2885,87 @@ void ExplorationLoop() {
     SDL_RenderPresent(renderer);
 }
 
+void LoseLoop() {
+  M("Loss screen");
+  combatUIManager->mainPanel->show = 1;
+  combatUIManager->mainText->show = 1;
+  combatUIManager->optionsPanel->show = 0;
+
+  if(input[11]) {
+    text_speed_up = 50;
+  } else {
+    text_speed_up = 1;
+  }
+
+
+  curTextWait += elapsed * text_speed_up;
+  
+  if(combatUIManager->finalText == combatUIManager->currentText) {
+    combatUIManager->dialogProceedIndicator->show = 1;
+  } else {
+    combatUIManager->dialogProceedIndicator->show = 0;
+  }
+
+  if (curTextWait >= textWait)
+  {
+   
+    if(combatUIManager->finalText != combatUIManager->currentText) {
+      if(input[8]) {
+        combatUIManager->currentText = combatUIManager->finalText;
+      } else {
+        combatUIManager->currentText += combatUIManager->finalText.at(combatUIManager->currentText.size());
+        playSound(6, g_ui_voice, 0);
+      }
+      combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+  
+    }
+    
+    curTextWait = 0;
+  }
+
+  if(combatUIManager->finalText == combatUIManager->currentText) {
+    if(input[11] && !oldinput[11]) {
+      //advance dialog
+      if(combatUIManager->queuedStrings.size() > 0) {
+        combatUIManager->dialogProceedIndicator->y = 0.25;
+        combatUIManager->currentText = "";
+        combatUIManager->finalText = combatUIManager->queuedStrings.at(0);
+        combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
+      } else {
+        combatUIManager->mainPanel->show = 0;
+        combatUIManager->mainText->show = 0;
+        combatUIManager->dialogProceedIndicator->show = 0;
+        combatUIManager->optionsPanel->show = 1;
+        g_submode = submode::MAIN;
+        combatUIManager->currentOption = 0;
+        while(g_partyCombatants[curCombatantIndex]->health <= 0 && curCombatantIndex+1 < g_partyCombatants.size()) {
+          curCombatantIndex ++;
+        }
+      }
+    }
+  }
+
+  //animate dialogproceedarrow
+  {
+    combatUIManager->c_dpiDesendMs += elapsed;
+    if(combatUIManager->c_dpiDesendMs > combatUIManager->dpiDesendMs) {
+      combatUIManager->c_dpiDesendMs = 0;
+      combatUIManager->c_dpiAsending = !combatUIManager->c_dpiAsending;
+  
+    }
+    
+    if(combatUIManager->c_dpiAsending) {
+      combatUIManager->dialogProceedIndicator->y += combatUIManager->dpiAsendSpeed;
+    } else {
+      combatUIManager->dialogProceedIndicator->y -= combatUIManager->dpiAsendSpeed;
+  
+    }
+  }
+
+  SDL_RenderClear(renderer);
+  SDL_RenderPresent(renderer);
+}
+
 int WinMain()
 {
 
@@ -2815,7 +3066,7 @@ int WinMain()
 
   if (canSwitchOffDevMode)
   {
-    init_map_writing(renderer);
+    //init_map_writing(renderer);
     // done once, because textboxes aren't cleared during clear_map()
     nodeInfoText = new textbox(renderer, "",  g_fontsize, 0, 0, WIN_WIDTH);
     g_config = "dev";
@@ -3350,9 +3601,6 @@ int WinMain()
   blackSmokeEffect = new effectIndex("blackpowder", renderer);
   blackSmokeEffect->persistent = 1;
 
-  sparksEffect = new effectIndex("sparks", renderer);
-  sparksEffect->persistent = 1;
-
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
   SDL_RenderPresent(renderer);
   SDL_GL_SetSwapInterval(1);
@@ -3561,6 +3809,11 @@ int WinMain()
       case gamemode::COMBAT:
       { 
         CombatLoop();
+        break;
+      }
+      case gamemode::LOSS:
+      {
+        LoseLoop();
         break;
       }
 
@@ -4548,17 +4801,14 @@ void getExplorationInput(float &elapsed)
         }
   
         if(g_escapeUI->positionOfCursor == 3) {
-          //quit = 1;  //to desktop
+          oldStaticInput[4] = 1;
+          g_levelFlashing = 0;
+          inPauseMenu = 0;
+          Mix_FadeOutMusic(1000);
           clear_map(g_camera);
-          //g_inTitleScreen = 1;
-          //g_mapdir = "sp-title";
+          //transition = 1;
           g_gamemode = gamemode::TITLE;
           titleUIManager->showAll();
-          transition = 1;
-          
-
-          //load_map(renderer, "resources/maps/sp-title/g.map","a"); //to menu
-          
         }
 
         if(g_escapeUI->positionOfCursor == 2) { //Settings
@@ -5232,6 +5482,10 @@ void getExplorationInput(float &elapsed)
     devinput[36] = 1;
   }
 
+  if(keystate[SDL_SCANCODE_S] && devMode) {
+    devinput[38] = 1;
+  }
+
   if (keystate[SDL_SCANCODE_ESCAPE])
   {
 
@@ -5477,6 +5731,7 @@ void toggleDevmode() {
   }
   else
   {
+    M("hid floortex");
     floortexDisplay->show = 0;
     captexDisplay->show = 0;
     walltexDisplay->show = 0;

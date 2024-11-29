@@ -34,8 +34,6 @@ using namespace std;
 
 class usable;
 
-void cyclePalette(SDL_Surface* source, SDL_Surface* destination, std::vector<Uint32>& palette);
-
 navNode* getNodeByPos(vector<navNode*> array, int x, int y) {
   float min_dist = 0;
   navNode* ret = nullptr;
@@ -7113,7 +7111,39 @@ int writeSave() {
 
   //write party
   for(auto x : party) {
-    file << x->name << " " << x->level << " " << x->hp << endl;
+    int spiritOne = -1;
+    int spiritTwo = -1;
+    int spiritThree = -1;
+    int spiritFour = -1;
+
+    combatant* y = 0;
+    for(auto z : g_partyCombatants) {
+      D(z->name);
+      D(x->name);
+      if(z->filename == x->name) {
+        y = z;
+        break;
+      }
+    }
+    if(y == 0) {
+      E("Fatal: Couldn't find party combatant for party member " + x->name);
+      abort();
+    }
+
+    if(y->spiritMoves.size() > 0) {
+      spiritOne = y->spiritMoves[0];
+    }
+    if(y->spiritMoves.size() > 1) {
+      spiritOne = y->spiritMoves[1];
+    }
+    if(y->spiritMoves.size() > 2) {
+      spiritOne = y->spiritMoves[2];
+    }
+    if(y->spiritMoves.size() > 3) {
+      spiritOne = y->spiritMoves[3];
+    }
+
+    file << x->name << " " << y->xp << " " << y->health << " " << y->sp << " " << spiritOne << " " << spiritTwo << " " << spiritThree << " " << spiritFour << endl;
   }
   file << "&" << endl;
   
@@ -8063,6 +8093,8 @@ void clear_map(camera& cameraToReset) {
   g_ex_familiars.clear();
   g_lt_collisions.clear();
   g_is_collisions.clear();
+  loadedEncounters.clear();
+  loadedBackgrounds.clear();
   if(g_dungeonSystemOn == 0) {
     g_behemoths.clear();
     g_behemoth0 = 0;
@@ -8070,6 +8102,9 @@ void clear_map(camera& cameraToReset) {
     g_behemoth2 = 0;
     g_behemoth3 = 0;
   }
+
+  g_encountersFile = "";
+  g_encounterChance = 0;
 
   
   if(g_waterAllocated) {
@@ -8108,32 +8143,50 @@ void clear_map(camera& cameraToReset) {
 
     SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
     SDL_SetRenderTarget(renderer, frame);
-
-    //to stop the clock and the goal text from rendering
-
-    //render current frame to texture -- this is gonna get weird
-    switch(g_gamemode) {
-      case gamemode::TITLE:
+    
+    {
+      // tiles
+      for (long long unsigned int i = 0; i < g_tiles.size(); i++)
       {
-        TitleLoop();
-        break;
+        if (g_tiles[i]->z == 0)
+        {
+          g_tiles[i]->render(renderer, g_camera);
+        }
       }
-      case gamemode::EXPLORATION: 
+  
+      for (long long unsigned int i = 0; i < g_tiles.size(); i++)
       {
-        ExplorationLoop();
-        break;
-      }
-      case gamemode::COMBAT:
-      { 
-        CombatLoop();
-        break;
+        if (g_tiles[i]->z == 1)
+        {
+          g_tiles[i]->render(renderer, g_camera);
+        }
       }
 
+
+      for (long long unsigned int i = 0; i < g_actors.size(); i++)
+      {
+        g_actors[i]->render(renderer, g_camera);
+      }
+  
+      for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+      {
+        if (g_tiles[i]->z == 2)
+        {
+          g_tiles[i]->render(renderer, g_camera);
+        }
+      }
+
+      drawUI();
     }
 
-    //to stop the clock and the goal text from rendering
-
     SDL_SetRenderTarget(renderer, NULL);
+
+
+    SDL_RenderClear(renderer);
+    SDL_RenderCopy(renderer, frame, NULL, NULL);
+    SDL_RenderPresent(renderer);
+
+
     while (!cont) {
 
       //onframe things
@@ -8148,7 +8201,8 @@ void clear_map(camera& cameraToReset) {
       //Uint32 halftone = SDL_MapRGBA( mappingFormat, 50, 50, 50, 128);
 
       offset += g_transitionSpeed + 0.02 * offset;
-
+ 
+      int blackPixels = 0;
       for(int x = 0;  x < imageWidth; x++) {
         for(int y = 0; y < imageHeight; y++) {
 
@@ -8163,6 +8217,7 @@ void clear_map(camera& cameraToReset) {
             // 	pixels[dest] = halftone;
             // } else {
             pixels[dest] = 0;
+            blackPixels++;
             // }
           }
 
@@ -8247,7 +8302,13 @@ void clear_map(camera& cameraToReset) {
   g_behemoth2 = 0;
   g_behemoth3 = 0;
 
-  for(int i = 0; i < g_ribbons.size(); i++) {
+  size = g_tallGrasses.size();
+  for(int i = 0; i < size; i++) {
+    delete g_tallGrasses[0];
+  }
+
+  size = g_ribbons.size();
+  for(int i = 0; i < size; i++) {
     delete g_ribbons[0];
   }
 
@@ -9335,7 +9396,7 @@ void adventureUI::continueDialogue()
     string s = scriptToUse->at(dialogue_index + 1);
     vector<string> x = splitString(s, ' ');
 
-    string loadme = "resources/static/backgrounds/json/" + to_string(0) + ".json";
+    string loadme = "resources/static/backgrounds/json/" + x[1] + ".json";
     combatUIManager->loadedBackground = bground(renderer, loadme.c_str());
 
     if(combatUIManager->sb1 != 0) {
@@ -9358,13 +9419,139 @@ void adventureUI::continueDialogue()
   if (scriptToUse->at(dialogue_index + 1).substr(0,7) == "/combat")
   {
     g_gamemode = gamemode::COMBAT;
-    g_submode = submode::TEXT;
+    g_submode = submode::INWIPE;
+    writeSave();
+    transitionDelta = transitionImageHeight;
+    g_combatEntryType = 0;
 
     combatUIManager->partyHealthBox->show = 1;
     combatUIManager->partyText->show = 1;
     combatUIManager->finalText = "It's an enemy encounter!";
     combatUIManager->currentText = "";
     combatUIManager->dialogProceedIndicator->y = 0.25;
+
+    {
+      //SDL_GL_SetSwapInterval(0);
+      bool cont = false;
+      float ticks = 0;
+      float lastticks = 0;
+      float transitionElapsed = 5;
+      float mframes = 60;
+      float transitionMinFrametime = 5;
+      transitionMinFrametime = 1/mframes * 1000;
+    
+    
+      SDL_Surface* transitionSurface = loadSurface("resources/engine/transition.qoi");
+    
+      int imageWidth = transitionSurface->w;
+      int imageHeight = transitionSurface->h;
+    
+      SDL_Texture* transitionTexture = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, transitionSurface->w, transitionSurface->h );
+      SDL_SetTextureBlendMode(transitionTexture, SDL_BLENDMODE_BLEND);
+    
+    
+      void* pixelReference;
+      int pitch;
+    
+      float offset = imageHeight;
+    
+      SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
+      SDL_SetRenderTarget(renderer, frame);
+
+      // tiles
+      for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+      {
+        if (g_tiles[i]->z == 0)
+        {
+          g_tiles[i]->render(renderer, g_camera);
+        }
+      }
+  
+      for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+      {
+        if (g_tiles[i]->z == 1)
+        {
+          g_tiles[i]->render(renderer, g_camera);
+        }
+      }
+
+      // sort
+      sort_by_y(g_actors);
+      for (long long unsigned int i = 0; i < g_actors.size(); i++)
+      {
+        g_actors[i]->render(renderer, g_camera);
+      }
+  
+      for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+      {
+        if (g_tiles[i]->z == 2)
+        {
+          g_tiles[i]->render(renderer, g_camera);
+        }
+      }
+    
+      SDL_SetRenderTarget(renderer, NULL);
+      while (!cont) {
+    
+        //onframe things
+        SDL_LockTexture(transitionTexture, NULL, &pixelReference, &pitch);
+    
+        memcpy( pixelReference, transitionSurface->pixels, transitionSurface->pitch * transitionSurface->h);
+        Uint32 format = SDL_PIXELFORMAT_ARGB8888;
+        SDL_PixelFormat* mappingFormat = SDL_AllocFormat( format );
+        Uint32* pixels = (Uint32*)pixelReference;
+        Uint32 transparent = SDL_MapRGBA( mappingFormat, 0, 0, 0, 255);
+    
+        offset += g_transitionSpeed + 0.02 * offset;
+    
+        for(int x = 0;  x < imageWidth; x++) {
+          for(int y = 0; y < imageHeight; y++) {
+    
+    
+            int dest = (y * imageWidth) + x;
+            //int src =  (y * imageWidth) + x;
+    
+            if(pow(pow(imageWidth/2 - x,2) + pow(imageHeight + y,2),0.5) < offset) {
+              pixels[dest] = transparent;
+            } else {
+              pixels[dest] = 0;
+            }
+    
+          }
+        }
+    
+    
+    
+    
+    
+        ticks = SDL_GetTicks();
+        transitionElapsed = ticks - lastticks;
+        //lock framerate
+        if(transitionElapsed < transitionMinFrametime) {
+          SDL_Delay(transitionMinFrametime - transitionElapsed);
+          ticks = SDL_GetTicks();
+          transitionElapsed = ticks - lastticks;
+        }
+        lastticks = ticks;
+    
+        SDL_RenderClear(renderer);
+        //render last frame
+        SDL_RenderCopy(renderer, frame, NULL, NULL);
+        SDL_UnlockTexture(transitionTexture);
+        SDL_RenderCopy(renderer, transitionTexture, NULL, NULL);
+        SDL_RenderPresent(renderer);
+    
+        if(offset > imageHeight + pow(pow(imageWidth/2,2) + pow(imageHeight,2),0.5)) {
+          cont = 1;
+        }
+      }
+      SDL_FreeSurface(transitionSurface);
+      SDL_DestroyTexture(transitionTexture);
+      SDL_DestroyTexture(frame);
+      transition = 1;
+      titleUIManager->hideAll();
+      SDL_GL_SetSwapInterval(1);
+    }
 
     return;
   }
@@ -11639,4 +11826,12 @@ void ribbon::render(SDL_Renderer* renderer, camera fcamera) {
   center.y = r_thickness/2;
 
   SDL_RenderCopyEx(renderer, texture, NULL, &drect, angle, &center, SDL_FLIP_NONE);
+}
+
+tallGrass::tallGrass() {
+  g_tallGrasses.push_back(this);
+}
+
+tallGrass::~tallGrass() {
+  g_tallGrasses.erase(remove(g_tallGrasses.begin(), g_tallGrasses.end(), this), g_tallGrasses.end());
 }

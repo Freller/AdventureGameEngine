@@ -125,6 +125,11 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
   g_budget = strtol(word.c_str(), NULL, 10);
   int index = 0;
 
+  g_encountersFile = "";
+  g_encounterChance = 0;
+  loadedEncounters.clear();
+  loadedBackgrounds.clear();
+
   while (index < strings.size())
   {
     line = strings[index];
@@ -136,6 +141,16 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
     {
       iss >> s0 >> s1 >> p0;
       enemiesMap[s1] = p0;
+    }
+
+    if (word == "grass") {
+      iss >> s0 >> p0 >> p1 >> p2 >> p3;
+      tallGrass* a = new tallGrass();
+      a->bounds.x = p0;
+      a->bounds.y = p1;
+      a->bounds.width = p2;
+      a->bounds.height = p3;
+
     }
 
     if (word == "limits")
@@ -192,6 +207,58 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
           x->tangible = 0;
         }
       }
+    }
+    if(word == "grasschance") {
+      iss >> s0 >> p0;
+      g_encounterChance = p0;
+    }
+    if(word == "cbg") { //combat background
+      iss >> s0 >> s1;
+      loadedBackgrounds.push_back(s1);
+    }
+    if (word == "encounters") {
+      iss >> s0 >> s1;
+      g_encountersFile = s1;
+      D(g_encountersFile);
+
+      //load encounters from file into loadedEncounters
+      std::ifstream file("resources/static/encounters/" + g_encountersFile + ".enc");
+      if (!file.is_open()) {
+          E("Couldn't open encounter file resources/encounters/" + g_encountersFile + ".enc");
+          abort();
+      }
+  
+      std::string line;
+      // Read the file line by line
+      while (std::getline(file, line)) {
+          std::istringstream stream(line);
+          std::string enemyPath;
+          int enemyLevel;
+          std::vector<std::pair<std::string, int>> encounter;
+  
+          // Read each enemy's path and level
+          while (stream >> enemyPath >> enemyLevel) {
+              encounter.emplace_back(enemyPath, enemyLevel);
+          }
+  
+          // Add the encounter to the list of loaded encounters
+          loadedEncounters.push_back(encounter);
+      }
+  
+      file.close();
+  
+      // Print loaded encounters to verify
+      for (const auto& encounter : loadedEncounters) {
+          std::cout << "Encounter: ";
+          for (const auto& enemy : encounter) {
+              std::cout << "[" << enemy.first << ", " << enemy.second << "] ";
+          }
+          std::cout << std::endl;
+      }
+
+
+
+
     }
     if (word == "box")
     {
@@ -1510,6 +1577,15 @@ bool mapeditor_save_map(string word)
 
   ofile << "dark " << g_fogofwarEnabled << endl;
 
+  ofile << "grasschance " << g_encounterChance << endl;
+  
+  if(g_encountersFile != "") {
+    ofile << "encounters " << g_encountersFile << endl;
+  }
+  for(string x : loadedBackgrounds) {
+    ofile << "cbg " << x << endl;
+  }
+
   bool limitflag = 0;
   for (auto x : limits)
   {
@@ -1721,6 +1797,15 @@ bool mapeditor_save_map(string word)
     ofile << "collisionZone " << x->bounds.x << " " << x->bounds.y << " " << x->bounds.width << " " << x->bounds.height << endl;
   }
 
+  for(long long unsigned int i = 0; i < g_tallGrasses.size(); i++) 
+  {
+    ofile << "grass " << g_tallGrasses[i]->bounds.x << " " 
+                      << g_tallGrasses[i]->bounds.y << " "
+                      << g_tallGrasses[i]->bounds.width << " "
+                      << g_tallGrasses[i]->bounds.height << " " << endl;;
+
+  }
+
   //D("resources/maps/" + g_mapdir + "/scripts/INIT-" + g_map + ".txt");
   // run script on load
 
@@ -1769,6 +1854,8 @@ void init_map_writing(SDL_Renderer *renderer)
   doorIcon->software = 1;
   ddoorIcon->software = 1;
   triggerIcon->software = 1;
+
+  grassTexture = loadTexture(renderer, "resources/engine/grass-select.qoi");
 
   //i thought i was leaking data but its okay since all tiles are deleted in clear_map();
 
@@ -1974,6 +2061,18 @@ void write_map(entity *mapent)
       }
     }
   }
+
+  //draw tallgrass
+  for(auto x :g_tallGrasses) {
+    drect.x = x->bounds.x;
+    drect.y = x->bounds.y;
+    drect.w = x->bounds.width;
+    drect.h = x->bounds.height;
+    drect = transformRect(drect);
+    SDL_RenderCopyF(renderer, grassTexture, NULL, &drect);
+
+  }
+  
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 
   // draw rectangle to visualize the selection
@@ -3209,8 +3308,23 @@ void write_map(entity *mapent)
     istringstream line(input);
     string word = "";
 
+    //INTERNAL CONSOLE
     while (line >> word)
     {
+      if(word == "cbg") {
+        line >> word;
+        loadedBackgrounds.push_back(word);
+      }
+      if(word == "grasschance" || word == "chance" || word == "encounterchance") {
+        line >> word;
+        g_encounterChance = stof(word);
+        D(g_encounterChance);
+
+      }
+      if(word == "encounters" || word == "enc") {
+        line >> word;
+        g_encountersFile = word;
+      }
       if (word == "sb")
       {
         drawhitboxes = !drawhitboxes;
@@ -5791,7 +5905,21 @@ void write_map(entity *mapent)
   }
 
   if (devinput[37] && !olddevinput[37]) {
-    sparksEffect->happen(g_focus->getOriginX() + 128, g_focus->getOriginY(), g_focus->z, 0);
+    //sparksEffect->happen(g_focus->getOriginX() + 128, g_focus->getOriginY(), g_focus->z, 0);
+  }
+  if(devinput[38] && !olddevinput[38] && makingbox == 0) {
+    //make tallgrass
+    lx = px;
+    ly = py;
+    makingbox = 1;
+    selection->texture = loadTexture(renderer, "resources/engine/grass-select.qoi");
+  } else if(devinput[38] && !olddevinput[38] && makingbox == 1){
+    makingbox = 0;
+    tallGrass* a = new tallGrass();
+    a->bounds.x = selection->x;
+    a->bounds.y = selection->y;
+    a->bounds.width = selection->width;
+    a->bounds.height = selection->height;
   }
 
   // change wall, cap, and floor textures

@@ -2,6 +2,7 @@
 #include "objects.h"
 #include "main.h"
 #include "utils.h"
+#include "map_editor.h"
 
 void titleUI::hideAll() {
   newText->show = 0;
@@ -382,6 +383,12 @@ void TitleLoop() {
         titleUIManager->hideAll();
         SDL_GL_SetSwapInterval(1);
 
+        if (canSwitchOffDevMode)
+        {
+          init_map_writing(renderer);
+        }
+        load_map(renderer, "resources/maps/" + g_mapOfLastSave + ".map", g_waypointOfLastSave);
+
         break;
       };
       case 1:
@@ -389,13 +396,241 @@ void TitleLoop() {
         //continue game
         g_gamemode = gamemode::EXPLORATION;
         loadSave();
+        if (canSwitchOffDevMode)
+        {
+          init_map_writing(renderer);
+        }
+        Mix_FadeOutMusic(1000);
+    
+        //SDL_GL_SetSwapInterval(0);
+        bool cont = false;
+        float ticks = 0;
+        float lastticks = 0;
+        float transitionElapsed = 5;
+        float mframes = 60;
+        float transitionMinFrametime = 5;
+        transitionMinFrametime = 1/mframes * 1000;
+    
+    
+        SDL_Surface* transitionSurface = loadSurface("resources/engine/transition.qoi");
+    
+        int imageWidth = transitionSurface->w;
+        int imageHeight = transitionSurface->h;
+    
+        SDL_Texture* transitionTexture = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, transitionSurface->w, transitionSurface->h );
+        SDL_SetTextureBlendMode(transitionTexture, SDL_BLENDMODE_BLEND);
+    
+    
+        void* pixelReference;
+        int pitch;
+    
+        float offset = imageHeight;
+    
+        SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
+        SDL_SetRenderTarget(renderer, frame);
+    
+        titleUIManager->bg->render(renderer, g_camera, elapsed);
+      
+        titleUIManager->newText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+        titleUIManager->continueText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+      
+        titleUIManager->endText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+      
+        titleUIManager->handMarker->render(renderer, g_camera, elapsed);
+      
+        titleUIManager->titles->render(renderer, g_camera, elapsed);
+        titleUIManager->title->render(renderer, g_camera, elapsed);
+      
+        titleUIManager->creditText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+    
+    
+        SDL_SetRenderTarget(renderer, NULL);
+        while (!cont) {
+    
+          //onframe things
+          SDL_LockTexture(transitionTexture, NULL, &pixelReference, &pitch);
+    
+          memcpy( pixelReference, transitionSurface->pixels, transitionSurface->pitch * transitionSurface->h);
+          Uint32 format = SDL_PIXELFORMAT_ARGB8888;
+          SDL_PixelFormat* mappingFormat = SDL_AllocFormat( format );
+          Uint32* pixels = (Uint32*)pixelReference;
+          //int numPixels = imageWidth * imageHeight;
+          Uint32 transparent = SDL_MapRGBA( mappingFormat, 0, 0, 0, 255);
+          //Uint32 halftone = SDL_MapRGBA( mappingFormat, 50, 50, 50, 128);
+    
+          offset += g_transitionSpeed + 0.02 * offset;
+    
+          for(int x = 0;  x < imageWidth; x++) {
+            for(int y = 0; y < imageHeight; y++) {
+    
+    
+              int dest = (y * imageWidth) + x;
+              //int src =  (y * imageWidth) + x;
+    
+              if(pow(pow(imageWidth/2 - x,2) + pow(imageHeight + y,2),0.5) < offset) {
+                pixels[dest] = transparent;
+              } else {
+                // if(pow(pow(imageWidth/2 - x,2) + pow(imageHeight + y,2),0.5) < 10 + offset) {
+                // 	pixels[dest] = halftone;
+                // } else {
+                pixels[dest] = 0;
+                // }
+              }
+    
+            }
+          }
+    
+    
+    
+    
+    
+          ticks = SDL_GetTicks();
+          transitionElapsed = ticks - lastticks;
+          //lock framerate
+          if(transitionElapsed < transitionMinFrametime) {
+            SDL_Delay(transitionMinFrametime - transitionElapsed);
+            ticks = SDL_GetTicks();
+            transitionElapsed = ticks - lastticks;
+          }
+          lastticks = ticks;
+    
+          SDL_RenderClear(renderer);
+          //render last frame
+          SDL_RenderCopy(renderer, frame, NULL, NULL);
+          SDL_UnlockTexture(transitionTexture);
+          SDL_RenderCopy(renderer, transitionTexture, NULL, NULL);
+          SDL_RenderPresent(renderer);
+    
+          if(offset > imageHeight + pow(pow(imageWidth/2,2) + pow(imageHeight,2),0.5)) {
+            cont = 1;
+          }
+        }
+        SDL_FreeSurface(transitionSurface);
+        SDL_DestroyTexture(transitionTexture);
+        SDL_DestroyTexture(frame);
+        transition = 1;
         titleUIManager->hideAll();
+        SDL_GL_SetSwapInterval(1);
+
         break;
       };
       case 2:
       {
         //quit
         quit = 1;
+        Mix_FadeOutMusic(1000);
+    
+        //SDL_GL_SetSwapInterval(0);
+        bool cont = false;
+        float ticks = 0;
+        float lastticks = 0;
+        float transitionElapsed = 5;
+        float mframes = 60;
+        float transitionMinFrametime = 5;
+        transitionMinFrametime = 1/mframes * 1000;
+    
+    
+        SDL_Surface* transitionSurface = loadSurface("resources/engine/transition.qoi");
+    
+        int imageWidth = transitionSurface->w;
+        int imageHeight = transitionSurface->h;
+    
+        SDL_Texture* transitionTexture = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, transitionSurface->w, transitionSurface->h );
+        SDL_SetTextureBlendMode(transitionTexture, SDL_BLENDMODE_BLEND);
+    
+    
+        void* pixelReference;
+        int pitch;
+    
+        float offset = imageHeight;
+    
+        SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
+        SDL_SetRenderTarget(renderer, frame);
+    
+        titleUIManager->bg->render(renderer, g_camera, elapsed);
+      
+        titleUIManager->newText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+        titleUIManager->continueText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+      
+        titleUIManager->endText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+      
+        titleUIManager->handMarker->render(renderer, g_camera, elapsed);
+      
+        titleUIManager->titles->render(renderer, g_camera, elapsed);
+        titleUIManager->title->render(renderer, g_camera, elapsed);
+      
+        titleUIManager->creditText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+    
+    
+        SDL_SetRenderTarget(renderer, NULL);
+        while (!cont) {
+    
+          //onframe things
+          SDL_LockTexture(transitionTexture, NULL, &pixelReference, &pitch);
+    
+          memcpy( pixelReference, transitionSurface->pixels, transitionSurface->pitch * transitionSurface->h);
+          Uint32 format = SDL_PIXELFORMAT_ARGB8888;
+          SDL_PixelFormat* mappingFormat = SDL_AllocFormat( format );
+          Uint32* pixels = (Uint32*)pixelReference;
+          //int numPixels = imageWidth * imageHeight;
+          Uint32 transparent = SDL_MapRGBA( mappingFormat, 0, 0, 0, 255);
+          //Uint32 halftone = SDL_MapRGBA( mappingFormat, 50, 50, 50, 128);
+    
+          offset += g_transitionSpeed + 0.02 * offset;
+    
+          for(int x = 0;  x < imageWidth; x++) {
+            for(int y = 0; y < imageHeight; y++) {
+    
+    
+              int dest = (y * imageWidth) + x;
+              //int src =  (y * imageWidth) + x;
+    
+              if(pow(pow(imageWidth/2 - x,2) + pow(imageHeight + y,2),0.5) < offset) {
+                pixels[dest] = transparent;
+              } else {
+                // if(pow(pow(imageWidth/2 - x,2) + pow(imageHeight + y,2),0.5) < 10 + offset) {
+                // 	pixels[dest] = halftone;
+                // } else {
+                pixels[dest] = 0;
+                // }
+              }
+    
+            }
+          }
+    
+    
+    
+    
+    
+          ticks = SDL_GetTicks();
+          transitionElapsed = ticks - lastticks;
+          //lock framerate
+          if(transitionElapsed < transitionMinFrametime) {
+            SDL_Delay(transitionMinFrametime - transitionElapsed);
+            ticks = SDL_GetTicks();
+            transitionElapsed = ticks - lastticks;
+          }
+          lastticks = ticks;
+    
+          SDL_RenderClear(renderer);
+          //render last frame
+          SDL_RenderCopy(renderer, frame, NULL, NULL);
+          SDL_UnlockTexture(transitionTexture);
+          SDL_RenderCopy(renderer, transitionTexture, NULL, NULL);
+          SDL_RenderPresent(renderer);
+    
+          if(offset > imageHeight + pow(pow(imageWidth/2,2) + pow(imageHeight,2),0.5)) {
+            cont = 1;
+          }
+        }
+        SDL_FreeSurface(transitionSurface);
+        SDL_DestroyTexture(transitionTexture);
+        SDL_DestroyTexture(frame);
+        transition = 1;
+        titleUIManager->hideAll();
+        SDL_GL_SetSwapInterval(1);
+        g_levelFlashing = 1; //skip ending animation, we already did it (better)
+
         break;
       };
     }

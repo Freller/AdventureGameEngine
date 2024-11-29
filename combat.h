@@ -73,6 +73,7 @@ class combatant {
 public:
 
   std::string name;
+  std::string filename;
 
   float baseAttack;
   float attackGain;
@@ -180,6 +181,8 @@ type stringToType(const std::string& str);
 
 //for handing menuing in turn based combat code
 enum class submode {
+  INWIPE,
+  OUTWIPE,
   TEXT, //entry text box
   MAIN, //player chooses between Fight, Items, Spirit, Defend, Run
   SPIRITCHOOSE, //player chooses which spirit move to use
@@ -194,7 +197,8 @@ enum class submode {
   FINAL,
   FINALTEXT, // Feedback about the battle
   SPWARNING,
-  DODGING
+  DODGING,
+  RUNWARNING
 };
 
 
@@ -282,6 +286,7 @@ public:
 
   float time = 0.0f;
   float cycleTime = 0;
+  combatant* partyDodgingCombatant = 0;
 
   combatUI(SDL_Renderer* renderer);
 

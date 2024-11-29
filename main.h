@@ -11,4 +11,6 @@ void CombatLoop();
 
 void toggleFullscreen();
 
+void drawUI();
+
 #endif

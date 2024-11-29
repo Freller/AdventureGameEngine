@@ -132,6 +132,8 @@ class miniEnt;
 
 class miniBullet;
 
+class tallGrass;
+
 class camera
 {
   public:
@@ -260,6 +262,8 @@ extern vector<combatant *> g_partyCombatants;
 extern vector<miniEnt *> g_miniEnts;
 
 extern vector<miniBullet *> g_miniBullets;
+
+extern vector<tallGrass*> g_tallGrasses;
 
 struct cmpCoord
 {
@@ -843,6 +847,7 @@ extern tile *poiIcon;
 extern tile *doorIcon;
 extern tile *ddoorIcon;
 extern tile *triggerIcon;
+extern SDL_Texture* grassTexture;
 extern textbox *nodeInfoText;
 extern string entstring;
 
@@ -924,6 +929,7 @@ enum gamemode {
   COMBAT,
   TITLE,
   LOSS,
+  WIN
 };
 
 extern gamemode g_gamemode;
@@ -941,6 +947,20 @@ extern vector<int> g_combatInventory;
 extern int g_maxInventorySize;
 
 extern titleUI* titleUIManager;
+
+extern string g_encountersFile;
+
+extern vector<vector<pair<string, int>>> loadedEncounters;
+
+extern int g_lastGrassX;
+
+extern int g_lastGrassY;
+
+extern float g_encounterChance;
+
+extern vector<string> loadedBackgrounds;
+
+extern int g_combatEntryType;
 
 bool fileExists(const std::string &name);
 
