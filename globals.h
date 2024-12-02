@@ -21,6 +21,7 @@
 #include <ctime> //clock display
 #include "combat.h"
 #include "title.h"
+#include "loss.h"
 
 // this is unique to the windowsport
 //#include "windowsinclude.h"
@@ -133,6 +134,8 @@ class miniEnt;
 class miniBullet;
 
 class tallGrass;
+
+class lossUI;
 
 class camera
 {
@@ -256,6 +259,8 @@ extern vector<levelNode *> g_levelNodes;
 extern vector<ribbon *> g_ribbons;
 
 extern vector<combatant *> g_enemyCombatants;
+
+extern vector<combatant*> g_deadCombatants;
 
 extern vector<combatant *> g_partyCombatants;
 
@@ -961,6 +966,20 @@ extern float g_encounterChance;
 extern vector<string> loadedBackgrounds;
 
 extern int g_combatEntryType;
+
+enum class lossSub {
+  INWIPE,
+  SHAKE,
+  SPLAT,
+  PAUSE,
+  TEXT,
+  QUESTION,
+  OUTWIPE
+};
+
+extern lossSub g_lossSub;
+
+extern lossUI* lossUIManager;
 
 bool fileExists(const std::string &name);
 

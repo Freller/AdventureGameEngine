@@ -124,6 +124,8 @@ vector<ribbon *> g_ribbons;
 
 vector<combatant *> g_enemyCombatants;
 
+vector<combatant*> g_deadCombatants; //for fade-out
+
 vector<combatant *> g_partyCombatants;
 
 vector<miniEnt *> g_miniEnts;
@@ -969,6 +971,9 @@ int g_lastGrassY = 0;
 float g_encounterChance = 0;
 vector<string> loadedBackgrounds={};
 int g_combatEntryType = 0;
+lossSub g_lossSub = lossSub::INWIPE;
+
+lossUI* lossUIManager = 0;
 
 bool fileExists(const std::string &name)
 {

@@ -34,7 +34,8 @@ enum class turnAction {
   ATTACK,
   SPIRITMOVE,
   ITEM,
-  DEFEND
+  DEFEND,
+  FLEE
 };
 
 struct bground {
@@ -101,6 +102,9 @@ public:
   int xp;
   int level;
 
+  Uint8 opacity = 255;
+  bool disappearing = 0;
+
   std::string deathText;
 
   SDL_Texture * texture;
@@ -114,7 +118,6 @@ public:
   int maxSp;
 
   //for drawing enemies
-  int opacity = 0;
   SDL_Rect renderQuad = {-1,-1,-1,-1};
 
   turnSerialization serial;
@@ -125,6 +128,8 @@ public:
   int itemToUse = -1;
 
   vector<int> spiritMoves;
+
+  vector<pair<int, int>> spiritTree;
 
   combatant(string filename, int level);
 
@@ -198,7 +203,12 @@ enum class submode {
   FINALTEXT, // Feedback about the battle
   SPWARNING,
   DODGING,
-  RUNWARNING
+  RUNWARNING,
+  RUNSUCCESSTEXT,
+  RUNFAILTEXT,
+  LEVELINGA,
+  LEVELINGB,
+  LEVELTEXT
 };
 
 
@@ -219,7 +229,7 @@ public:
   std::vector<std::string> options = {"Attack", "Spirit", "Bag", "Shrink", "Run", "Auto"};
   std::string finalText = "";
   std::string currentText = "";
-  std::vector<std::string> queuedStrings;
+  std::vector<pair<std::string,int>> queuedStrings;
 
   ui* optionsPanel = 0;
   textbox* optionsText = 0;
@@ -287,6 +297,15 @@ public:
   float time = 0.0f;
   float cycleTime = 0;
   combatant* partyDodgingCombatant = 0;
+
+  //for the levelup sequence
+  int thisLevel;
+  int newLevel;
+  int oldLevel;
+
+  int xpToGrant;
+
+  void calculateXP();
 
   combatUI(SDL_Renderer* renderer);
 

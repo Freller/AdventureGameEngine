@@ -512,6 +512,13 @@ void TitleLoop() {
         titleUIManager->hideAll();
         SDL_GL_SetSwapInterval(1);
 
+        if (canSwitchOffDevMode)
+        {
+          init_map_writing(renderer);
+        }
+        D(g_mapOfLastSave);
+        load_map(renderer, "resources/maps/" + g_mapOfLastSave + ".map", g_waypointOfLastSave);
+
         break;
       };
       case 2:
@@ -686,8 +693,6 @@ void TitleLoop() {
       transitionDelta = transitionImageHeight;
     }
   }
-
-
 
   SDL_RenderPresent(renderer);
 }

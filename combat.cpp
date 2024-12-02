@@ -194,17 +194,18 @@ void drawBackground() {
   applyWarpEffect(combatUIManager->tb1, renderer, combatUIManager->time/10000.0f, combatUIManager->loadedBackground.interleaved, combatUIManager->loadedBackground.horizontalIntensity, combatUIManager->loadedBackground.horizontalPeriod, combatUIManager->loadedBackground.verticalIntensity, combatUIManager->loadedBackground.verticalPeriod, combatUIManager->loadedBackground.scrollXMagnitude, combatUIManager->loadedBackground.scrollYMagnitude);
 }
 
-combatant::combatant(string filename, int fxp) {
+combatant::combatant(string ffilename, int fxp) {
   string loadstr;
-  loadstr = "resources/static/combatfiles/" + filename + ".cmb";
+  loadstr = "resources/static/combatfiles/" + ffilename + ".cmb";
   istringstream file(loadTextAsString(loadstr));
 
   string temp;
   file >> temp;
   file >> temp;
 
+
   name = temp;
-  filename = filename;
+  filename = ffilename;
 
   file >> temp;
   file >> temp;
@@ -283,6 +284,19 @@ combatant::combatant(string filename, int fxp) {
     }
   }
 
+  file >> temp;
+  file >> temp; //read the '{'
+  while (true) {
+    std::getline(file, temp);
+    temp.erase(std::remove(temp.begin(), temp.end(), '\r'), temp.end()); // Remove carriage return if present
+    if(temp.empty()) {continue;}
+    if (temp == "}") break;
+    vector<string> x = splitString(temp, ':');
+    pair<int, int> a; a.first = stoi(x[0]);
+    a.second = stoi(x[1]);
+    spiritTree.push_back(a);
+  }
+
 
   xp = fxp;
   level = xpToLevel(xp);
@@ -299,6 +313,9 @@ combatant::combatant(string filename, int fxp) {
 
   width /= 1920.0;
   height /= 1920.0; 
+  serial.target = -1;
+  serial.action = turnAction::ATTACK;
+  serial.actionIndex = -1;
 }
 
 combatant::~combatant() {
@@ -1078,23 +1095,23 @@ void useItem(int item, int target, combatant* user) {
       for(int i = 0; i < g_enemyCombatants.size(); i++) {
         g_enemyCombatants[i]->health -= mag;
         string message = g_enemyCombatants[i]->name + " took " + to_string(mag) + " from the bomb.";
-        combatUIManager->queuedStrings.push_back(message);
+        combatUIManager->queuedStrings.push_back(make_pair(message,0));
         combatUIManager->currentText = "";
         combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
         combatUIManager->dialogProceedIndicator->y = 0.25;
         combatant* e = g_enemyCombatants[i];
         if(e->health < 0) {
           string deathmessage = e->name + " " +  e->deathText;
-          combatUIManager->queuedStrings.push_back(deathmessage);
+          combatUIManager->queuedStrings.push_back(make_pair(deathmessage,1));
           g_enemyCombatants.erase(g_enemyCombatants.begin() + i);
-          delete e;
+          g_deadCombatants.push_back(e);
+          //delete e;
           i--;
         }
       }
-      combatUIManager->finalText = combatUIManager->queuedStrings.at(0);
+      combatUIManager->finalText = combatUIManager->queuedStrings.at(0).first;
       combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
-      break;
-      
+      user->serial.target = 1;
       break;
     }
     case 2:
@@ -1118,6 +1135,7 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
         }
 
         int mag = baseDmg * frng(0.70, 1.30) * (float)((float)user->baseSoul + ((float)user->soulGain * user->level));
+        if(mag < 0) {mag = 0;}
         g_enemyCombatants[target]->health -= mag;
         string message = user->name + " hurt " + g_enemyCombatants[target]->name + " for " + to_string(mag) + ".";
         combatUIManager->finalText = message;
@@ -1127,9 +1145,10 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
         combatant* e = g_enemyCombatants[target];
         if(e->health < 0) {
           string deathmessage = e->name + " " +  e->deathText;
-          combatUIManager->queuedStrings.push_back(deathmessage);
+          combatUIManager->queuedStrings.push_back(make_pair(deathmessage,1));
           g_enemyCombatants.erase(g_enemyCombatants.begin() + target);
-          delete e;
+          g_deadCombatants.push_back(e);
+          //delete e;
         }
         break;
       }
@@ -1137,6 +1156,15 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
   }
 }
 
+combatUI:calculateXP() {
+  for(auto x : g_deadCombatants) {
+    int dmg = x->baseAttack + x->attackGain*x->level;
+    int def = x->baseDefense + x->defenseGain*x->level;
+    int het = x->baseHealth + x->healthGain*x->level;
+    int sum = dmg + def + het;
+    xpToGrant += sum;
+  }
+}
 
 combatUI::combatUI(SDL_Renderer* renderer) {
   initTables();
@@ -1471,6 +1499,14 @@ void drawCombatants() {
       SDL_RenderCopy(renderer, combatant->texture, nullptr, &combatant->renderQuad);
   }
 
+  for(auto x : g_deadCombatants) {
+    SDL_SetTextureAlphaMod(x->texture, x->opacity);
+    if(x->disappearing && x->opacity-1 > 0) {
+      x->opacity-=5;
+    }
+    SDL_RenderCopy(renderer, x->texture, nullptr, &x->renderQuad);
+  }
+
   count = g_partyCombatants.size();
   combatUIManager->partyHealthBox->show = 1;
   gap = 0.1;
@@ -1552,13 +1588,13 @@ void drawCombatants() {
 }
 
 void CombatLoop() {
+
   getCombatInput();
 
   SDL_RenderClear(renderer);
    
   updateWindowResolution();
 
-  //draw background
   drawBackground();
 
   drawCombatants();
@@ -1719,6 +1755,16 @@ void CombatLoop() {
          //wasn't a scripted fight
        }
 
+       //if the player ran away, we should delete these
+       for(int i = 0; i < g_enemyCombatants.size(); i++) {
+         delete g_enemyCombatants[i];
+       }
+       g_enemyCombatants.clear();
+       for(int i = 0; i < g_deadCombatants.size(); i++) {
+         delete g_deadCombatants[i];
+       }
+       g_deadCombatants.clear();
+
        break;
     }
     case submode::TEXT:
@@ -1766,7 +1812,7 @@ void CombatLoop() {
           if(combatUIManager->queuedStrings.size() > 0) {
             combatUIManager->dialogProceedIndicator->y = 0.25;
             combatUIManager->currentText = "";
-            combatUIManager->finalText = combatUIManager->queuedStrings.at(0);
+            combatUIManager->finalText = combatUIManager->queuedStrings.at(0).first;
             combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
           } else {
             combatUIManager->mainPanel->show = 0;
@@ -1895,20 +1941,10 @@ void CombatLoop() {
               g_submode = submode::RUNWARNING;
 
             } else {
-              int levelDifference = 0;
-              int highestTeamateLevel = 0;
-              for(auto x : g_partyCombatants) {
-                if(x->level > highestTeamateLevel) {
-                  highestTeamateLevel = x->level;
-                }
-              }
-              int highestEnemyLevel = 0;
-              for(auto x : g_enemyCombatants) {
-                if(x->level > highestEnemyLevel) {
-                  highestEnemyLevel = x->level;
-                }
-              }
-              levelDifference = highestTeamateLevel - highestEnemyLevel;
+              g_partyCombatants[curCombatantIndex]->serial.action = turnAction::FLEE;
+              g_submode = submode::CONTINUE;
+              break;
+
               
 
             }
@@ -2013,7 +2049,6 @@ void CombatLoop() {
     {
 
       drawOptionsPanel();
-      
       if(curCombatantIndex == g_partyCombatants.size() - 1) {
         g_submode = submode::EXECUTE_P;
         combatUIManager->executePIndex = 0;
@@ -2037,9 +2072,15 @@ void CombatLoop() {
     }
     case submode::EXECUTE_P:
     {
+      breakpoint();
       combatant* c = g_partyCombatants[combatUIManager->executePIndex];
       while(g_partyCombatants[combatUIManager->executePIndex]->health <= 0 && combatUIManager->executePIndex+1 < g_partyCombatants.size()) {
         combatUIManager->executePIndex++;
+      }
+      if(combatUIManager->executePIndex == g_partyCombatants.size() - 1 && g_partyCombatants[combatUIManager->executePIndex]->health <= 0) {
+        g_submode = submode::EXECUTE_E;
+        combatUIManager->executeEIndex = 0;
+        break;
       }
       if(combatUIManager->executePIndex >= g_partyCombatants.size()) {
         g_submode = submode::EXECUTE_E;
@@ -2047,40 +2088,45 @@ void CombatLoop() {
         break;
       }
       if(c->serial.action == turnAction::ATTACK) {
-        while(c->serial.target >= g_enemyCombatants.size()) {
-          c->serial.target-= 1;
-        }
         if(g_enemyCombatants.size() == 0) {
           g_submode = submode::FINAL;
-        } else {
-          combatant* e = g_enemyCombatants[c->serial.target];
-          int damage = c->baseAttack + (c->attackGain * c->level) - (e->baseDefense + (e->defenseGain * e->level));
-          damage *= frng(0.70,1.30);
-          e->health -= damage;
-          string message = c->name + " deals " + to_string(damage) + " to " + e->name + "!";
-  
-          if(e->health < 0) {
-            string deathmessage = e->name + " " +  e->deathText;
-            combatUIManager->queuedStrings.push_back(deathmessage);
-            g_enemyCombatants.erase(g_enemyCombatants.begin() + c->serial.target);
-            delete e;
-          }
-  
-          combatUIManager->finalText = message;
-          combatUIManager->currentText = "";
-          combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
-          combatUIManager->dialogProceedIndicator->y = 0.25;
-          g_submode = submode::TEXT_P;
+          break;
         }
-      } else if(c->serial.action == turnAction::ITEM) {
         while(c->serial.target >= g_enemyCombatants.size()) {
           c->serial.target-= 1;
+        }
+        combatant* e = g_enemyCombatants[c->serial.target];
+        int damage = c->baseAttack + (c->attackGain * c->level) - (e->baseDefense + (e->defenseGain * e->level));
+        damage *= frng(0.70,1.30);
+        if(damage < 0) {damage = 0;}
+        e->health -= damage;
+        string message = c->name + " deals " + to_string(damage) + " to " + e->name + "!";
+  
+        if(e->health < 0) {
+          string deathmessage = e->name + " " +  e->deathText;
+          combatUIManager->queuedStrings.push_back(make_pair(deathmessage, 1));
+          g_enemyCombatants.erase(g_enemyCombatants.begin() + c->serial.target);
+          g_deadCombatants.push_back(e);
+          //delete e;
+        }
+  
+        combatUIManager->finalText = message;
+        combatUIManager->currentText = "";
+        combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+        combatUIManager->dialogProceedIndicator->y = 0.25;
+        g_submode = submode::TEXT_P;
+      } else if(c->serial.action == turnAction::ITEM) {
+        if(g_enemyCombatants.size() == 0) {
+          g_submode = submode::FINAL;
+          break;
+        }
+        while(c->serial.target >= g_enemyCombatants.size()) {
+          c->serial.target-= 1;
+          if(c->serial.target <0) {break;}
         }
         combatant* com = g_partyCombatants[combatUIManager->executePIndex];
         int a = com->serial.actionIndex; //which item
         int b = com->serial.target; //which ally/enemy
-        D(com->serial.actionIndex);
-        //int c = itemsTable[com->itemToUse].targeting; //target allies or enemies or neither
         com->itemToUse = -1;
 
         useItem(a, b, com);
@@ -2088,6 +2134,10 @@ void CombatLoop() {
         g_submode = submode::TEXT_P;
 
       } else if(c->serial.action == turnAction::SPIRITMOVE) {
+        if(g_enemyCombatants.size() == 0) {
+          g_submode = submode::FINAL;
+          break;
+        }
         while(c->serial.target >= g_enemyCombatants.size()) {
           c->serial.target-= 1;
         }
@@ -2102,6 +2152,41 @@ void CombatLoop() {
         combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
         combatUIManager->dodgingThisTurn[combatUIManager->executePIndex] = 1;
         g_submode = submode::TEXT_P;
+      } else if(c->serial.action == turnAction::FLEE) {
+        int levelDifference = 0;
+        int highestTeamateLevel = 0;
+        for(auto x : g_partyCombatants) {
+          if(x->level > highestTeamateLevel) {
+            highestTeamateLevel = x->level;
+          }
+        }
+        int highestEnemyLevel = 0;
+        for(auto x : g_enemyCombatants) {
+          if(x->level > highestEnemyLevel) {
+            highestEnemyLevel = x->level;
+          }
+        }
+        levelDifference = highestTeamateLevel - highestEnemyLevel;
+        int random = rng(0,10);
+        if(random + levelDifference >= 7) {
+          //successful fleeing
+          combatUIManager->finalText = g_partyCombatants[combatUIManager->executePIndex]->name + " tries to run away...";
+          combatUIManager->queuedStrings.push_back(make_pair("And did!", 0));
+          combatUIManager->currentText = "";
+          combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+          combatUIManager->dialogProceedIndicator->y = 0.25;
+          g_submode = submode::RUNSUCCESSTEXT;
+          
+        } else {
+          //failed fleeing
+          combatUIManager->finalText = g_partyCombatants[combatUIManager->executePIndex]->name + " tries to run away...";
+          combatUIManager->queuedStrings.push_back(make_pair("But couldn't!", 0));
+          combatUIManager->currentText = "";
+          combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+          combatUIManager->dialogProceedIndicator->y = 0.25;
+          g_submode = submode::RUNFAILTEXT;
+
+        }
       }
 
       break;
@@ -2147,7 +2232,18 @@ void CombatLoop() {
         if(combatUIManager->queuedStrings.size() > 0) {
           combatUIManager->dialogProceedIndicator->y = 0.25;
           combatUIManager->currentText = "";
-          combatUIManager->finalText = combatUIManager->queuedStrings.at(0);
+          combatUIManager->finalText = combatUIManager->queuedStrings.at(0).first;
+          int someoneDied = combatUIManager->queuedStrings.at(0).second;
+          if(someoneDied != 0) {
+            int index = 0;
+            while(index < g_deadCombatants.size()) {
+              if(g_deadCombatants.at(index)->disappearing == 0) {
+                g_deadCombatants.at(index)->disappearing = 1;
+                break;
+              }
+              index++;
+            }
+          }
           combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
         } else {
           if(combatUIManager->executePIndex + 1 ==  g_partyCombatants.size()) {
@@ -2222,10 +2318,18 @@ void CombatLoop() {
 
         int dodgingIndex = rng(0, validCombatants.size() - 1);
         combatant* e = validCombatants[dodgingIndex];
+        int adjustedDIndex = 0;
+        for(auto x : g_partyCombatants) {
+          if(x == e) {
+            break;
+          }
+          adjustedDIndex++;
+        }
         combatUIManager->partyDodgingCombatant = e;
         D(combatUIManager->partyDodgingCombatant->name);
         int damage = c->baseAttack + (c->attackGain * c->level) - (e->baseDefense + (e->defenseGain * e->level));
         damage *= frng(0.70,1.30);
+        if(damage < 0) {damage = 0;}
         combatUIManager->damageFromEachHit = damage;
         combatUIManager->dodgePanel->x = combatUIManager->dodgePanelSmallX;
         combatUIManager->dodgePanel->y = combatUIManager->dodgePanelSmallY;
@@ -2239,7 +2343,7 @@ void CombatLoop() {
         
         //g_submode = submode::DODGING;
         string message = c->name + " attacks " + e->name + " for " + to_string(damage) + " damage!";
-        if(combatUIManager->dodgingThisTurn[dodgingIndex] == 1) {
+        if(combatUIManager->dodgingThisTurn[adjustedDIndex] == 1) {
           combatUIManager->shrink = 1;
         } else {
           combatUIManager->shrink = 0;
@@ -2297,7 +2401,7 @@ void CombatLoop() {
         if(combatUIManager->queuedStrings.size() > 0) {
           combatUIManager->dialogProceedIndicator->y = 0.25;
           combatUIManager->currentText = "";
-          combatUIManager->finalText = combatUIManager->queuedStrings.at(0);
+          combatUIManager->finalText = combatUIManager->queuedStrings.at(0).first;
           combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
         } else {
           g_submode = submode::DODGING;
@@ -2337,15 +2441,57 @@ void CombatLoop() {
     }
     case submode::FINAL:
     {
-      //calculate XP, etc.
+      //calculate XP based on total stats of defeated enemies
+      //award xp grant xp award exp grant exp give xp give exp
+
+      combatUIManager->calculateXP();
+      combatUIManager->xpToGrant = 10000;
+      curCombatantIndex = 0;
+
+      combatant* x = g_partyCombatants[curCombatantIndex];
+      x->level = xpToLevel(x->xp);
+      x->levelingLevel = x->level;
+      combatUIManager->oldLevel = x->level;
+      x->xp += xpToGrant;
+      combatUIManager->newLevel= xpToLevel(x->xp);
+      combatUIManager->thisLevel = combatUIManager->oldLevel;
+
       
-      combatUIManager->currentText = "";
-      combatUIManager->finalText = "Fomm has won the battle!";
-      g_submode = submode::FINALTEXT;
+        
+
+//      combatUIManager->currentText = "";
+//      combatUIManager->finalText = "Fomm has won the battle!";
+//      g_submode = submode::FINALTEXT;
+      break;
+    }
+    case submode::LEVELINGA:
+    {
+
+      break;
+    }
+    case submode::LEVELINGB:
+    {
+
+      if(combatUIManager->newLevel > combatUIManager->oldLevel) {
+        combatUIManager->thisLevel = combatUIManager->oldLevel+1;
+        g_submode = submode::LEVELING;
+      } else {
+        curCombatantIndex++;
+        g_submode = submode::FINAL;
+      }
+
       break;
     }
     case submode::FINALTEXT:
     {
+      for(int i = 0; i < g_enemyCombatants.size(); i++) {
+        delete g_enemyCombatants[i];
+      }
+      g_enemyCombatants.clear();
+      for(int i = 0; i < g_deadCombatants.size(); i++) {
+        delete g_deadCombatants[i];
+      }
+      g_deadCombatants.clear();
       curCombatantIndex = 0;
       combatUIManager->mainPanel->show = 1;
       combatUIManager->mainText->show = 1;
@@ -2389,10 +2535,83 @@ void CombatLoop() {
           if(combatUIManager->queuedStrings.size() > 0) {
             combatUIManager->dialogProceedIndicator->y = 0.25;
             combatUIManager->currentText = "";
-            combatUIManager->finalText = combatUIManager->queuedStrings.at(0);
+            combatUIManager->finalText = combatUIManager->queuedStrings.at(0).first;
             combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
           } else {
             g_submode = submode::OUTWIPE;
+            break;
+          }
+        }
+      }
+
+      //animate dialogproceedarrow
+      {
+        combatUIManager->c_dpiDesendMs += elapsed;
+        if(combatUIManager->c_dpiDesendMs > combatUIManager->dpiDesendMs) {
+          combatUIManager->c_dpiDesendMs = 0;
+          combatUIManager->c_dpiAsending = !combatUIManager->c_dpiAsending;
+  
+        }
+        
+        if(combatUIManager->c_dpiAsending) {
+          combatUIManager->dialogProceedIndicator->y += combatUIManager->dpiAsendSpeed;
+        } else {
+          combatUIManager->dialogProceedIndicator->y -= combatUIManager->dpiAsendSpeed;
+  
+        }
+      }
+
+      break;
+    }
+    case submode::LEVELTEXT:
+    {
+      combatUIManager->mainPanel->show = 1;
+      combatUIManager->mainText->show = 1;
+      combatUIManager->optionsPanel->show = 0;
+
+      if(input[11]) {
+        text_speed_up = 50;
+      } else {
+        text_speed_up = 1;
+      }
+
+
+      curTextWait += elapsed * text_speed_up;
+      
+      if(combatUIManager->finalText == combatUIManager->currentText) {
+        combatUIManager->dialogProceedIndicator->show = 1;
+      } else {
+        combatUIManager->dialogProceedIndicator->show = 0;
+      }
+
+      if (curTextWait >= textWait)
+      {
+       
+        if(combatUIManager->finalText != combatUIManager->currentText) {
+          if(input[8]) {
+            combatUIManager->currentText = combatUIManager->finalText;
+          } else {
+            combatUIManager->currentText += combatUIManager->finalText.at(combatUIManager->currentText.size());
+            playSound(6, g_ui_voice, 0);
+          }
+          combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+  
+        }
+        
+        curTextWait = 0;
+      }
+
+      if(combatUIManager->finalText == combatUIManager->currentText) {
+        if(input[11] && !oldinput[11]) {
+          //advance dialog
+          if(combatUIManager->queuedStrings.size() > 0) {
+            combatUIManager->dialogProceedIndicator->y = 0.25;
+            combatUIManager->currentText = "";
+            combatUIManager->finalText = combatUIManager->queuedStrings.at(0).first;
+            combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
+          } else {
+            g_submode = submode::FINAL;
+            curCombatantIndex ++;
             break;
           }
         }
@@ -2765,7 +2984,7 @@ void CombatLoop() {
           if(combatUIManager->queuedStrings.size() > 0) {
             combatUIManager->dialogProceedIndicator->y = 0.25;
             combatUIManager->currentText = "";
-            combatUIManager->finalText = combatUIManager->queuedStrings.at(0);
+            combatUIManager->finalText = combatUIManager->queuedStrings.at(0).first;
             combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
           } else {
             combatUIManager->mainPanel->show = 0;
@@ -2876,6 +3095,11 @@ void CombatLoop() {
       }
 
       if(combatUIManager->dodgeTimer > combatUIManager->maxDodgeTimer) {
+        // delete all miniEnts
+        int size = g_miniEnts.size();
+        for(int i = 0; i < size; i++) {
+          delete g_miniEnts[0];
+        }
 
           //is every party member dead? if so, go to the loss screen
           int deadPartyMembers = 0;
@@ -2885,7 +3109,31 @@ void CombatLoop() {
             }
           }
           if(deadPartyMembers == g_partyCombatants.size()) {
+            for(int i = 0; i < g_enemyCombatants.size(); i++) {
+              delete g_enemyCombatants[i];
+            }
+            g_enemyCombatants.clear();
+            for(int i = 0; i < g_deadCombatants.size(); i++) {
+              delete g_deadCombatants[i];
+            }
+            g_deadCombatants.clear();
+     
+
+
+            adventureUIManager->executingScript = 0;
+        
+            adventureUIManager->mobilize = 0;
+            adventureUIManager->hideTalkingUI();
+            protag_is_talking = 2;
+
+            g_enemyCombatants.clear();
             g_gamemode = gamemode::LOSS;
+            g_lossSub = lossSub::INWIPE;
+            transitionDelta = transitionImageHeight;
+            g_submode = submode::TEXT;//dont run the code to draw the minients after the switch statement
+
+
+
             
             {
               //SDL_GL_SetSwapInterval(0);
@@ -3055,7 +3303,7 @@ void CombatLoop() {
           if(combatUIManager->queuedStrings.size() > 0) {
             combatUIManager->dialogProceedIndicator->y = 0.25;
             combatUIManager->currentText = "";
-            combatUIManager->finalText = combatUIManager->queuedStrings.at(0);
+            combatUIManager->finalText = combatUIManager->queuedStrings.at(0).first;
             combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
           } else {
             combatUIManager->mainPanel->show = 0;
@@ -3064,6 +3312,158 @@ void CombatLoop() {
             combatUIManager->optionsPanel->show = 1;
             g_submode = submode::MAIN;
             combatUIManager->currentOption = 0;
+          }
+        }
+      }
+
+      //animate dialogproceedarrow
+      {
+        combatUIManager->c_dpiDesendMs += elapsed;
+        if(combatUIManager->c_dpiDesendMs > combatUIManager->dpiDesendMs) {
+          combatUIManager->c_dpiDesendMs = 0;
+          combatUIManager->c_dpiAsending = !combatUIManager->c_dpiAsending;
+  
+        }
+        
+        if(combatUIManager->c_dpiAsending) {
+          combatUIManager->dialogProceedIndicator->y += combatUIManager->dpiAsendSpeed;
+        } else {
+          combatUIManager->dialogProceedIndicator->y -= combatUIManager->dpiAsendSpeed;
+  
+        }
+      }
+
+      break;
+    }
+    case submode::RUNSUCCESSTEXT:
+    {
+      combatUIManager->mainPanel->show = 1;
+      combatUIManager->mainText->show = 1;
+      combatUIManager->optionsPanel->show = 0;
+
+      if(input[8]) {
+        text_speed_up = 50;
+      } else {
+        text_speed_up = 1;
+      }
+
+      curTextWait += elapsed * text_speed_up;
+      
+      if(combatUIManager->finalText == combatUIManager->currentText) {
+        combatUIManager->dialogProceedIndicator->show = 1;
+      } else {
+        combatUIManager->dialogProceedIndicator->show = 0;
+      }
+
+      if (curTextWait >= textWait)
+      {
+       
+        if(combatUIManager->finalText != combatUIManager->currentText) {
+          if(input[8]) {
+            combatUIManager->currentText = combatUIManager->finalText;
+          } else {
+            combatUIManager->currentText += combatUIManager->finalText.at(combatUIManager->currentText.size());
+            playSound(6, g_ui_voice, 0);
+          }
+          combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+  
+        }
+        
+        curTextWait = 0;
+      }
+
+      if(combatUIManager->finalText == combatUIManager->currentText) {
+        if(input[11] && !oldinput[11]) {
+          //advance dialog
+          if(combatUIManager->queuedStrings.size() > 0) {
+            combatUIManager->dialogProceedIndicator->y = 0.25;
+            combatUIManager->currentText = "";
+            combatUIManager->finalText = combatUIManager->queuedStrings.at(0).first;
+            combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
+          } else {
+            combatUIManager->mainPanel->show = 0;
+            combatUIManager->mainText->show = 0;
+            combatUIManager->dialogProceedIndicator->show = 0;
+            combatUIManager->optionsPanel->show = 1;
+            g_submode = submode::OUTWIPE;
+            break;
+          }
+        }
+      }
+
+      //animate dialogproceedarrow
+      {
+        combatUIManager->c_dpiDesendMs += elapsed;
+        if(combatUIManager->c_dpiDesendMs > combatUIManager->dpiDesendMs) {
+          combatUIManager->c_dpiDesendMs = 0;
+          combatUIManager->c_dpiAsending = !combatUIManager->c_dpiAsending;
+  
+        }
+        
+        if(combatUIManager->c_dpiAsending) {
+          combatUIManager->dialogProceedIndicator->y += combatUIManager->dpiAsendSpeed;
+        } else {
+          combatUIManager->dialogProceedIndicator->y -= combatUIManager->dpiAsendSpeed;
+  
+        }
+      }
+
+      break;
+    }
+    case submode::RUNFAILTEXT:
+    {
+      combatUIManager->mainPanel->show = 1;
+      combatUIManager->mainText->show = 1;
+      combatUIManager->optionsPanel->show = 0;
+
+      if(input[8]) {
+        text_speed_up = 50;
+      } else {
+        text_speed_up = 1;
+      }
+
+      curTextWait += elapsed * text_speed_up;
+      
+      if(combatUIManager->finalText == combatUIManager->currentText) {
+        combatUIManager->dialogProceedIndicator->show = 1;
+      } else {
+        combatUIManager->dialogProceedIndicator->show = 0;
+      }
+
+      if (curTextWait >= textWait)
+      {
+       
+        if(combatUIManager->finalText != combatUIManager->currentText) {
+          if(input[8]) {
+            combatUIManager->currentText = combatUIManager->finalText;
+          } else {
+            combatUIManager->currentText += combatUIManager->finalText.at(combatUIManager->currentText.size());
+            playSound(6, g_ui_voice, 0);
+          }
+          combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+  
+        }
+        
+        curTextWait = 0;
+      }
+
+      if(combatUIManager->finalText == combatUIManager->currentText) {
+        if(input[11] && !oldinput[11]) {
+          //advance dialog
+          if(combatUIManager->queuedStrings.size() > 0) {
+            combatUIManager->dialogProceedIndicator->y = 0.25;
+            combatUIManager->currentText = "";
+            combatUIManager->finalText = combatUIManager->queuedStrings.at(0).first;
+            combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
+          } else {
+            if(combatUIManager->executePIndex + 1 ==  g_partyCombatants.size()) {
+              g_submode = submode::EXECUTE_E;
+              combatUIManager->executeEIndex = 0;
+            } else {
+              combatUIManager->executePIndex++;
+              g_submode = submode::EXECUTE_P;
+            }
+            break;
           }
         }
       }
@@ -3150,6 +3550,8 @@ void CombatLoop() {
         for(auto x : g_miniBullets) {
           if(Distance(combatUIManager->dodgerX, combatUIManager->dodgerY, x->x, x->y) < (combatUIManager->dodgerWidth + x->w)/2) {
             combatUIManager->partyDodgingCombatant->health -= combatUIManager->damageFromEachHit;
+            if(combatUIManager->partyDodgingCombatant->health < 0) {combatUIManager->partyDodgingCombatant->health = 0;}
+
             combatUIManager->damageTakenFromDodgingPhase += combatUIManager->damageFromEachHit;
             combatUIManager->invincibleMs = combatUIManager->maxInvincibleMs;
             break;

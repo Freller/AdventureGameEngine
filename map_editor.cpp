@@ -98,6 +98,7 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
   auto x = splitString(mapname, '/');
 
   if(x.size() > 3) {
+    g_mapdir = x.at(2);
     g_map = x.at(3);
     g_map.pop_back();
     g_map.pop_back();
@@ -219,7 +220,6 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
     if (word == "encounters") {
       iss >> s0 >> s1;
       g_encountersFile = s1;
-      D(g_encountersFile);
 
       //load encounters from file into loadedEncounters
       std::ifstream file("resources/static/encounters/" + g_encountersFile + ".enc");
@@ -251,7 +251,7 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
       for (const auto& encounter : loadedEncounters) {
           std::cout << "Encounter: ";
           for (const auto& enemy : encounter) {
-              std::cout << "[" << enemy.first << ", " << enemy.second << "] ";
+              std::cout << "[" << enemy.first << ", lv" << enemy.second << "] ";
           }
           std::cout << std::endl;
       }
@@ -1357,14 +1357,15 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
 
   for (long long unsigned int i = 0; i < g_waypoints.size(); i++)
   {
+    M("Is this the right waypoint?");
     if (g_waypoints[i]->name == destWaypointName)
     {
+      M("Found the right waypoint");
       protag->x = g_waypoints[i]->x - protag->width / 2;
       protag->y = g_waypoints[i]->y + protag->bounds.height;
       protag->z = g_waypoints[i]->z;
       protag->steeringAngle = convertFrameToAngleNew(g_waypoints[i]->angle, 0);
       protag->animation = g_waypoints[i]->angle;
-      D(g_waypoints[i]->angle);
       protag->flip = SDL_FLIP_NONE;
       if(protag->animation == 5) {
         protag->animation = 3;
@@ -1372,7 +1373,6 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
       } else if(protag->animation == 6) {
         protag->animation = 2;
         protag->flip = SDL_FLIP_HORIZONTAL;
-        M("Gotta flip the protag");
       } else if(protag->animation == 7) {
         protag->animation = 1;
         protag->flip = SDL_FLIP_HORIZONTAL;
@@ -3311,6 +3311,11 @@ void write_map(entity *mapent)
     //INTERNAL CONSOLE
     while (line >> word)
     {
+      if(word == "die") {
+        g_gamemode = gamemode::LOSS;
+        g_lossSub = lossSub::INWIPE;
+        transitionDelta = transitionImageHeight;
+      }
       if(word == "cbg") {
         line >> word;
         loadedBackgrounds.push_back(word);

@@ -2654,6 +2654,7 @@ entity::entity() {
 }
 
 //entity constructor
+// ent constructor
 entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) {
 
   //bool using_default = 0;
@@ -7118,8 +7119,6 @@ int writeSave() {
 
     combatant* y = 0;
     for(auto z : g_partyCombatants) {
-      D(z->name);
-      D(x->name);
       if(z->filename == x->name) {
         y = z;
         break;
@@ -7134,13 +7133,13 @@ int writeSave() {
       spiritOne = y->spiritMoves[0];
     }
     if(y->spiritMoves.size() > 1) {
-      spiritOne = y->spiritMoves[1];
+      spiritTwo = y->spiritMoves[1];
     }
     if(y->spiritMoves.size() > 2) {
-      spiritOne = y->spiritMoves[2];
+      spiritThree = y->spiritMoves[2];
     }
     if(y->spiritMoves.size() > 3) {
-      spiritOne = y->spiritMoves[3];
+      spiritFour = y->spiritMoves[3];
     }
 
     file << x->name << " " << y->xp << " " << y->health << " " << y->sp << " " << spiritOne << " " << spiritTwo << " " << spiritThree << " " << spiritFour << endl;
@@ -7156,7 +7155,12 @@ int writeSave() {
   }
 
   file << "&" << endl; //token to stop writing unlocked levels
-  
+
+  for(auto x : g_combatInventory) {
+    file << x << endl;
+  }
+  file << "&" << endl; //token to stop writing combat items
+                        
   file.close();
   return 0;
 }
@@ -8600,8 +8604,8 @@ settingsUI::settingsUI() {
   optionStrings.push_back("Right");
   optionStrings.push_back("Spring");
   optionStrings.push_back("Interact");
-  optionStrings.push_back("Select Item");
-  optionStrings.push_back("Use Item");
+  optionStrings.push_back("Check Status");
+  optionStrings.push_back("Spin");
 
   optionStrings.push_back("Maximize");
   optionStrings.push_back("Music Volume");
@@ -9382,6 +9386,7 @@ void adventureUI::continueDialogue()
     string s = scriptToUse->at(dialogue_index + 1);
     vector<string> x = splitString(s, ' ');
     combatant* a = new combatant (x[1], stoi(x[2]));
+    a->level = stoi(x[2]);
     a->maxHealth = a->baseHealth + (a->healthGain * a->level);
     a->health = a->maxHealth;
     g_enemyCombatants.push_back(a);
@@ -11235,8 +11240,6 @@ I("s");
   */
   if (scriptToUse->at(dialogue_index + 1).substr(0, 9) == "/settings") 
   {
-    M("Check dialogue index before");
-    D(adventureUIManager->dialogue_index);
     //write to settingsUi from related variables
     g_settingsUI->show();
     g_inSettingsMenu = 1;

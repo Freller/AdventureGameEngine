@@ -20,6 +20,7 @@
 #include "utils.h"
 #include "combat.h"
 #include "title.h"
+#include "loss.h"
 
 using namespace std;
 
@@ -2067,7 +2068,7 @@ void ExplorationLoop() {
     }
 
     g_protagIsBeingDetectedBySmell = 0; //this will be set in the entity update loop
-    g_protagIsBeingDetectedBySight = 0;
+    //g_protagIsBeingDetectedBySight = 0;
 
     if(g_dungeonDoorActivated == 0) {
       g_dungeonDarkEffectDelta = -16;
@@ -2084,18 +2085,19 @@ void ExplorationLoop() {
       grassX -= grassX % 64;
       grassY -= grassY % 55;
       if(grassX != g_lastGrassX || grassY != g_lastGrassY) {
+        g_protagIsBeingDetectedBySight = 0;
         for(auto x : g_tallGrasses) {
           if(RectOverlap(protag->getMovedBounds(), x->bounds)) {
+            g_protagIsBeingDetectedBySight = 1;
             if(frng(0,1) <= g_encounterChance) {
-              M("Begin an encounter");
               int randomIndex = rng(0, loadedEncounters.size()-1);
               for(auto x : loadedEncounters[randomIndex]) {
                 combatant* a = new combatant(x.first, x.second);
+                a->level = x.second;
                 a->maxHealth = a->baseHealth + (a->healthGain * a->level);
                 a->health = a->maxHealth;
                 g_enemyCombatants.push_back(a);
               }
-              D(g_enemyCombatants.size());
 
               string bgstr;
               if(loadedBackgrounds.size() > randomIndex) {
@@ -2885,86 +2887,6 @@ void ExplorationLoop() {
     SDL_RenderPresent(renderer);
 }
 
-void LoseLoop() {
-  M("Loss screen");
-  combatUIManager->mainPanel->show = 1;
-  combatUIManager->mainText->show = 1;
-  combatUIManager->optionsPanel->show = 0;
-
-  if(input[11]) {
-    text_speed_up = 50;
-  } else {
-    text_speed_up = 1;
-  }
-
-
-  curTextWait += elapsed * text_speed_up;
-  
-  if(combatUIManager->finalText == combatUIManager->currentText) {
-    combatUIManager->dialogProceedIndicator->show = 1;
-  } else {
-    combatUIManager->dialogProceedIndicator->show = 0;
-  }
-
-  if (curTextWait >= textWait)
-  {
-   
-    if(combatUIManager->finalText != combatUIManager->currentText) {
-      if(input[8]) {
-        combatUIManager->currentText = combatUIManager->finalText;
-      } else {
-        combatUIManager->currentText += combatUIManager->finalText.at(combatUIManager->currentText.size());
-        playSound(6, g_ui_voice, 0);
-      }
-      combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
-  
-    }
-    
-    curTextWait = 0;
-  }
-
-  if(combatUIManager->finalText == combatUIManager->currentText) {
-    if(input[11] && !oldinput[11]) {
-      //advance dialog
-      if(combatUIManager->queuedStrings.size() > 0) {
-        combatUIManager->dialogProceedIndicator->y = 0.25;
-        combatUIManager->currentText = "";
-        combatUIManager->finalText = combatUIManager->queuedStrings.at(0);
-        combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
-      } else {
-        combatUIManager->mainPanel->show = 0;
-        combatUIManager->mainText->show = 0;
-        combatUIManager->dialogProceedIndicator->show = 0;
-        combatUIManager->optionsPanel->show = 1;
-        g_submode = submode::MAIN;
-        combatUIManager->currentOption = 0;
-        while(g_partyCombatants[curCombatantIndex]->health <= 0 && curCombatantIndex+1 < g_partyCombatants.size()) {
-          curCombatantIndex ++;
-        }
-      }
-    }
-  }
-
-  //animate dialogproceedarrow
-  {
-    combatUIManager->c_dpiDesendMs += elapsed;
-    if(combatUIManager->c_dpiDesendMs > combatUIManager->dpiDesendMs) {
-      combatUIManager->c_dpiDesendMs = 0;
-      combatUIManager->c_dpiAsending = !combatUIManager->c_dpiAsending;
-  
-    }
-    
-    if(combatUIManager->c_dpiAsending) {
-      combatUIManager->dialogProceedIndicator->y += combatUIManager->dpiAsendSpeed;
-    } else {
-      combatUIManager->dialogProceedIndicator->y -= combatUIManager->dpiAsendSpeed;
-  
-    }
-  }
-
-  SDL_RenderClear(renderer);
-  SDL_RenderPresent(renderer);
-}
 
 int WinMain()
 {
@@ -3062,6 +2984,8 @@ int WinMain()
   combatUIManager->hideAll();
 
   titleUIManager = new titleUI(renderer);
+
+  lossUIManager = new lossUI();
 
 
   if (canSwitchOffDevMode)
@@ -3636,6 +3560,8 @@ int WinMain()
   lightdri = loadTexture(renderer, "resources/engine/lightdri.qoi");
 
   g_loadingATM = 0;
+  transitionDelta = transitionImageHeight;
+  transition = 1;
 
   while (!quit)
   {
@@ -3813,7 +3739,7 @@ int WinMain()
       }
       case gamemode::LOSS:
       {
-        LoseLoop();
+        LossLoop();
         break;
       }
 
@@ -3821,10 +3747,127 @@ int WinMain()
 
   }
 
-  clear_map(g_camera);
+
+  {
+    //SDL_GL_SetSwapInterval(0);
+    bool cont = false;
+    float ticks = 0;
+    float lastticks = 0;
+    float transitionElapsed = 5;
+    float mframes = 60;
+    float transitionMinFrametime = 5;
+    transitionMinFrametime = 1/mframes * 1000;
+  
+  
+    SDL_Surface* transitionSurface = loadSurface("resources/engine/transition.qoi");
+  
+    int imageWidth = transitionSurface->w;
+    int imageHeight = transitionSurface->h;
+  
+    SDL_Texture* transitionTexture = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, transitionSurface->w, transitionSurface->h );
+    SDL_SetTextureBlendMode(transitionTexture, SDL_BLENDMODE_BLEND);
+  
+  
+    void* pixelReference;
+    int pitch;
+  
+    float offset = imageHeight;
+  
+    SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
+    SDL_SetRenderTarget(renderer, frame);
+
+    switch(g_gamemode) {
+      case gamemode::TITLE:
+      {
+        TitleLoop();
+        break;
+      }
+      case gamemode::EXPLORATION: 
+      {
+        ExplorationLoop();
+        break;
+      }
+      case gamemode::COMBAT:
+      { 
+        CombatLoop();
+        break;
+      }
+      case gamemode::LOSS:
+      {
+        LossLoop();
+        break;
+      }
+  
+    }
+  
+    SDL_SetRenderTarget(renderer, NULL);
+    SDL_RenderClear(renderer);
+
+    while (!cont) {
+  
+      //onframe things
+      SDL_LockTexture(transitionTexture, NULL, &pixelReference, &pitch);
+  
+      memcpy( pixelReference, transitionSurface->pixels, transitionSurface->pitch * transitionSurface->h);
+      Uint32 format = SDL_PIXELFORMAT_ARGB8888;
+      SDL_PixelFormat* mappingFormat = SDL_AllocFormat( format );
+      Uint32* pixels = (Uint32*)pixelReference;
+      Uint32 transparent = SDL_MapRGBA( mappingFormat, 0, 0, 0, 255);
+  
+      offset += g_transitionSpeed + 0.02 * offset;
+  
+      for(int x = 0;  x < imageWidth; x++) {
+        for(int y = 0; y < imageHeight; y++) {
+  
+  
+          int dest = (y * imageWidth) + x;
+          //int src =  (y * imageWidth) + x;
+  
+          if(pow(pow(imageWidth/2 - x,2) + pow(imageHeight + y,2),0.5) < offset) {
+            pixels[dest] = transparent;
+          } else {
+            pixels[dest] = 0;
+          }
+  
+        }
+      }
+  
+  
+  
+  
+  
+      ticks = SDL_GetTicks();
+      transitionElapsed = ticks - lastticks;
+      //lock framerate
+      if(transitionElapsed < transitionMinFrametime) {
+        SDL_Delay(transitionMinFrametime - transitionElapsed);
+        ticks = SDL_GetTicks();
+        transitionElapsed = ticks - lastticks;
+      }
+      lastticks = ticks;
+  
+      SDL_RenderClear(renderer);
+      //render last frame
+      SDL_RenderCopy(renderer, frame, NULL, NULL);
+ 
+      SDL_UnlockTexture(transitionTexture);
+      SDL_RenderCopy(renderer, transitionTexture, NULL, NULL);
+      SDL_RenderPresent(renderer);
+  
+      if(offset > imageHeight + pow(pow(imageWidth/2,2) + pow(imageHeight,2),0.5)) {
+        cont = 1;
+      }
+    }
+    SDL_FreeSurface(transitionSurface);
+    SDL_DestroyTexture(transitionTexture);
+    SDL_DestroyTexture(frame);
+    SDL_GL_SetSwapInterval(1);
+  }
+  //clear_map(g_camera);
   delete adventureUIManager;
   delete combatUIManager;
   delete titleUIManager;
+  delete lossUIManager;
   close_map_writing();
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
@@ -4808,6 +4851,7 @@ void getExplorationInput(float &elapsed)
           clear_map(g_camera);
           //transition = 1;
           g_gamemode = gamemode::TITLE;
+          titleUIManager->option = 0;
           titleUIManager->showAll();
         }
 
