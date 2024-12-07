@@ -947,6 +947,8 @@ extern combatUI* combatUIManager;
 
 extern int curCombatantIndex;
 
+extern int curLevelIndex;
+
 extern vector<int> g_combatInventory;
 
 extern int g_maxInventorySize;
@@ -1038,5 +1040,7 @@ void transform3dPoint(float x, float y, float z, float &u, float &v);
 void doSpringForce(entity* target, entity* him);
 
 string getCurrentDir();
+
+string to_stringF(double value);
 
 #endif

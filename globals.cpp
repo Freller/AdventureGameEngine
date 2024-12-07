@@ -957,6 +957,8 @@ combatUI* combatUIManager;
 
 int curCombatantIndex = 0; //the party combatant for which the player currently builds the turnserial
 
+int curLevelIndex = 0;
+
 vector<int> g_combatInventory;
 
 int g_maxInventorySize = 14;
@@ -1404,3 +1406,16 @@ string getCurrentDir() {
 //  string curdir(buf);
 //  return curdir;
 //}
+
+string to_stringF(double value) {
+  std::ostringstream out;
+  out << value;
+  string result = out.str();
+
+  result.erase(result.find_last_not_of('0') + 1, std::string::npos);
+
+  if(result.back() == '.') {
+    result.pop_back();
+  }
+  return result;
+}

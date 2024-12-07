@@ -3690,7 +3690,6 @@ void entity::unsolidify() {
 
 //entity render function
 void entity::render(SDL_Renderer * renderer, camera fcamera) {
-  
   opacity += opacity_delta;
   shadow->alphamod += opacity_delta;
   if(opacity_delta < 0 && opacity <= 0) {
@@ -8317,7 +8316,8 @@ void clear_map(camera& cameraToReset) {
   }
 
   //push back any entities that were in the party
-  
+  M("Should be zero");
+  D(g_actors.size());
   for (long long unsigned int i = 0; i < party.size(); i++) {
     g_entities.push_back(party[i]);
     g_actors.push_back(party[i]);
@@ -8332,6 +8332,8 @@ void clear_map(camera& cameraToReset) {
     g_entities.push_back(n);
     g_actors.push_back(n);
   }
+  //!!! remember, party ents need to be persistent or you'll crash. 
+  //I crashed at the actor render loop
 
 
   //clear lastReferencedEnt

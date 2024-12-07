@@ -206,9 +206,18 @@ enum class submode {
   RUNWARNING,
   RUNSUCCESSTEXT,
   RUNFAILTEXT,
-  LEVELINGA,
-  LEVELINGB,
-  LEVELTEXT
+  CHARAXP,
+  XPTEXT,
+  LEVELUP,
+  LEVELTEXT,
+  LEARNEDTEXT, // sonso learned X
+  LEARNTEXT, // sonso can learn X, but would need to forget a move. Choose a move to forget.
+  FORGET, //select a move to forget
+  FORGETTEXT,
+  FORGETCONFIRM,
+  MEMBERDEADTEXT,
+  ALLDEADTEXT,
+  OUTWIPEL
 };
 
 
@@ -253,6 +262,16 @@ public:
   ui* spiritPanel = 0;
   textbox* spiritText = 0;
   int currentSpiritOption = 0;
+
+  ui* forgetPanel = 0;
+  textbox* forgetText = 0;
+  ui* forgetPicker = 0;
+  int forgetOption = 0;
+
+  textbox* yes = 0;
+  textbox* no = 0;
+  int confirmOption = 0;
+  ui* confirmPicker = 0;
 
   float dodgePanelFullX;
   float dodgePanelFullY;
@@ -304,6 +323,8 @@ public:
   int oldLevel;
 
   int xpToGrant;
+
+  int moveToLearn = 0;
 
   void calculateXP();
 

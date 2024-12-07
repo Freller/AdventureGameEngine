@@ -84,6 +84,7 @@ void populateMapWithEntities()
 void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
 {
   M("Loading map: " + filename);
+  D(g_actors.size());
   g_usingMsToStunned = 0;
   protag->hisStatusComponent.enraged.clearStatuses();
   protag->bonusSpeed = 0;
@@ -1357,10 +1358,8 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
 
   for (long long unsigned int i = 0; i < g_waypoints.size(); i++)
   {
-    M("Is this the right waypoint?");
     if (g_waypoints[i]->name == destWaypointName)
     {
-      M("Found the right waypoint");
       protag->x = g_waypoints[i]->x - protag->width / 2;
       protag->y = g_waypoints[i]->y + protag->bounds.height;
       protag->z = g_waypoints[i]->z;
