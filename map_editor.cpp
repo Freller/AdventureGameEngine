@@ -84,7 +84,6 @@ void populateMapWithEntities()
 void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
 {
   M("Loading map: " + filename);
-  D(g_actors.size());
   g_usingMsToStunned = 0;
   protag->hisStatusComponent.enraged.clearStatuses();
   protag->bonusSpeed = 0;
@@ -1360,25 +1359,28 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
   {
     if (g_waypoints[i]->name == destWaypointName)
     {
-      protag->x = g_waypoints[i]->x - protag->width / 2;
-      protag->y = g_waypoints[i]->y + protag->bounds.height;
-      protag->z = g_waypoints[i]->z;
-      protag->steeringAngle = convertFrameToAngleNew(g_waypoints[i]->angle, 0);
-      protag->animation = g_waypoints[i]->angle;
-      protag->flip = SDL_FLIP_NONE;
-      if(protag->animation == 5) {
-        protag->animation = 3;
-        protag->flip = SDL_FLIP_HORIZONTAL;
-      } else if(protag->animation == 6) {
-        protag->animation = 2;
-        protag->flip = SDL_FLIP_HORIZONTAL;
-      } else if(protag->animation == 7) {
-        protag->animation = 1;
-        protag->flip = SDL_FLIP_HORIZONTAL;
-      }
-  
-      if(protag->animation > 5 || protag->animation < 0) {
-        protag->animation = 0;
+      for(auto e : party) {
+        e->x = g_waypoints[i]->x - e->width / 2;
+        e->y = g_waypoints[i]->y + e->bounds.height;
+        e->z = g_waypoints[i]->z;
+        e->steeringAngle = convertFrameToAngleNew(g_waypoints[i]->angle, 0);
+        e->animation = g_waypoints[i]->angle;
+        e->flip = SDL_FLIP_NONE;
+        if(e->animation == 5) {
+          e->animation = 3;
+          e->flip = SDL_FLIP_HORIZONTAL;
+        } else if(e->animation == 6) {
+          e->animation = 2;
+          e->flip = SDL_FLIP_HORIZONTAL;
+        } else if(e->animation == 7) {
+          e->animation = 1;
+          e->flip = SDL_FLIP_HORIZONTAL;
+        }
+    
+        if(e->animation > 5 || e->animation < 0) {
+          e->animation = 0;
+        }
+
       }
 
     }
@@ -1437,6 +1439,12 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
     }
   }
   transition = 0;
+
+  //set up the party to follow each other
+  if(party.size() > 0) { //protag is party[0]
+    party[1]->agrod = 1;
+    party[1]->target = party[0];
+  }
 }
 
 void changeTheme(string str)

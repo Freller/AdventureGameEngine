@@ -279,6 +279,7 @@ void ExplorationLoop() {
       protag->cooldown = 0;
     }
 
+
     // cycle right if the current character dies
     if ((input[9] && !oldinput[9]) || protag->hp <= 0)
     {

@@ -4287,7 +4287,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
 
         //should we animate?
-        if( (xaccel != 0 || yaccel != 0) || !grounded ) {
+        if( (xaccel != 0 || yaccel != 0) || !grounded || (inParty && (protag->xaccel != 0 ||protag->yaccel != 0))) {
           animate = 1;
           if(useAnimForWalking) {
             if( (!scriptedAnimation) && grounded) {
@@ -6130,7 +6130,10 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
         flashingMS -= elapsed;
         darkenMs -= elapsed;
-        if(this->inParty) {
+//        if(this->inParty) {
+//          return nullptr;
+//        }
+        if(this == protag) {
           return nullptr;
         }
 
@@ -6368,6 +6371,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
               rangeToUse = 64 * 3;
             } else {
               rangeToUse = 128;
+              if(inParty) {rangeToUse = 64;}
             }
   
             if( distToTarget > rangeToUse) {
@@ -6966,8 +6970,11 @@ int loadSave() {
   getline(file,line);
 
 
+  for(auto e : party) {
+    delete e;
+  }
   party.clear();
-  delete protag;
+  //delete protag;
 
   for(int i = 0; i < g_partyCombatants.size(); i++) {
     delete g_partyCombatants[i];
@@ -8269,15 +8276,19 @@ void clear_map(camera& cameraToReset) {
 
   navNodeMap.clear();
 
+  party.clear();
+
 
   //copy protag to a pointer, clear the array, and re-add protag
   vector<entity*> persistentEnts;
   for(int i=0; i< size; i++) {
     if(g_entities[0]->inParty) {
+      M("Found a party ent! It's called " + g_entities[0]->name);
       //remove from array without deleting
+      party.push_back(g_entities[0]);
+      g_actors.erase(remove(g_actors.begin(), g_actors.end(), g_entities[0]), g_actors.end());
       g_entities.erase(remove(g_entities.begin(), g_entities.end(), g_entities[0]), g_entities.end());
 
-      g_actors.erase(remove(g_actors.begin(), g_actors.end(), g_entities[0]), g_actors.end());
     } else if (g_entities[0]->persistentHidden) {
       //do nothing because nar is handled differently now
       persistentEnts.push_back(g_entities[0]);
@@ -8316,7 +8327,6 @@ void clear_map(camera& cameraToReset) {
   }
 
   //push back any entities that were in the party
-  M("Should be zero");
   D(g_actors.size());
   for (long long unsigned int i = 0; i < party.size(); i++) {
     g_entities.push_back(party[i]);

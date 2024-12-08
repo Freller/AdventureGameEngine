@@ -3699,7 +3699,7 @@ void CombatLoop() {
           if(combatUIManager->partyDodgingCombatant->health <= 0) {
             M("B");
 
-            combatUIManager->finalText = g_partyCombatants[curCombatantIndex]->name + " passed out!";
+            combatUIManager->finalText = combatUIManager->partyDodgingCombatant->name + " passed out!";
             combatUIManager->currentText = "";
             combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
           }
@@ -3736,7 +3736,6 @@ void CombatLoop() {
         } else {
           //if the character died, report on it with MEMBERDEADTEXT. If all characters are dead, report on it with ALLDEADTEXT
           
-          M("E");
           int deadPartyMembers = 0;
           for(auto x : g_partyCombatants) {
             if(x->health <= 0) {
@@ -3745,7 +3744,6 @@ void CombatLoop() {
           }
 
           if(combatUIManager->partyDodgingCombatant->health <= 0) {
-            M("F");
 
             combatUIManager->finalText = combatUIManager->partyDodgingCombatant->name + " passed out!";
             combatUIManager->currentText = "";
@@ -3753,7 +3751,6 @@ void CombatLoop() {
           }
 
           if(deadPartyMembers == g_partyCombatants.size()) {
-            M("G");
             string message = "All party members are knocked-out!";
             combatUIManager->queuedStrings.clear();
             combatUIManager->queuedStrings.push_back(make_pair(message,0));
@@ -3763,12 +3760,10 @@ void CombatLoop() {
           }
 
           if(combatUIManager->partyDodgingCombatant->health <= 0) {
-            M("H");
             g_submode = submode::MEMBERDEADTEXT;
             break;
           }
 
-          M("L");
 
           combatUIManager->executeEIndex++;
           g_submode = submode::EXECUTE_E;
@@ -4049,9 +4044,7 @@ void CombatLoop() {
             combatUIManager->finalText = combatUIManager->queuedStrings.at(0).first;
             combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
           } else {
-            M("I");
             if(combatUIManager->executeEIndex + 1 ==  g_enemyCombatants.size()) {
-              M("J");
               combatUIManager->mainPanel->show = 0;
               combatUIManager->mainText->show = 0;
               combatUIManager->dialogProceedIndicator->show = 0;
@@ -4065,7 +4058,7 @@ void CombatLoop() {
               }
               break;
             } else {
-              M("K");
+              combatUIManager->executeEIndex++;
               g_submode = submode::EXECUTE_E;
               break;
             }

@@ -237,6 +237,7 @@ void LossLoop() {
       lossUIManager->pMinX = -WIN_WIDTH* 0.002;
       lossUIManager->pMaxX = WIN_WIDTH* 0.002;
       if(lossUIManager->timer < lossUIManager->shake1Ms) {
+        lossUIManager->redness = 255;
         lossUIManager->offset += lossUIManager->delta;
         if(lossUIManager->offset > lossUIManager->pMaxX) {
           lossUIManager->delta = lossUIManager->magnitude*-1;
@@ -254,7 +255,6 @@ void LossLoop() {
         }
       } else if(lossUIManager->timer < lossUIManager->pause2Ms) {
         lossUIManager->offset /=2;
-        lossUIManager->redness = 255;
       } else if (lossUIManager->timer < lossUIManager->shake3Ms) {
         lossUIManager->offset += lossUIManager->delta;
         SDL_SetTextureColorMod(lossUIManager->protag, 255, lossUIManager->redness, lossUIManager->redness);
