@@ -39,6 +39,7 @@ enum class turnAction {
 };
 
 struct bground {
+  int scene = 0;
   int texture = 1;
   bool interleaved = 0;
 
@@ -116,6 +117,8 @@ public:
 
   int sp;
   int maxSp;
+
+  float offset = 0; //screen percentage to offset the combat sprite
 
   //for drawing enemies
   SDL_Rect renderQuad = {-1,-1,-1,-1};
@@ -313,6 +316,8 @@ public:
   SDL_Surface* db1 = 0;
   SDL_Texture* tb1 = 0;
 
+  SDL_Texture* scene = 0;
+
   float time = 0.0f;
   float cycleTime = 0;
   combatant* partyDodgingCombatant = 0;
@@ -392,6 +397,8 @@ public:
 };
 
 void drawBackground();
+
+void drawSimpleBackground();
 
 
 

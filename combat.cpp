@@ -39,7 +39,8 @@ bground::bground(SDL_Renderer* renderer, const char* configFilePath) {
             if (std::getline(iss, key, ':')) {
                 std::string value;
                 if (std::getline(iss, value)) {
-                    if (key == "texture") texture = std::stoi(value);
+                    if(key == "scene") scene = std::stoi(value);
+                    else if (key == "texture") texture = std::stoi(value);
                     else if (key == "interleaved") interleaved = std::stoi(value);
                     else if (key == "horizontalIntensity") horizontalIntensity = std::stof(value);
                     else if (key == "horizontalPeriod") horizontalPeriod = std::stof(value);
@@ -132,7 +133,7 @@ void cyclePalette(SDL_Surface* source, SDL_Surface* destination, std::vector<Uin
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
             uint8_t red = (srcPixels[y * width + x] >> 16) & 0xFF;
-            int index = (int)red;
+            int index = (int)red/25;
             //std::cout << index << std::endl;
             int currentColorIndex = index % paletteSize;
             dstPixels[y * width + x] = palette[currentColorIndex];
@@ -194,6 +195,10 @@ void drawBackground() {
   applyWarpEffect(combatUIManager->tb1, renderer, combatUIManager->time/10000.0f, combatUIManager->loadedBackground.interleaved, combatUIManager->loadedBackground.horizontalIntensity, combatUIManager->loadedBackground.horizontalPeriod, combatUIManager->loadedBackground.verticalIntensity, combatUIManager->loadedBackground.verticalPeriod, combatUIManager->loadedBackground.scrollXMagnitude, combatUIManager->loadedBackground.scrollYMagnitude);
 }
 
+void drawSimpleBackground() {
+  SDL_RenderCopy(renderer, combatUIManager->scene, NULL, NULL);
+}
+
 combatant::combatant(string ffilename, int fxp) {
   string loadstr;
   loadstr = "resources/static/combatfiles/" + ffilename + ".cmb";
@@ -207,6 +212,9 @@ combatant::combatant(string ffilename, int fxp) {
   name = temp;
   filename = ffilename;
 
+  std::transform(name.begin(), name.end(), name.begin(), 
+      [](unsigned char c) { if(c == '_') {int e = ' '; return e;} else {return int(c);}  } );
+
   file >> temp;
   file >> temp;
 
@@ -215,6 +223,10 @@ combatant::combatant(string ffilename, int fxp) {
   spritefilevar = "resources/static/combatsprites/" + temp + ".qoi";
   const char* spritefile = spritefilevar.c_str();
   texture = loadTexture(renderer, spritefile);
+
+  file >> temp;
+  file >> temp;
+  offset = stof(temp);
 
   file >> temp;
   file >> temp;
@@ -1177,7 +1189,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   partyHealthBox->persistent = true;
   partyHealthBox->show = 0;
 
-  partyText = new textbox(renderer, "Hey", 1600 * g_fontsize, 0, 0, 0.9);
+  partyText = new textbox(renderer, "Hey", 1500 * g_fontsize, 0, 0, 0.9);
   partyText->boxWidth = 0;
   partyText->width = 0.95;
   partyText->boxHeight = 0;
@@ -1521,33 +1533,61 @@ void getCombatInput() {
 }
 
 void drawCombatants() {
-  int count = g_enemyCombatants.size();
-  int gap = 0.05 * WIN_WIDTH; // Space between combatants
-  
-  for (int i = 0; i < count; ++i) {
-      combatant* combatant = g_enemyCombatants[i];
-  
-      if(combatant->renderQuad.x == -1) {
-        // Convert percentage-based width and height to actual pixel values
-        int actual_width = static_cast<int>(WIN_WIDTH * combatant->width);
-        int actual_height = static_cast<int>(WIN_WIDTH * combatant->height);
+    int count = g_enemyCombatants.size();
+
+    // Total padding on both sides
+    int padding = 0.05 * WIN_WIDTH;
+
+    // Calculate total available width for spacing
+    int availableWidth = WIN_WIDTH - (2 * padding);
+
+    // Calculate gap between combatants' centers
+    int gap = availableWidth / (count + 1);
+
+    // Starting x position for the first combatant's center
+    int xCenter = padding + gap;
+
+    for (int i = 0; i < count; ++i) {
+        combatant* combatant = g_enemyCombatants[i];
+
+        
+
+        // Set renderQuad if it hasn't been initialized
+        if (combatant->renderQuad.x == -1) {
+
+            // Calculate actual width and height
+            int actual_width = static_cast<int>(WIN_WIDTH * combatant->width);
+            int actual_height = static_cast<int>(WIN_WIDTH * combatant->height);
     
-        // Calculate X position to arrange horizontally
-        int total_width = (count * actual_width) + ((count - 1) * gap);
-        int x = (WIN_WIDTH - total_width) / 2 + i * (actual_width + gap);
-        int y = ((WIN_HEIGHT - actual_height) / 2); // Centering vertically
-        SDL_Rect renderQuad = { x, y, actual_width, actual_height };
-        combatant->renderQuad = renderQuad;
-      }
+            // Calculate x and y position for this combatant
+            int x = xCenter - (actual_width / 2);
+            int y = WIN_HEIGHT *(0.43 + combatant->offset); // Center vertically
 
-      if(g_submode == submode::TARGETING && i == combatUIManager->currentTarget) {
-        SDL_SetTextureColorMod(combatant->texture, combatUIManager->targetingColorMod, combatUIManager->targetingColorMod, combatUIManager->targetingColorMod);
-      } else {
-        SDL_SetTextureColorMod(combatant->texture, 255, 255, 255);
-      }
+            //to make them seem equidistant from the camera, move ones closer to the
+            //edges of the screen down a bit (to go on the guidecircle)
+            int distFromCenter = 0.00000003* pow(abs(xCenter - WIN_WIDTH/2), 3);
+            y += distFromCenter;
+            actual_width += distFromCenter *2;
+            actual_height += distFromCenter *2;
 
-      SDL_RenderCopy(renderer, combatant->texture, nullptr, &combatant->renderQuad);
-  }
+
+            SDL_Rect renderQuad = { x, y, actual_width, actual_height };
+            combatant->renderQuad = renderQuad;
+        }
+
+        // Apply targeting color mod if needed
+        if (g_submode == submode::TARGETING && i == combatUIManager->currentTarget) {
+            SDL_SetTextureColorMod(combatant->texture, combatUIManager->targetingColorMod, combatUIManager->targetingColorMod, combatUIManager->targetingColorMod);
+        } else {
+            SDL_SetTextureColorMod(combatant->texture, 255, 255, 255);
+        }
+
+        // Render the combatant
+        SDL_RenderCopy(renderer, combatant->texture, nullptr, &combatant->renderQuad);
+
+        // Update xCenter for the next combatant
+        xCenter += gap;
+    }
 
   for(auto x : g_deadCombatants) {
     SDL_SetTextureAlphaMod(x->texture, x->opacity);
@@ -1556,6 +1596,9 @@ void drawCombatants() {
     }
     SDL_RenderCopy(renderer, x->texture, nullptr, &x->renderQuad);
   }
+  
+  SDL_SetTextureAlphaMod(g_shade, g_dungeonDarkEffect);
+  SDL_RenderCopy(renderer, g_shade, NULL, NULL);
 
   count = g_partyCombatants.size();
   combatUIManager->partyHealthBox->show = 1;
@@ -1645,7 +1688,11 @@ void CombatLoop() {
    
   updateWindowResolution();
 
-  drawBackground();
+  if(combatUIManager->loadedBackground.scene == -1) {
+    drawBackground();
+  } else {
+    drawSimpleBackground();
+  }
 
   drawCombatants();
   switch (g_submode) {
@@ -1724,7 +1771,11 @@ void CombatLoop() {
         SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
         SDL_SetRenderTarget(renderer, frame);
 
-        drawBackground();
+        if(combatUIManager->loadedBackground.scene == -1) {
+          drawBackground();
+        } else {
+          drawSimpleBackground();
+        }
         drawCombatants();
       
         SDL_SetRenderTarget(renderer, NULL);
@@ -1776,7 +1827,11 @@ void CombatLoop() {
           SDL_RenderClear(renderer);
           //render last frame
           //SDL_RenderCopy(renderer, frame, NULL, NULL);
-          drawBackground();
+          if(combatUIManager->loadedBackground.scene == -1) {
+            drawBackground();
+          } else {
+            drawSimpleBackground();
+          }
         
           drawCombatants();
  
@@ -1848,7 +1903,11 @@ void CombatLoop() {
         SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
         SDL_SetRenderTarget(renderer, frame);
 
-        drawBackground();
+        if(combatUIManager->loadedBackground.scene == -1) {
+          drawBackground();
+        } else {
+          drawSimpleBackground();
+        }
         drawCombatants();
       
         SDL_SetRenderTarget(renderer, NULL);
@@ -1900,7 +1959,11 @@ void CombatLoop() {
           SDL_RenderClear(renderer);
           //render last frame
           //SDL_RenderCopy(renderer, frame, NULL, NULL);
-          drawBackground();
+          if(combatUIManager->loadedBackground.scene == -1) {
+            drawBackground();
+          } else {
+            drawSimpleBackground();
+          }
         
           drawCombatants();
  
@@ -1925,6 +1988,7 @@ void CombatLoop() {
       protag_is_talking = 2;
 
        g_gamemode = gamemode::LOSS;
+       //lossUIManager->redness = 255;
        transition = 1;
        transitionDelta = transitionImageHeight;
        combatUIManager->hideAll();
@@ -2067,6 +2131,7 @@ void CombatLoop() {
 
             //now, choose a target
             g_submode = submode::TARGETING;
+            combatUIManager->currentTarget = 0;
 
             break;
           }
@@ -2246,10 +2311,12 @@ void CombatLoop() {
     }
     case submode::EXECUTE_P:
     {
-      combatant* c = g_partyCombatants[combatUIManager->executePIndex];
-      while(g_partyCombatants[combatUIManager->executePIndex]->health <= 0 && combatUIManager->executePIndex+1 < g_partyCombatants.size()) {
+      D(combatUIManager->executePIndex);
+      while(combatUIManager->executePIndex+1 <= g_partyCombatants.size() && g_partyCombatants[combatUIManager->executePIndex]->health <= 0) {
         combatUIManager->executePIndex++;
       }
+      combatant* c = g_partyCombatants[combatUIManager->executePIndex];
+      D(combatUIManager->executePIndex);
       if(combatUIManager->executePIndex == g_partyCombatants.size() - 1 && g_partyCombatants[combatUIManager->executePIndex]->health <= 0) {
         g_submode = submode::EXECUTE_E;
         combatUIManager->executeEIndex = 0;
@@ -2590,6 +2657,10 @@ void CombatLoop() {
           combatUIManager->dodgerX = 512;
           combatUIManager->dodgerY = 512;
           combatant* e = g_enemyCombatants[combatUIManager->executeEIndex];
+          if(e->attackPatterns.size() <0) {
+            E("Add attack patterns for " + e->name);
+            abort();
+          }
           combatUIManager->curPatterns = e->attackPatterns[rng(0, e->attackPatterns.size()-1)];
           for(int i = 0; i < g_miniEnts.size(); i++) {
             delete g_miniEnts[i];
@@ -2622,6 +2693,18 @@ void CombatLoop() {
     {
       //calculate XP based on total stats of defeated enemies
       //award xp grant xp award exp grant exp give xp give exp
+
+      //return held items to inventory (combatant.itemToUse)
+      for(auto x : g_partyCombatants) {
+        if(x->itemToUse != -1) {
+          if(g_combatInventory.size() < g_maxInventorySize) {
+              g_combatInventory.push_back(x->itemToUse);;
+              M("Returned item ");
+              x->itemToUse = -1;
+          }
+
+        }
+      }
 
       combatUIManager->calculateXP();
       D(combatUIManager->xpToGrant);
@@ -3295,12 +3378,14 @@ void CombatLoop() {
             g_partyCombatants[curCombatantIndex]->serial.actionIndex = g_combatInventory[combatUIManager->currentInventoryOption];
             
             g_submode = submode::TARGETING;
+            combatUIManager->currentTarget = 0;
             break;
           case 1:
             //teamate
             g_partyCombatants[curCombatantIndex]->serial.action = turnAction::ITEM;
             g_partyCombatants[curCombatantIndex]->serial.actionIndex = g_combatInventory[combatUIManager->currentInventoryOption];
             g_submode = submode::ALLYTARGETING;
+            combatUIManager->currentTarget = 0;
             break;
           case 2:
             //none
@@ -4160,6 +4245,7 @@ void CombatLoop() {
       break;
     }
   }
+
 
   combatUIManager->mainPanel->render(renderer, g_camera, elapsed);
   combatUIManager->mainText->render(renderer, WIN_WIDTH, WIN_HEIGHT);

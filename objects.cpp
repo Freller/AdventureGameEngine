@@ -224,7 +224,8 @@ navNode* getNodeByPosition(int fx, int fy) {
   auto upperbound = navNodeMap.upper_bound(make_pair(fx+(64 * MaxDistanceFromNode), fy+(45 * MaxDistanceFromNode)));
   //return lowerbound->second;
   float min_dist = 0;
-  navNode* ret = lowerbound->second;
+  //navNode* ret = lowerbound->second;
+  navNode* ret = nullptr;
   bool flag = 1;
 
   for(auto q = lowerbound; q != upperbound; q++) {
@@ -4287,7 +4288,13 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
 
         //should we animate?
-        if( (xaccel != 0 || yaccel != 0) || !grounded || (inParty && (protag->xaccel != 0 ||protag->yaccel != 0))) {
+        //if( (xaccel != 0 || yaccel != 0) || !grounded || (inParty && (protag->xaccel != 0 ||protag->yaccel != 0))) { //this has problems too
+        if(xaccel != 0 || yaccel != 0) {
+          extraAnimateFrames = 6;
+        }
+
+        if( (xaccel != 0 || yaccel != 0) || !grounded || extraAnimateFrames > 0) {
+          extraAnimateFrames --;
           animate = 1;
           if(useAnimForWalking) {
             if( (!scriptedAnimation) && grounded) {
@@ -5149,7 +5156,12 @@ door* entity::update(vector<door*> doors, float elapsed) {
         }
 
 
-        if((xcollide || ycollide) && ( pow( pow(oxvel,2) + pow(oyvel, 2), 0.5) > 30 )) {
+//        if(name == "common/neheten") {
+//          D(xcollide);
+//          D(ycollide);
+//          D(( pow( pow(oxvel,2) + pow(oyvel, 2), 0.5) ));
+//        }
+        if(((xcollide || ycollide )) && ( pow( pow(oxvel,2) + pow(oyvel, 2), 0.5) > 2 )) {
           if(fragileMovement) {
             timeToLiveMs = -1;
             usingTimeToLive = 1;
@@ -6142,7 +6154,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
 //        }
 
         //shooting ai
-        if(canFight && agrod) {
+        if(canFight && agrod && 0) {
           //do we have a target?
           if(target != nullptr) {
             //check if target is still valid
@@ -6358,12 +6370,14 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
           //chase if custommovement type is 0 or we are within movementTypeSwitchRadius
           //to target
+          blindrun = 0;
           if(customMovement == 0 || distToTarget < movementTypeSwitchRadius)
           { //blindrun movement
             
             if(( (LineTrace(this->getOriginX(), this->getOriginY(), target->getOriginX(), target->getOriginY(), false, 64 + 32, this->layer, 10, true) )  || (distToTarget < 180) ) ) {
             //just walk towards the target, need to use range to stop walking if we are at target (for friendly npcs)
             targetSteeringAngle = angleToTarget;
+            blindrun = 1;
             
             int rangeToUse = 0;
             
@@ -6371,7 +6385,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
               rangeToUse = 64 * 3;
             } else {
               rangeToUse = 128;
-              if(inParty) {rangeToUse = 64;}
+              if(inParty) {rangeToUse = 100;}
             }
   
             if( distToTarget > rangeToUse) {
@@ -6402,11 +6416,13 @@ door* entity::update(vector<door*> doors, float elapsed) {
             dest = nullptr;
             Destination = nullptr;
             timeSinceLastDijkstra = -1;
+            //M("Dijkstra refresh");
             justLostLosToTarget = 1;
             path.clear();
 
           } else {
             if(Destination != nullptr) {
+              //M("BN D");
               BasicNavigate(Destination);
             }
             justLostLosToTarget = 0;
@@ -6425,7 +6441,8 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
         //walking ai
         if(agrod) {
-          if(timeSinceLastDijkstra - elapsed < 0) {
+          if(timeSinceLastDijkstra - elapsed < 0 && blindrun ==0 ) {
+            //M("Dijkstra update");
             //need to update our Destination member variable, dijkstra will
             //be called this frame
             if(target != nullptr && (target->tangible || target == protag && g_protagIsWithinBoardable)) {
@@ -6454,19 +6471,30 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
               vector<int> ret;
               if(this->hisweapon->attacks[hisweapon->combo]->melee)  {
-                ret = getCardinalPoint(target->getOriginX(), target->getOriginY(), 0, index);
+                //ret = getCardinalPoint(target->getOriginX(), target->getOriginY(), 0, index);
                
-                Destination = getNodeByPosition(ret[0], ret[1]);
+                //Destination = getNodeByPosition(ret[0], ret[1]);
+                Destination = getNodeByPosition(target->getOriginX(), target->getOriginY());
+//                M("getNodeByPosition() A");
+//                D(Destination->x);
+//                D(Destination->y);
+
               } else {
                 ret = getCardinalPoint(target->getOriginX(), target->getOriginY(), this->hisweapon->attacks[hisweapon->combo]->range, index);
       
                 if( LineTrace(ret[0], ret[1], target->getOriginX(), target->getOriginY(), false, 30, 0, 10, 0) && abs(target->z- verticalRayCast(ret[0], ret[1])) < 32 ) {
       
                   Destination = getNodeByPosition(ret[0], ret[1]);
+//                  M("getNodeByPosition() B");
+//                  D(Destination->x);
+//                  D(Destination->y);
                 } else {
                   //Can't get our full range, so use the values in LineTraceX and LineTraceY
                   extern int lineTraceX, lineTraceY;
                   Destination = getNodeByPosition(lineTraceX, lineTraceY);
+//                  M("getNodeByPosition() C");
+//                  D(Destination->x);
+//                  D(Destination->y);
                 }
               }
               
@@ -6476,13 +6504,16 @@ door* entity::update(vector<door*> doors, float elapsed) {
           //detect stuckness- if we're stuck, try heading to a random nearby node for a moment
 
           if(stuckTime > maxStuckTime) {
-            M("A PATHFINDER IS STUCK");
+            //this is somehow wrong
+            //entities will be rubbing against a wall and stuckTime won't be incremented
+            //and this chunk of code won't be exeecuted
+            //M("A PATHFINDER IS STUCK");
             stuckTime = 0;
             current = Get_Closest_Node(g_navNodes);
             if(current != nullptr) {
               int c = rand() % current->friends.size();
-              Destination = current->friends[c];
-              M("stuck resolved?");
+              Destination = target->Get_Closest_Node(g_navNodes);
+              dest = current->friends[c];
             }
             readyForNextTravelInstruction = 1;
           }
@@ -6500,6 +6531,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
 //all-purpose pathfinding function
 void entity::BasicNavigate(navNode* ultimateTargetNode) {
+  M("BasicNavigate()");
   if(g_navNodes.size() < 1) {return;}
   bool popOffPath = 0;
   if(current == nullptr) { //modified during rotational overhaul
@@ -6563,7 +6595,7 @@ void entity::BasicNavigate(navNode* ultimateTargetNode) {
 
 
     //randomized time to space out dijkstra calls -> less framedrops
-    timeSinceLastDijkstra = dijkstraSpeed + rand() % 500;
+    timeSinceLastDijkstra = (dijkstraSpeed - 25) + rand() % 50;
     navNode* targetNode = ultimateTargetNode;
     vector<navNode*> bag;
     for (int i = 0; i < (int)g_navNodes.size(); i++) {
@@ -6645,10 +6677,15 @@ void entity::BasicNavigate(navNode* ultimateTargetNode) {
 
       path.push_back(targetNode);
 
+
       if(targetNode == current) {
         break;
       }
-      targetNode = targetNode->prev;
+      targetNode = targetNode->prev; //this can kinda randomly segfault, the crash has been here for years
+                                     //the usual fix is just to add more navnodes but I'd love to 
+                                     //find a blanket-solution
+                                     //I think it's fixed now.
+                                     //I changed navNode* ret =  lowerbound->second; to navNode* ret = nullptr; in getNodeByPosition()
     }
 
     if(popOffPath && path.size() > 1) {
@@ -6971,6 +7008,7 @@ int loadSave() {
 
 
   for(auto e : party) {
+    M("Deleted party member");
     delete e;
   }
   party.clear();
@@ -6996,13 +7034,23 @@ int loadSave() {
     int spiritThree = stoi(tokens[6]);
     int spiritFour = stoi(tokens[7]);
 
+    M("Oh boy lets load an ent");
     entity* a = new entity(renderer, name);
+    D(a->name);
+    D(a->asset_sharer);
     party.push_back(a);
+    M("Pushed back to party");
     a->inParty = 1;
 
     combatant* b = new combatant(name, exp);
     b->health = currentHP;
     b->sp = currentSP;
+    if(b->health > b->maxHealth) {
+      b->health = b->maxHealth;
+    }
+    if(b->sp > b->maxSp) {
+      b->sp = b->maxSp;
+    }
     if(spiritOne != -1) {
       b->spiritMoves.push_back(spiritOne);
     }
@@ -8189,6 +8237,9 @@ void clear_map(camera& cameraToReset) {
       drawUI();
     }
 
+    D(g_dungeonDarkEffect);
+    SDL_SetTextureAlphaMod(g_shade, g_dungeonDarkEffect);
+    SDL_RenderCopy(renderer, g_shade, NULL, NULL);
     SDL_SetRenderTarget(renderer, NULL);
 
 
@@ -8283,7 +8334,7 @@ void clear_map(camera& cameraToReset) {
   vector<entity*> persistentEnts;
   for(int i=0; i< size; i++) {
     if(g_entities[0]->inParty) {
-      M("Found a party ent! It's called " + g_entities[0]->name);
+      //M("Found a party ent! It's called " + g_entities[0]->name);
       //remove from array without deleting
       party.push_back(g_entities[0]);
       g_actors.erase(remove(g_actors.begin(), g_actors.end(), g_entities[0]), g_actors.end());
@@ -8342,6 +8393,13 @@ void clear_map(camera& cameraToReset) {
     g_entities.push_back(n);
     g_actors.push_back(n);
   }
+
+  for(auto e : g_entities) {
+    e->Destination = nullptr;
+    e->current = nullptr;
+    e->dest = nullptr;
+  }
+
   //!!! remember, party ents need to be persistent or you'll crash. 
   //I crashed at the actor render loop
 
@@ -9423,6 +9481,12 @@ void adventureUI::continueDialogue()
     loadme = "resources/static/backgrounds/textures/" + to_string(combatUIManager->loadedBackground.texture) + ".qoi";
     combatUIManager->sb1 = IMG_Load(loadme.c_str());
 
+    if(combatUIManager->scene !=0) {
+      SDL_DestroyTexture(combatUIManager->scene);
+    }
+    loadme = "resources/static/backgrounds/scenes/" + to_string(combatUIManager->loadedBackground.scene) + ".qoi";
+    combatUIManager->scene = loadTexture(renderer, loadme);
+
 
     cyclePalette(combatUIManager->sb1, combatUIManager->db1, combatUIManager->loadedBackground.palette);
 
@@ -9507,6 +9571,7 @@ void adventureUI::continueDialogue()
         }
       }
     
+      SDL_RenderCopy(renderer, g_shade, NULL, NULL);
       SDL_SetRenderTarget(renderer, NULL);
       while (!cont) {
     

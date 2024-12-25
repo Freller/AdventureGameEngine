@@ -177,6 +177,8 @@ void LossLoop() {
   switch(g_lossSub) {
     case lossSub::INWIPE:
     {
+      lossUIManager->redness = 255;
+      SDL_SetTextureColorMod(lossUIManager->protag, 255, lossUIManager->redness, lossUIManager->redness);
       SDL_RenderCopy(renderer, lossUIManager->floor, NULL, NULL);
 
       lossUIManager->shadowX = (WIN_WIDTH - lossUIManager->shadowW)/2;
@@ -237,7 +239,6 @@ void LossLoop() {
       lossUIManager->pMinX = -WIN_WIDTH* 0.002;
       lossUIManager->pMaxX = WIN_WIDTH* 0.002;
       if(lossUIManager->timer < lossUIManager->shake1Ms) {
-        lossUIManager->redness = 255;
         lossUIManager->offset += lossUIManager->delta;
         if(lossUIManager->offset > lossUIManager->pMaxX) {
           lossUIManager->delta = lossUIManager->magnitude*-1;
@@ -429,12 +430,19 @@ void LossLoop() {
           //Yes
           //Load the player's save and go to exploration mode
           g_gamemode = gamemode::EXPLORATION;
-          loadSave();
+
+
+          g_levelFlashing = 1;
+          clear_map(g_camera);
           if (canSwitchOffDevMode)
           {
             init_map_writing(renderer);
           }
+          g_levelFlashing = 0;
+          loadSave();
           Mix_FadeOutMusic(1000);
+          g_zoom_mod = 1; //somehow there was a problem where the cam would be zoomed in after continuing from a gameover
+          g_update_zoom = 1;
       
           //SDL_GL_SetSwapInterval(0);
           bool cont = false;

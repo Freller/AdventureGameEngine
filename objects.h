@@ -73,11 +73,11 @@ class heightmap {
 
 class navNode {
   public:
-    int x;
-    int y;
+    int x = 0;
+    int y = 0;
     int z = 0;
-    vector<navNode*> friends;
-    vector<float> costs;
+    vector<navNode*> friends = {};
+    vector<float> costs = {};
 
     bool highlighted = 0;
     float costFromSource = 0; //updated with dijkstras algorithm
@@ -1321,6 +1321,9 @@ class entity:public actor {
 
 
     //animation
+    int extraAnimateFrames = 0; //this is for stopping partymembers from instantly stopping
+                                //their animation when they catch up to the person ahead
+                                //since they're slightly faster than the player this is an issue
     bool animate = false; //does the squash/stretch animation for walking, talking... everything really
     float animtime = 0; //time since having started animating
     float animspeed = 0;
@@ -1610,6 +1613,7 @@ class entity:public actor {
     float statusMag = 0; //magnitude of status
 
     //pathfinding
+    int blindrun = 0;
     float updateSpeed = 1500;
     float timeSinceLastUpdate = 0;
     navNode* dest = nullptr;
@@ -1623,7 +1627,7 @@ class entity:public actor {
     float maxDistanceFromHome = 1400;
     float range = 3;
     int stuckTime = 0; //time since ai is trying to go somewhere but isn't moving
-    int maxStuckTime = 80; //frames waited before resolving stuckness
+    static const int maxStuckTime = 2; //frames waited before resolving stuckness
     float lastx = 0;
     float lasty = 0;
 

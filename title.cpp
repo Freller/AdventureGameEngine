@@ -396,10 +396,6 @@ void TitleLoop() {
         //continue game
         g_gamemode = gamemode::EXPLORATION;
         loadSave();
-        if (canSwitchOffDevMode)
-        {
-          init_map_writing(renderer);
-        }
         Mix_FadeOutMusic(1000);
     
         //SDL_GL_SetSwapInterval(0);

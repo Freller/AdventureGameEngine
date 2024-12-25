@@ -1705,6 +1705,9 @@ void ExplorationLoop() {
 //    adventureUIManager->healthText->boxX = protagHealthbarA->x + protagHealthbarA->width / 2;
 //    adventureUIManager->healthText->boxY = protagHealthbarA->y - 0.005;
 
+    //shade
+    SDL_RenderCopy(renderer, g_shade, NULL, NULL);
+
     drawUI();
 
     //render fancybox
@@ -2117,6 +2120,13 @@ void ExplorationLoop() {
             
               loadme = "resources/static/backgrounds/textures/" + to_string(combatUIManager->loadedBackground.texture) + ".qoi";
               combatUIManager->sb1 = IMG_Load(loadme.c_str());
+
+              if(combatUIManager->scene !=0) {
+                SDL_DestroyTexture(combatUIManager->scene);
+              }
+              loadme = "resources/static/backgrounds/scenes/" + to_string(combatUIManager->loadedBackground.scene) + ".qoi";
+              combatUIManager->scene = loadTexture(renderer, loadme);
+
             
               cyclePalette(combatUIManager->sb1, combatUIManager->db1, combatUIManager->loadedBackground.palette);
 
@@ -2229,6 +2239,8 @@ void ExplorationLoop() {
                 
                     ticks = SDL_GetTicks();
                     transitionElapsed = ticks - lastticks;
+                    
+
                     //lock framerate
                     if(transitionElapsed < transitionMinFrametime) {
                       SDL_Delay(transitionMinFrametime - transitionElapsed);
@@ -2296,7 +2308,7 @@ void ExplorationLoop() {
 
           // render this frame
 
-          //clear_map(g_camera);
+          clear_map(g_camera);
           load_map(renderer, savemap, dest_waypoint);
 
           // clear_map() will also delete engine tiles, so let's re-load them (but only if the user is map-editing)
@@ -2304,6 +2316,8 @@ void ExplorationLoop() {
           {
             init_map_writing(renderer);
           }
+
+          D(g_mapdir);
 
           break;
         }
@@ -2869,8 +2883,6 @@ void ExplorationLoop() {
       adventureUIManager->continueDialogue();
     }
 
-    //shade
-    SDL_RenderCopy(renderer, g_shade, NULL, NULL);
 
     //PUNISHMENT!
     punishValue += punishValueDegrade;
@@ -3101,9 +3113,6 @@ int WinMain()
 
   // apply vsync
   SDL_GL_SetSwapInterval(1);
-
-  // hide mouse
-  // REMEMBER SHIPPING JOSEPH
 
   g_fullscreen = 0; //!!!
   // apply fullscreen
@@ -3718,6 +3727,8 @@ int WinMain()
     ticks = SDL_GetTicks();
     elapsed = ticks - lastticks;
     lastticks = ticks;
+
+    //D(elapsed);
 
     // lock time
     elapsed = 16.6666666667;

@@ -818,7 +818,7 @@ float navMeshDensity = 2;                       // navnodes every two blocks
 int limits[4] = {0};
 int m_enemyPoints = 0;                          // points the map has to spend on enemies when spawned and every x seconds afterwards
 string textureDirectory = "mapeditor";          // for choosing a file to load textures from, i.e. keep textures for a desert style level, a laboratory level, and a forest level separa
-float mapeditorNavNodeCullRadius = 128;
+float mapeditorNavNodeCullRadius = 96;
 float mapeditorNavNodeTraceRadius = 150;        // for choosing the radius of the traces between navNodes when creating them in the editor. Should be the radius of the biggest entity
 // in the level, so that he does not get stuck on corners
 

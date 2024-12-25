@@ -209,6 +209,10 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
         }
       }
     }
+    if(word == "darkness") {
+      iss >> s0 >> p1;
+      g_dungeonDarkness = p1;
+    }
     if(word == "grasschance") {
       iss >> s0 >> p0;
       g_encounterChance = p0;
@@ -1441,10 +1445,20 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
   transition = 0;
 
   //set up the party to follow each other
-  if(party.size() > 0) { //protag is party[0]
+  if(party.size() > 1) { //protag is party[0]
     party[1]->agrod = 1;
     party[1]->target = party[0];
   }
+  if(party.size() > 2) { //protag is party[0]
+    party[2]->agrod = 1;
+    party[2]->target = party[1];
+  }
+  if(party.size() > 3) { //protag is party[0]
+    party[3]->agrod = 1;
+    party[3]->target = party[2];
+  }
+  g_zoom_mod = 1;
+  g_update_zoom = 1;
 }
 
 void changeTheme(string str)
@@ -1583,6 +1597,8 @@ bool mapeditor_save_map(string word)
   // write fow
 
   ofile << "dark " << g_fogofwarEnabled << endl;
+
+  ofile << "darkness " << g_dungeonDarkness << endl;
 
   ofile << "grasschance " << g_encounterChance << endl;
   
@@ -1866,6 +1882,9 @@ void init_map_writing(SDL_Renderer *renderer)
 
   //i thought i was leaking data but its okay since all tiles are deleted in clear_map();
 
+  // display tiles
+  // theme tiles
+  // theme display
   floortexDisplay = new ui(renderer, floortex.c_str(), 0.0, 0, 0.1, 0.1, -100);
   walltexDisplay = new ui(renderer, walltex.c_str(), 0.1, 0, 0.1, 0.1, -100);
   captexDisplay = new ui(renderer, captex.c_str(), 0.2, 0, 0.1, 0.1, -100);
@@ -1910,9 +1929,15 @@ void write_map(entity *mapent)
     float percentx = (float)mxint / (float)WIN_WIDTH;
     float percenty = (float)myint / (float)WIN_HEIGHT;
     temp = percentx / (scalex) * (g_camera.width * ((scalex)*0.2)) + (g_camera.x - 32);
+    float xf = temp;
     px = round(temp / grid) * grid;
     temp = percenty / (scalex) * (g_camera.height * ((scalex)*0.2)) + (g_camera.y - 26);
+    float yf = temp;
     py = round(temp / (float)round(grid * XtoY)) * (float)round(grid * XtoY);
+    if(g_holdingTAB) {
+      px = xf;
+      py = yf;
+    }
   }
   else
   {
@@ -3316,10 +3341,23 @@ void write_map(entity *mapent)
     string word = "";
 
     //INTERNAL CONSOLE
+    //command line
+    //commandline
+    //instruction
     while (line >> word)
     {
+      if(word == "darkness") {
+        line >> word;
+        g_dungeonDarkness = stoi(word);
+      }
       if(word == "die") {
+        clear_map(g_camera);
+        if (canSwitchOffDevMode)
+        {
+          init_map_writing(renderer);
+        }
         g_gamemode = gamemode::LOSS;
+        //lossUIManager->redness = 255;
         g_lossSub = lossSub::INWIPE;
         transitionDelta = transitionImageHeight;
       }
@@ -4484,7 +4522,7 @@ void write_map(entity *mapent)
 
           break;
         }
-        if (word == "fogofwar" || word == "fow" || word == "dark" || word == "darkness")
+        if (word == "fogofwar" || word == "fow")
         {
           bool b;
           if (line >> b)

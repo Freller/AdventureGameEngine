@@ -56,7 +56,7 @@ public:
 
   float handOffset = 0.02;
 
-  Uint8 redness = 0;
+  Uint8 redness = 255;
 
   void hideAll();
 
