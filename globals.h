@@ -135,6 +135,10 @@ class miniBullet;
 
 class tallGrass;
 
+class camBlocker;
+
+class gradient;
+
 class lossUI;
 
 class camera
@@ -144,9 +148,11 @@ class camera
     float oldy = 0;
     int x = 200;
     int y = 200;
+    int desiredX = 0;
+    int desiredY = 0;
     float width = 640;
     float height = 480;
-    float lag = 0.0;
+    float lag = 0;
     const float DEFAULTLAGACCEL = 0.01;
     float lagaccel = 0.01; // how much faster the camera gets while lagging
     float zoom = 1;
@@ -156,6 +162,12 @@ class camera
     int upperLimitX = 0;
     int upperLimitY = 0;
     bool enforceLimits = 0;
+
+    bool intersectsX = 0;
+    bool intersectsY = 0;
+
+    bool xAdjusted = 0;
+    bool yAdjusted = 0;
 
     camera(float fx, float fy);
 
@@ -269,6 +281,19 @@ extern vector<miniEnt *> g_miniEnts;
 extern vector<miniBullet *> g_miniBullets;
 
 extern vector<tallGrass*> g_tallGrasses;
+
+extern vector<camBlocker*> g_camBlockers;
+
+extern vector<gradient*> g_gradients;
+
+extern SDL_Texture* g_gradient_a;
+extern SDL_Texture* g_gradient_b;
+extern SDL_Texture* g_gradient_c;
+extern SDL_Texture* g_gradient_d;
+extern SDL_Texture* g_gradient_e;
+extern SDL_Texture* g_gradient_f;
+extern SDL_Texture* g_gradient_g;
+extern SDL_Texture* g_gradient_h;
 
 struct cmpCoord
 {
@@ -853,6 +878,7 @@ extern tile *doorIcon;
 extern tile *ddoorIcon;
 extern tile *triggerIcon;
 extern SDL_Texture* grassTexture;
+extern SDL_Texture* cameraBlockerTexture;
 extern textbox *nodeInfoText;
 extern string entstring;
 

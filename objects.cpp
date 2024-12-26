@@ -1135,54 +1135,69 @@ void tile::render(SDL_Renderer * renderer, camera fcamera) {
       SDL_RenderCopyF(renderer, texture, NULL, &dstrect);
     }
 
-    //render specular over water
-    if(texture == g_waterTexture) {
-      SDL_FRect dstrect = { 0, 0, WIN_WIDTH, WIN_HEIGHT};
-      SDL_Rect srcrect = { 0, 0, 256, 220};
-      //minimize the shine if it wouldn't be drawn over the
-      //tile
-      float left, right;
-      float top, bottom;
-      transform3dPoint(x, y, 0, left, top);
-      transform3dPoint(x+width, y+height, 0, right, bottom);
-
-      float tclip = 0, bclip = 0, lclip = 0, rclip = 0;
-      float tp = 0, lp = 0;
-      if(top > 0) {
-        tclip = top/WIN_HEIGHT;
-      }
-      if(bottom < WIN_HEIGHT) {
-        bclip = (WIN_HEIGHT-bottom)/WIN_HEIGHT;
-      }
-
-      if(left > 0) {
-        lclip = left/WIN_WIDTH;
-      }     
-      if(right < WIN_WIDTH) {
-        rclip = (WIN_WIDTH-right)/WIN_WIDTH;
-      }
-      dstrect.y += tclip * WIN_HEIGHT;
-      srcrect.y += (tclip)* 220;
-
-      dstrect.x += lclip * WIN_WIDTH;
-      srcrect.x += (lclip)* 256;
-
-      dstrect.h -= bclip * WIN_HEIGHT;
-      srcrect.h -= bclip * 220;
-
-      dstrect.w -= rclip * WIN_WIDTH;
-      srcrect.w -= rclip* 256;
-      
-      if(dstrect.w + dstrect.x > WIN_WIDTH) {
-        dstrect.w += WIN_WIDTH - (dstrect.w + dstrect.x);
-      }
-
-      if(dstrect.h + dstrect.y > WIN_HEIGHT) {
-        dstrect.h += WIN_HEIGHT - (dstrect.h + dstrect.y);
-      }
-      
-      SDL_RenderCopyF(renderer, g_wSpec, &srcrect, &dstrect);
+// render specular over water
+if (texture == g_waterTexture) {
+  SDL_FRect dstrect = {0, 0, WIN_WIDTH, WIN_HEIGHT};
+  SDL_Rect srcrect = {0, 0, 256, 220};
+  // minimize the shine if it wouldn't be drawn over the
+  // tile
+  float left, right;
+  float top, bottom;
+  transform3dPoint(x, y, 0, left, top);
+  transform3dPoint(x + width, y + height, 0, right, bottom);
+  float tclip = 0, bclip = 0, lclip = 0, rclip = 0;
+  float tp = 0, lp = 0;
+  if (top > 0) {
+    tclip = top / WIN_HEIGHT;
+  }
+  if (bottom < WIN_HEIGHT) {
+    if(top > 0) {
+      bclip = ((WIN_HEIGHT - bottom) + top) / WIN_HEIGHT;
+    } else {
+      bclip = (WIN_HEIGHT - bottom) / WIN_HEIGHT;
     }
+  }
+  if (left > 0) {
+    lclip = left / WIN_WIDTH;
+  }
+  if (right < WIN_WIDTH) {
+    if(left > 0) {
+      rclip = ((WIN_WIDTH - right) + left) / WIN_WIDTH;
+    } else {
+      rclip = (WIN_WIDTH - right) / WIN_WIDTH;
+    }
+  }
+  dstrect.y += tclip * WIN_HEIGHT;
+  srcrect.y += (tclip) * 220;
+  dstrect.x += lclip * WIN_WIDTH;
+  srcrect.x += (lclip) * 256;
+  dstrect.h -= bclip * WIN_HEIGHT;
+  srcrect.h -= bclip * 220;
+  dstrect.w -= rclip * WIN_WIDTH;
+  srcrect.w -= rclip * 256;
+  if (dstrect.w + dstrect.x > WIN_WIDTH) {
+    dstrect.w += WIN_WIDTH - (dstrect.w + dstrect.x);
+  }
+  if (dstrect.h + dstrect.y > WIN_HEIGHT) {
+    dstrect.h += WIN_HEIGHT - (dstrect.h + dstrect.y);
+  }
+
+//    //1920 x 1200
+//    if((float)dstrect.w * (1920.0 / 256.0) > width) {
+//      dstrect.w = width;
+//      float a = 256.0 / 1920.0;
+//      srcrect.w = width * a;
+//    }
+//    if((float)dstrect.h * (1200.0 / 220.0) > height) {
+//      dstrect.h = height;
+//      float a = 220.0 / 1200.0;
+//      srcrect.h = width * a;
+//    }
+
+    SDL_RenderCopyF(renderer, g_wSpec, &srcrect, &dstrect);
+}
+
+
   }
 }
 
@@ -6531,7 +6546,6 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
 //all-purpose pathfinding function
 void entity::BasicNavigate(navNode* ultimateTargetNode) {
-  M("BasicNavigate()");
   if(g_navNodes.size() < 1) {return;}
   bool popOffPath = 0;
   if(current == nullptr) { //modified during rotational overhaul
@@ -8372,6 +8386,17 @@ void clear_map(camera& cameraToReset) {
     delete g_tallGrasses[0];
   }
 
+  size = g_camBlockers.size();
+  for(int i = 0; i < size; i++) {
+    delete g_camBlockers[0];
+  }
+
+  size = g_gradients.size();
+  for(int i = 0; i < size; i++) {
+    delete g_gradients[0];
+  }
+
+
   size = g_ribbons.size();
   for(int i = 0; i < size; i++) {
     delete g_ribbons[0];
@@ -9569,6 +9594,59 @@ void adventureUI::continueDialogue()
         {
           g_tiles[i]->render(renderer, g_camera);
         }
+      }
+
+      //render black bars
+      {
+        SDL_Rect blackrect;
+        
+        blackrect = {
+          g_camera.desiredX - g_camera.width,
+          g_camera.desiredY - g_camera.height,
+          g_camera.width,
+          g_camera.height*3
+        };
+  
+  
+        blackrect = transformRect(blackrect);
+  
+        SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+  
+        blackrect = {
+          g_camera.desiredX + g_camera.width,
+          g_camera.desiredY - g_camera.height,
+          g_camera.width,
+          g_camera.height*3
+        };
+  
+  
+        blackrect = transformRect(blackrect);
+  
+        SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+  
+        blackrect = {
+          g_camera.desiredX,
+          g_camera.desiredY - g_camera.height,
+          g_camera.width,
+          g_camera.height
+        };
+  
+        blackrect = transformRect(blackrect);
+  
+        SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+  
+        blackrect = {
+          g_camera.desiredX,
+          g_camera.desiredY + g_camera.height,
+          g_camera.width,
+          g_camera.height
+        };
+  
+        blackrect = transformRect(blackrect);
+  
+        SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+  
+  
       }
     
       SDL_RenderCopy(renderer, g_shade, NULL, NULL);
@@ -11914,4 +11992,36 @@ tallGrass::tallGrass() {
 
 tallGrass::~tallGrass() {
   g_tallGrasses.erase(remove(g_tallGrasses.begin(), g_tallGrasses.end(), this), g_tallGrasses.end());
+}
+
+camBlocker::camBlocker() {
+  g_camBlockers.push_back(this);
+}
+
+camBlocker::~camBlocker() {
+  g_camBlockers.erase(remove(g_camBlockers.begin(), g_camBlockers.end(), this), g_camBlockers.end());
+}
+
+gradient::gradient() {
+  g_gradients.push_back(this);
+}
+
+gradient::~gradient() {
+  g_gradients.erase(remove(g_gradients.begin(), g_gradients.end(), this), g_gradients.end());
+}
+
+void gradient::render(SDL_Renderer* renderer, camera fcamera) {
+  rect obj;
+
+  obj = rect(
+      (floor(x) -fcamera.x),
+      (floor(y) - (floor(z)) * XtoZ) - fcamera.y,
+      floor(width),
+      floor(height)
+      );
+  rect cam(0, 0, fcamera.width, fcamera.height);
+  if(RectOverlap(obj, cam)) {
+    SDL_FRect dstrect = { (float)obj.x, (float)obj.y, (float)obj.width, (float)obj.height};
+    SDL_RenderCopyF(renderer, texture, NULL, &dstrect);
+  }
 }

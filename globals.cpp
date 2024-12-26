@@ -134,6 +134,19 @@ vector<miniBullet *> g_miniBullets;
 
 vector<tallGrass*> g_tallGrasses;
 
+vector<camBlocker*> g_camBlockers;
+
+vector<gradient*> g_gradients;
+
+SDL_Texture* g_gradient_a = 0;
+SDL_Texture* g_gradient_b = 0;
+SDL_Texture* g_gradient_c = 0;
+SDL_Texture* g_gradient_d = 0;
+SDL_Texture* g_gradient_e = 0;
+SDL_Texture* g_gradient_f = 0;
+SDL_Texture* g_gradient_g = 0;
+SDL_Texture* g_gradient_h = 0;
+
 map<string, int> enemiesMap; // stores (file,cost) for enemies to be spawned procedurally in the map
 int g_budget = 0;						 // how many points this map can spend on enemies;
 
@@ -483,58 +496,96 @@ camera::camera(float fx, float fy)
   fy = y;
 }
 
-void camera::update_movement(float elapsed, float targetx, float targety)
-{
-  if (!isfinite(targetx) || !isfinite(targety))
-  {
-    return;
-  }
-
-  if (lag == 0)
-  {
-    x = targetx;
-    y = targety;
-  }
-  else
-  {
-    x += (targetx - oldx) * (elapsed / 256) * lag;
-    y += (targety - oldy) * (elapsed / 256) * lag;
-
-    oldx = x;
-    oldy = y;
-    // if we're there, within a pixel, set the lagResetTimer to nothing
-    if (abs(targetx - x) < 1.4 && abs(targety - y) < 1.4)
-    {
-      lag = 0;
-    }
-    else
-    {
-      // if not, consider increasing lag to catch up
-      lag += lagaccel;
-    }
-  }
-
-  if (enforceLimits)
-  {
-    if (x < lowerLimitX)
-    {
-      x = lowerLimitX;
-    }
-    if (y < lowerLimitY)
-    {
-      y = lowerLimitY;
+void camera::update_movement(float elapsed, float targetx, float targety) {
+  desiredX = targetx;
+  desiredY = targety;
+    if (!isfinite(targetx) || !isfinite(targety)) {
+        return;
     }
 
-    if (x + width > upperLimitX)
-    {
-      x = upperLimitX - width;
+    if (lag == 0) {
+        x = targetx;
+        y = targety;
+    } else {
+        x += (targetx - oldx) * (elapsed / 256) * lag;
+        y += (targety - oldy) * (elapsed / 256) * lag;
+
+        oldx = x;
+        oldy = y;
+        // if we're there, within a pixel, set the lagResetTimer to nothing
+        if (abs(targetx - x) < 1.4 && abs(targety - y) < 1.4) {
+            lag = 0;
+        } else {
+            // if not, consider increasing lag to catch up
+            lag += lagaccel;
+        }
     }
-    if (y + height > upperLimitY)
-    {
-      y = upperLimitY - height;
+
+    if (devMode == 0) {
+
+        // Check for collisions with camBlockers and adjust camera position
+        for (const auto& blocker : g_camBlockers) {
+            intersectsX = (x < blocker->bounds.x + blocker->bounds.width) && (x + width > blocker->bounds.x);
+            intersectsY = (y < blocker->bounds.y + blocker->bounds.height) && (y + height > blocker->bounds.y);
+            int cameraIsFree = 1;
+            if(intersectsX && intersectsY) {
+              cameraIsFree = 0;
+            }
+
+            if (intersectsX && intersectsY) {
+                // Determine the axis to adjust based on proximity
+                float xOverlap = std::min((float)(blocker->bounds.x + blocker->bounds.width - x), x + width - blocker->bounds.x);
+                float yOverlap = std::min((float)(blocker->bounds.y + blocker->bounds.height - y), y + height - blocker->bounds.y);
+
+                if (!blocker->xAdjusted && !blocker->yAdjusted) {
+                    if (xOverlap < yOverlap) {
+                        // Adjust X axis
+                        if (x < blocker->bounds.x) {
+                            x = blocker->bounds.x - width;
+                        } else {
+                            x = blocker->bounds.x + blocker->bounds.width;
+                        }
+                        blocker->xAdjusted = true;
+                    } else {
+                        // Adjust Y axis
+                        if (y < blocker->bounds.y) {
+                            y = blocker->bounds.y - height;
+                        } else {
+                            y = blocker->bounds.y + blocker->bounds.height;
+                        }
+                        blocker->yAdjusted = true;
+                    }
+                } else if (!blocker->yAdjusted) {
+                    // Adjust X axis
+                    if (x < blocker->bounds.x) {
+                        x = blocker->bounds.x - width;
+                    } else {
+                        x = blocker->bounds.x + blocker->bounds.width;
+                    }
+                    blocker->xAdjusted = true;
+                } else if (!blocker->xAdjusted) {
+                    // Adjust Y axis
+                    if (y < blocker->bounds.y) {
+                        y = blocker->bounds.y - height;
+                    } else {
+                        y = blocker->bounds.y + blocker->bounds.height;
+                    }
+                    blocker->yAdjusted = true;
+                }
+            }
+
+          if(cameraIsFree) {
+            blocker->xAdjusted = false;
+            blocker->yAdjusted = false;
+          }
+        }
+
+
     }
-  }
 }
+
+
+
 
 void camera::resetCamera()
 {
@@ -863,11 +914,12 @@ tile *doorIcon;
 tile *ddoorIcon;
 tile *triggerIcon;
 SDL_Texture* grassTexture;
+SDL_Texture* cameraBlockerTexture;
 textbox *nodeInfoText;
-string entstring = "oilman"; // last entity spawned;
+string entstring = ""; // last entity spawned;
 
 string mapname = "";
-string backgroundstr = "black";
+string backgroundstr = "";
 
 float g_earshot = 4 * 64; // how close do entities need to be to join their friends in battle
 

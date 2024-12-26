@@ -151,6 +151,34 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
       a->bounds.y = p1;
       a->bounds.width = p2;
       a->bounds.height = p3;
+    }
+
+    if (word == "camblocker") {
+      iss >> s0 >> p0 >> p1 >> p2 >> p3;
+      camBlocker* a = new camBlocker();
+      a->bounds.x = p0;
+      a->bounds.y = p1;
+      a->bounds.width = p2;
+      a->bounds.height = p3;
+    }
+
+    if(word == "gradient") {
+      iss >> s0 >> p0 >> p1 >> p2 >> p3 >> p4;
+      gradient* a = new gradient();
+      a->x = p0;
+      a->y = p1;
+      a->z = 128;
+      a->sortingOffset = 500;
+      a->width = p2;
+      a->height = p3;
+      if(p4 == 0) { a->texture = g_gradient_a;}
+      else if(p4 == 1) { a->texture = g_gradient_b;}
+      else if(p4 == 2) { a->texture = g_gradient_c;}
+      else if(p4 == 3) { a->texture = g_gradient_d;}
+      else if(p4 == 4) { a->texture = g_gradient_e;}
+      else if(p4 == 5) { a->texture = g_gradient_f;}
+      else if(p4 == 6) { a->texture = g_gradient_g;}
+      else if(p4 == 7) { a->texture = g_gradient_h;}
 
     }
 
@@ -1825,8 +1853,33 @@ bool mapeditor_save_map(string word)
     ofile << "grass " << g_tallGrasses[i]->bounds.x << " " 
                       << g_tallGrasses[i]->bounds.y << " "
                       << g_tallGrasses[i]->bounds.width << " "
-                      << g_tallGrasses[i]->bounds.height << " " << endl;;
+                      << g_tallGrasses[i]->bounds.height << " " << endl;
 
+  }
+
+
+  for(long long unsigned int i = 0; i < g_camBlockers.size(); i++) 
+  {
+    ofile << "camblocker " << g_camBlockers[i]->bounds.x << " " 
+                      << g_camBlockers[i]->bounds.y << " "
+                      << g_camBlockers[i]->bounds.width << " "
+                      << g_camBlockers[i]->bounds.height << " " << endl;
+
+  }
+
+  for(auto x : g_gradients) {
+    int texture = 0;
+    if(x->texture == g_gradient_a) { texture = 0;}
+    else if(x->texture == g_gradient_b) { texture = 1;}
+    else if(x->texture == g_gradient_c) { texture = 2;}
+    else if(x->texture == g_gradient_d) { texture = 3;}
+    else if(x->texture == g_gradient_e) { texture = 4;}
+    else if(x->texture == g_gradient_f) { texture = 5;}
+    else if(x->texture == g_gradient_g) { texture = 6;}
+    else { texture = 7;}
+
+
+    ofile << "gradient " << x->x << " " << x->y << " " << x->width << " " << x->height << " " << texture << endl;
   }
 
   //D("resources/maps/" + g_mapdir + "/scripts/INIT-" + g_map + ".txt");
@@ -1879,6 +1932,8 @@ void init_map_writing(SDL_Renderer *renderer)
   triggerIcon->software = 1;
 
   grassTexture = loadTexture(renderer, "resources/engine/grass-select.qoi");
+
+  cameraBlockerTexture = loadTexture(renderer, "resources/engine/camera-blocker.qoi");
 
   //i thought i was leaking data but its okay since all tiles are deleted in clear_map();
 
@@ -2103,6 +2158,16 @@ void write_map(entity *mapent)
     drect = transformRect(drect);
     SDL_RenderCopyF(renderer, grassTexture, NULL, &drect);
 
+  }
+  
+  //draw cameraBlockers
+  for(auto x : g_camBlockers) {
+    drect.x = x->bounds.x;
+    drect.y = x->bounds.y;
+    drect.w = x->bounds.width;
+    drect.h = x->bounds.height;
+    drect = transformRect(drect);
+    SDL_RenderCopyF(renderer, cameraBlockerTexture, NULL, &drect);
   }
   
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -2590,6 +2655,7 @@ void write_map(entity *mapent)
         //right click delete
         //delete lists
         bool deleteflag = 1;
+
         for (auto n : g_entities)
         {
           if (n == protag)
@@ -2800,6 +2866,23 @@ void write_map(entity *mapent)
           delete x;
         }
 
+        for(auto x :g_camBlockers) {
+          if(RectOverlap(x->bounds, markerrect)) {
+            deleteflag = 0;
+            delete x;
+            break;
+          }
+        }
+
+        for(auto x : g_gradients) {
+          rect a = {x->x, x->y, x->width, x->height};
+          if(RectOverlap(a, markerrect)) {
+            deleteflag = 0;
+            delete x;
+            break;
+          }
+        }
+
         if (wallheight == 64 && deleteflag)
         {
           // musicnodes
@@ -2833,6 +2916,15 @@ void write_map(entity *mapent)
               // !!! Technically this is unsafe, the data should be handled better
             }
           }
+
+          for(auto x :g_tallGrasses) {
+            if(RectOverlap(x->bounds, markerrect)) {
+                delete x;
+                break;
+                }
+          }
+
+          
 
           // rect markerrect = {marker->x, marker->y, marker->width, marker->height};
           for (long long unsigned int i = 0; i < g_tiles.size(); i++)
@@ -5970,6 +6062,74 @@ void write_map(entity *mapent)
     a->bounds.y = selection->y;
     a->bounds.width = selection->width;
     a->bounds.height = selection->height;
+  }
+
+  if(devinput[39] && !olddevinput[39] && makingbox == 0) {
+    //make camblocker
+    lx = px;
+    ly = py;
+    makingbox = 1;
+    selection->texture = loadTexture(renderer, "resources/engine/camera-blocker.qoi");
+  } else if(devinput[39] && !olddevinput[39] && makingbox == 1){
+    makingbox = 0;
+    camBlocker* a = new camBlocker();
+    a->bounds.x = selection->x;
+    a->bounds.y = selection->y;
+    a->bounds.width = selection->width;
+    a->bounds.height = selection->height;
+  }
+
+
+  if(devinput[40] && !olddevinput[40] && makingbox == 0) {
+    //are we hovering over any existing gradients?
+    //if so, cycle their texture
+    int cycleTexture = 0;
+    for(auto x : g_gradients) {
+      rect a = {marker->x, marker->y, 32, 32};
+      rect b = {x->x, x->y, x->width, x->height};
+      if(RectOverlap(a,b)) {
+          cycleTexture = 1;
+          if(x->texture == g_gradient_a) {
+            x->texture = g_gradient_b;
+          } else if(x->texture == g_gradient_b) {
+            x->texture = g_gradient_c;
+          } else if(x->texture == g_gradient_c) {
+            x->texture = g_gradient_d;
+          } else if(x->texture == g_gradient_d) {
+            x->texture = g_gradient_e;
+          } else if(x->texture == g_gradient_e) {
+            x->texture = g_gradient_f;
+          } else if(x->texture == g_gradient_f) {
+            x->texture = g_gradient_g;
+          } else if(x->texture == g_gradient_g) {
+            x->texture = g_gradient_h;
+          } else if(x->texture == g_gradient_h) {
+            x->texture = g_gradient_a;
+          }
+          break;
+      }
+
+    }
+
+    if(!cycleTexture) {
+      //make light gradient
+      lx = px;
+      ly = py;
+      makingbox = 1;
+      selection->texture = loadTexture(renderer, "resources/engine/fade-a.qoi");
+    }
+  } else if(devinput[40] && !olddevinput[40] && makingbox == 1){
+    makingbox = 0;
+    gradient* a = new gradient();
+    a->texture = g_gradient_a;
+    a->x = selection->x;
+    a->y = selection->y;
+    a->z = 128;
+    a->sortingOffset = 500;
+    a->width = selection->width;
+    a->height = selection->height;
+    D(a->width);
+    D(a->height);
   }
 
   // change wall, cap, and floor textures

@@ -114,12 +114,12 @@ class coord {
 
 class rect {
   public:
-    int x;
-    int y;
-    int z=0; //rarely used
-    int width;
-    int height;
-    int zeight = 32;
+    float x;
+    float y;
+    float z=0; //rarely used
+    float width;
+    float height;
+    float zeight = 32;
 
 
     rect();
@@ -2225,5 +2225,20 @@ public:
   ~tallGrass();
 };
 
+class camBlocker {
+public:
+  bool xAdjusted = 0;
+  bool yAdjusted = 0;
+  rect bounds;
+  camBlocker();
+  ~camBlocker();
+};
+
+class gradient: public actor {
+public:
+  gradient();
+  ~gradient();
+  void render(SDL_Renderer * renderer, camera fcamera);
+};
 
 #endif

@@ -851,6 +851,7 @@ void ExplorationLoop() {
 //      }
 //      M("--\n");
 
+      //no matter what, tiles on the edges are off
 
       addTextures(renderer, g_fc, canvas, light, 500, 500, 250, 250, 0); //g_fc is normal
 
@@ -908,6 +909,7 @@ void ExplorationLoop() {
       FoWrect.y -= 67 * XtoZ;
       // SDL_RenderCopy(renderer, TextureB, NULL, &FoWrect);
     }
+
 
     // don't render triangles hidden behind fogofwar
     if (g_fogofwarEnabled && g_trifog_optimize)
@@ -1350,6 +1352,59 @@ void ExplorationLoop() {
       {
         g_tiles[i]->render(renderer, g_camera);
       }
+    }
+
+    //render black bars
+    {
+      SDL_Rect blackrect;
+      
+      blackrect = {
+        g_camera.desiredX - g_camera.width,
+        g_camera.desiredY - g_camera.height,
+        g_camera.width,
+        g_camera.height*3
+      };
+
+
+      blackrect = transformRect(blackrect);
+
+      SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+
+      blackrect = {
+        g_camera.desiredX + g_camera.width,
+        g_camera.desiredY - g_camera.height,
+        g_camera.width,
+        g_camera.height*3
+      };
+
+
+      blackrect = transformRect(blackrect);
+
+      SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+
+      blackrect = {
+        g_camera.desiredX,
+        g_camera.desiredY - g_camera.height,
+        g_camera.width,
+        g_camera.height
+      };
+
+      blackrect = transformRect(blackrect);
+
+      SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+
+      blackrect = {
+        g_camera.desiredX,
+        g_camera.desiredY + g_camera.height,
+        g_camera.width,
+        g_camera.height
+      };
+
+      blackrect = transformRect(blackrect);
+
+      SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+
+
     }
 
     // map editing
@@ -3407,6 +3462,16 @@ int WinMain()
 
   TextureA = SDL_CreateTextureFromSurface(renderer, SurfaceA);
   TextureD = SDL_CreateTextureFromSurface(renderer, SurfaceA);
+
+  //light gradients to put near where maps transition
+  g_gradient_a = loadTexture(renderer, "resources/engine/fade-a.qoi");
+  g_gradient_b = loadTexture(renderer, "resources/engine/fade-b.qoi");
+  g_gradient_c = loadTexture(renderer, "resources/engine/fade-c.qoi");
+  g_gradient_d = loadTexture(renderer, "resources/engine/fade-d.qoi");
+  g_gradient_e = loadTexture(renderer, "resources/engine/fade-e.qoi");
+  g_gradient_f = loadTexture(renderer, "resources/engine/fade-f.qoi");
+  g_gradient_g = loadTexture(renderer, "resources/engine/fade-g.qoi");
+  g_gradient_h = loadTexture(renderer, "resources/engine/fade-h.qoi");
 
   SDL_FreeSurface(SurfaceA);
 
@@ -5540,6 +5605,14 @@ void getExplorationInput(float &elapsed)
 
   if(keystate[SDL_SCANCODE_S] && devMode) {
     devinput[38] = 1;
+  }
+
+  if(keystate[SDL_SCANCODE_D] && devMode) {
+    devinput[39] = 1;
+  }
+
+  if(keystate[SDL_SCANCODE_H] && devMode) {
+    devinput[40] = 1;
   }
 
   if (keystate[SDL_SCANCODE_ESCAPE])
