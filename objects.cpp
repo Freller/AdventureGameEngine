@@ -1137,6 +1137,7 @@ void tile::render(SDL_Renderer * renderer, camera fcamera) {
 
 // render specular over water
 if (texture == g_waterTexture) {
+  g_waterOnscreen = 1;
   SDL_FRect dstrect = {0, 0, WIN_WIDTH, WIN_HEIGHT};
   SDL_Rect srcrect = {0, 0, 256, 220};
   // minimize the shine if it wouldn't be drawn over the
@@ -2822,7 +2823,7 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
   file >> comment;
   file >> this->faction;
   
-  if(faction != -1) {
+  if(faction != -1 && faction != 0) {
     canFight = 1;
   } else {
     canFight = 0;
@@ -4303,7 +4304,6 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
 
         //should we animate?
-        //if( (xaccel != 0 || yaccel != 0) || !grounded || (inParty && (protag->xaccel != 0 ||protag->yaccel != 0))) { //this has problems too
         if(xaccel != 0 || yaccel != 0) {
           extraAnimateFrames = 6;
         }
@@ -4706,7 +4706,9 @@ door* entity::update(vector<door*> doors, float elapsed) {
               //did we walk into a door?
               if(RectOverlap(movedbounds, doors[i]->bounds) && (protag->z > doors[i]->z && protag->z < doors[i]->z + doors[i]->zeight)  ) {
                 //take the door.
-                return doors[i];
+                if(devMode == 0) {
+                  return doors[i];
+                }
               }
             }
           }
@@ -5702,23 +5704,24 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
 
         //alert nearby friends who arent fighting IF we are agrod
-        if(agrod && useAgro) {
-          for (auto y : g_entities) {
-            if(y->tangible && y != this && y->faction == this->faction && (y->agrod == 0 || y->target == nullptr) && XYWorldDistance(y->x, y->y, this->x, this->y) < g_earshot) {
-              if(y->useAgro) {
-                y->agrod = 1;
-  
-                if(this->target != nullptr) {
-                  y->targetFaction = this->targetFaction;
-                  if(y->target == nullptr) {
-                    y->target = this->target;
-                  }
-                }
-              }
-            }
-          }
-        }
+//        if(agrod && useAgro) {
+//          for (auto y : g_entities) {
+//            if(y->tangible && y != this && y->faction == this->faction && (y->agrod == 0 || y->target == nullptr) && XYWorldDistance(y->x, y->y, this->x, this->y) < g_earshot) {
+//              if(y->useAgro) {
+//                y->agrod = 1;
+//  
+//                if(this->target != nullptr) {
+//                  y->targetFaction = this->targetFaction;
+//                  if(y->target == nullptr) {
+//                    y->target = this->target;
+//                  }
+//                }
+//              }
+//            }
+//          }
+//        }
 
+        /*
         if(isAI && useAgro) {
           //check the auto-agro-range
           potentialTarget = nullptr;
@@ -6035,6 +6038,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
           }
 
         }
+        */
 
 
         //apply statuseffect
@@ -6484,34 +6488,35 @@ door* entity::update(vector<door*> doors, float elapsed) {
               //NOW - use angle to target to get prefered cardinal point
               int index = convertAngleToFrame(angleToTarget);
 
-              vector<int> ret;
-              if(this->hisweapon->attacks[hisweapon->combo]->melee)  {
-                //ret = getCardinalPoint(target->getOriginX(), target->getOriginY(), 0, index);
-               
-                //Destination = getNodeByPosition(ret[0], ret[1]);
-                Destination = getNodeByPosition(target->getOriginX(), target->getOriginY());
-//                M("getNodeByPosition() A");
-//                D(Destination->x);
-//                D(Destination->y);
-
-              } else {
-                ret = getCardinalPoint(target->getOriginX(), target->getOriginY(), this->hisweapon->attacks[hisweapon->combo]->range, index);
-      
-                if( LineTrace(ret[0], ret[1], target->getOriginX(), target->getOriginY(), false, 30, 0, 10, 0) && abs(target->z- verticalRayCast(ret[0], ret[1])) < 32 ) {
-      
-                  Destination = getNodeByPosition(ret[0], ret[1]);
-//                  M("getNodeByPosition() B");
-//                  D(Destination->x);
-//                  D(Destination->y);
-                } else {
-                  //Can't get our full range, so use the values in LineTraceX and LineTraceY
-                  extern int lineTraceX, lineTraceY;
-                  Destination = getNodeByPosition(lineTraceX, lineTraceY);
-//                  M("getNodeByPosition() C");
-//                  D(Destination->x);
-//                  D(Destination->y);
-                }
-              }
+              //vector<int> ret;
+              Destination = getNodeByPosition(target->getOriginX(), target->getOriginY());
+//              if(this->hisweapon->attacks[hisweapon->combo]->melee)  {
+//                //ret = getCardinalPoint(target->getOriginX(), target->getOriginY(), 0, index);
+//               
+//                //Destination = getNodeByPosition(ret[0], ret[1]);
+//                Destination = getNodeByPosition(target->getOriginX(), target->getOriginY());
+////                M("getNodeByPosition() A");
+////                D(Destination->x);
+////                D(Destination->y);
+//
+//              } else {
+//                ret = getCardinalPoint(target->getOriginX(), target->getOriginY(), this->hisweapon->attacks[hisweapon->combo]->range, index);
+//      
+//                if( LineTrace(ret[0], ret[1], target->getOriginX(), target->getOriginY(), false, 30, 0, 10, 0) && abs(target->z- verticalRayCast(ret[0], ret[1])) < 32 ) {
+//      
+//                  Destination = getNodeByPosition(ret[0], ret[1]);
+////                  M("getNodeByPosition() B");
+////                  D(Destination->x);
+////                  D(Destination->y);
+//                } else {
+//                  //Can't get our full range, so use the values in LineTraceX and LineTraceY
+//                  extern int lineTraceX, lineTraceY;
+//                  Destination = getNodeByPosition(lineTraceX, lineTraceY);
+////                  M("getNodeByPosition() C");
+////                  D(Destination->x);
+////                  D(Destination->y);
+//                }
+//              }
               
             }
           }
@@ -7048,12 +7053,8 @@ int loadSave() {
     int spiritThree = stoi(tokens[6]);
     int spiritFour = stoi(tokens[7]);
 
-    M("Oh boy lets load an ent");
     entity* a = new entity(renderer, name);
-    D(a->name);
-    D(a->asset_sharer);
     party.push_back(a);
-    M("Pushed back to party");
     a->inParty = 1;
 
     combatant* b = new combatant(name, exp);
@@ -7370,16 +7371,16 @@ int LineTrace(int x1, int y1, int x2, int y2, bool display, int size, int layer,
   if(display) {
     SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
   }
+  int xsize = size * p_ratio;
   for (float i = 1; i < resolution; i++) {
-    int xsize = size * p_ratio;
     int xpos = (i/resolution) * x1 + (1 - i/resolution) * x2;
     int ypos = (i/resolution) * y1 + (1 - i/resolution) * y2;
     rect a = rect(xpos - xsize/2, ypos - size/2, xsize, size);
     SDL_Rect b = {(int)(((xpos- xsize/2) - g_camera.x) * g_camera.zoom), (int)(((ypos- size/2) - g_camera.y) * g_camera.zoom), (int)(xsize), (int)(size)};
 
-    if(display) {
-      SDL_RenderDrawRect(renderer, &b);
-    }
+//    if(display) {
+//      SDL_RenderDrawRect(renderer, &b);
+//    }
 
     if(fogOfWar) {
       for(auto x : g_large_entities) {
@@ -7400,8 +7401,6 @@ int LineTrace(int x1, int y1, int x2, int y2, bool display, int size, int layer,
       }
 
     }
-
-
 
     for (long long unsigned int j = 0; j < g_lt_collisions.size(); j++) {
       if(RectOverlap(a, g_lt_collisions[j]->bounds)) {
@@ -8558,31 +8557,32 @@ void clear_map(camera& cameraToReset) {
 //    }
 //  }
 
-  vector<weapon*> persistentweapons;
-  size = (int)g_weapons.size();
-  for(int i = 0; i < size; i++) {
-    bool persist = false;
-    //check if party members own the weapons
-    for(auto x: party) {
-      if(x->hisweapon->name == g_weapons[0]->name) {
-        persist  = true;
-      }
-    }
-    if(g_weapons[0]->persistent) {
-      persist = true;
-
-    }
-    if(persist) {
-      persistentweapons.push_back(g_weapons[0]);
-      g_weapons.erase(remove(g_weapons.begin(), g_weapons.end(), g_weapons[0]), g_weapons.end());
-    } else {
-      delete g_weapons[0];
-    }
-  }
-
-  for(auto x : persistentweapons) {
-    g_weapons.push_back(x);
-  }
+  //party is unarmed so this is unneccessary
+//  vector<weapon*> persistentweapons;
+//  size = (int)g_weapons.size();
+//  for(int i = 0; i < size; i++) {
+//    bool persist = false;
+//    //check if party members own the weapons
+//    for(auto x: party) {
+//      if(x->hisweapon->name == g_weapons[0]->name) {
+//        persist  = true;
+//      }
+//    }
+//    if(g_weapons[0]->persistent) {
+//      persist = true;
+//
+//    }
+//    if(persist) {
+//      persistentweapons.push_back(g_weapons[0]);
+//      g_weapons.erase(remove(g_weapons.begin(), g_weapons.end(), g_weapons[0]), g_weapons.end());
+//    } else {
+//      delete g_weapons[0];
+//    }
+//  }
+//
+//  for(auto x : persistentweapons) {
+//    g_weapons.push_back(x);
+//  }
 
 
   vector<ui*> persistentui;

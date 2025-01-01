@@ -119,6 +119,7 @@ void updateWindowResolution() {
 }
 
 void ExplorationLoop() {
+    B("Start of frame");
     // cooldowns
     if(g_dungeonSystemOn) {g_dungeonMs += elapsed;}
     halfsecondtimer += elapsed;
@@ -467,6 +468,7 @@ void ExplorationLoop() {
       curTextWait = 0;
     }
 
+    B("Before fogofwar");
     // old Fogofwar
     if (g_fogofwarEnabled && !devMode)
     {
@@ -506,7 +508,7 @@ void ExplorationLoop() {
               int xpos = ((i - g_fogMiddleX) * 64) + functionalX;
               int ypos = ((j - g_fogMiddleY) * 55) + functionalY;
               //if (XYWorldDistance(functionalX, functionalY, xpos, ypos) > g_viewdist)
-              if(g_fog_window[i][j])
+              if(g_fog_window[i][j] == 0)
               {
                 // g_fogcookies[i][j] -= g_tile_fade_speed; if (g_fogcookies[i][j] < 0) g_fogcookies[i][j] = 0;
                 g_fogcookies[i][j] = 0;
@@ -517,8 +519,8 @@ void ExplorationLoop() {
                 // g_sc[i][j] -= g_tile_fade_speed; if (g_sc[i][j] < 0) g_sc[i][j] = 0;
                 g_sc[i][j] = 0;
               }
-              else if (
-                  LineTrace(functionalX, functionalY, xpos, ypos, 0, 35, g_focus->stableLayer, 15, 1, 1) 
+              else if (g_fog_relevent[i][j] == 1 && 
+                  LineTrace(functionalX, functionalY, xpos, ypos, 0, 35, g_focus->stableLayer, 7, 1, 1) 
                   &&
                   !g_transferingByBoardable
 
@@ -591,16 +593,18 @@ void ExplorationLoop() {
             auto fccopy = g_fc;
             auto sccopy = g_sc;
 
-            for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
+            for (long long unsigned i = 5; i < 15; i++)
             {
-              for (long long unsigned j = 0; j < g_fogcookies.size(); j++)
+              for (long long unsigned j = 4; j < 16; j++)
               {
-                // check if there was an "old" cookie
-                if ((i + xtileshift >= 0 && i + xtileshift < g_fogcookies.size()) && (j + ytileshift >= 0 && j + ytileshift < g_fogheight) && i >= 0 && i < g_fogwidth && j >= 0 && j < g_fogheight)
-                {
-                  g_fogcookies[i][j] = fogcopy[i + xtileshift][j + ytileshift];
-                  g_fc[i][j] = fccopy[i + xtileshift][j + ytileshift];
-                  g_sc[i][j] = sccopy[i + xtileshift][j + ytileshift];
+                if(g_fog_relevent_b[i][j] == 1) { //this one must be g_fog_relevent_b
+                  // check if there was an "old" cookie
+                  if ((i + xtileshift >= 0 && i + xtileshift < g_fogcookies.size()) && (j + ytileshift >= 0 && j + ytileshift < g_fogheight) && i >= 0 && i < g_fogwidth && j >= 0 && j < g_fogheight)
+                  {
+                    g_fogcookies[i][j] = fogcopy[i + xtileshift][j + ytileshift];
+                    g_fc[i][j] = fccopy[i + xtileshift][j + ytileshift];
+                    g_sc[i][j] = sccopy[i + xtileshift][j + ytileshift];
+                  }
                 }
               }
             }
@@ -611,79 +615,85 @@ void ExplorationLoop() {
             for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
             {
               
-
-              int xpos = ((i - g_fogMiddleX) * 64) + functionalX;
-              int ypos = ((j - g_fogMiddleY) * 55) + functionalY;
-
-              int xpos_fc = ((i - 10) * 64) + functionalX;
-              int ypos_fc = ((j - 9) * 55) + functionalY;
-
-              bool blocked = 1;
-              if (g_fogIgnoresLOS)
-              {
-                blocked = LineTrace(xpos, ypos, xpos, ypos, 0, 6, g_focus->stableLayer + 1, 15, 1, 1);
-              }
-              else
-              {
-                blocked = LineTrace(functionalX, functionalY + 3, xpos, ypos, 0, 1, g_focus->stableLayer + 1, 15, 1, 1);
-              }
-
-              int yBoost = 0;  //you could debate this, but since the block closest to the bottom of the screen is hidden by the shadow-cookie above it, I'll give the player an extra block of vision towards the bottom of the screen
-              if(ypos < functionalY) {yBoost = 55;}
-
-              //if (!(XYWorldDistance(functionalX, functionalY + yBoost, xpos, ypos) > g_viewdist) && blocked)
-              if(g_fog_window[i][j] && blocked && !g_transferingByBoardable)
-              {
-
-                g_fogcookies[i][j] += g_tile_fade_speed * (elapsed / 60);
-                if (g_fogcookies[i][j] > 255)
+              if(g_fog_relevent[i][j] == 1) {
+  
+                int xpos = ((i - g_fogMiddleX) * 64) + functionalX;
+                int ypos = ((j - g_fogMiddleY) * 55) + functionalY;
+  
+                int xpos_fc = ((i - 10) * 64) + functionalX;
+                int ypos_fc = ((j - 9) * 55) + functionalY;
+  
+                bool blocked = 1;
+                if (g_fogIgnoresLOS)
                 {
-                  g_fogcookies[i][j] = 255;
+                  blocked = LineTrace(xpos, ypos, xpos, ypos, 0, 10, g_focus->stableLayer + 1, 7, 1, 1);
                 }
-                // g_fogcookies[i][j] = 0;
-
-                // if you want to increment g_fc, there is an additional rule
-                //
-
-                g_fc[i][j] += g_tile_fade_speed * (elapsed / 60);
-                if (g_fc[i][j] > 255)
+                else
                 {
-                  g_fc[i][j] = 255;
+                  blocked = LineTrace(functionalX, functionalY + 3, xpos, ypos, 0, 7, g_focus->stableLayer + 1, 10, 1, 1);
                 }
-
-                // g_fc[i][j] = 0;
-
-                g_sc[i][j] += g_tile_fade_speed * (elapsed / 60);
-                if (g_sc[i][j] > 255)
+  
+                int yBoost = 0;  //you could debate this, but since the block closest to the bottom of the screen is hidden by the shadow-cookie above it, I'll give the player an extra block of vision towards the bottom of the screen
+                if(ypos < functionalY) {yBoost = 55;}
+  
+                //if (!(XYWorldDistance(functionalX, functionalY + yBoost, xpos, ypos) > g_viewdist) && blocked)
+                if(g_fog_window[i][j] && blocked && !g_transferingByBoardable)
                 {
-                  g_sc[i][j] = 255;
+  
+                  g_fogcookies[i][j] += g_tile_fade_speed * (elapsed / 60);
+                  if (g_fogcookies[i][j] > 255)
+                  {
+                    g_fogcookies[i][j] = 255;
+                  }
+                  // g_fogcookies[i][j] = 0;
+  
+                  // if you want to increment g_fc, there is an additional rule
+                  //
+  
+                  g_fc[i][j] += g_tile_fade_speed * (elapsed / 60);
+                  if (g_fc[i][j] > 255)
+                  {
+                    g_fc[i][j] = 255;
+                  }
+  
+                  // g_fc[i][j] = 0;
+  
+                  g_sc[i][j] += g_tile_fade_speed * (elapsed / 60);
+                  if (g_sc[i][j] > 255)
+                  {
+                    g_sc[i][j] = 255;
+                  }
+                  // g_sc[i][j] = 0;
                 }
-                // g_sc[i][j] = 0;
-              }
-              else
-              {
-
-                g_fogcookies[i][j] -= g_tile_fade_speed * (elapsed / 60);
-                if (g_fogcookies[i][j] < 0)
+                else
                 {
-                  g_fogcookies[i][j] = 0;
+  
+                  g_fogcookies[i][j] -= g_tile_fade_speed * (elapsed / 60);
+                  if (g_fogcookies[i][j] < 0)
+                  {
+                    g_fogcookies[i][j] = 0;
+                  }
+                  // g_fogcookies[i][j] = 0;
+  
+                  g_fc[i][j] -= g_tile_fade_speed * (elapsed / 60);
+                  if (g_fc[i][j] < 0)
+                  {
+                    g_fc[i][j] = 0;
+                  }
+  
+                  // g_fc[i][j] = 0;
+  
+                  g_sc[i][j] -= g_tile_fade_speed * (elapsed / 60);
+                  if (g_sc[i][j] < 0)
+                  {
+                    g_sc[i][j] = 0;
+                  }
+                  // g_sc[i][j] = 0;
                 }
-                // g_fogcookies[i][j] = 0;
-
-                g_fc[i][j] -= g_tile_fade_speed * (elapsed / 60);
-                if (g_fc[i][j] < 0)
-                {
-                  g_fc[i][j] = 0;
-                }
-
-                // g_fc[i][j] = 0;
-
-                g_sc[i][j] -= g_tile_fade_speed * (elapsed / 60);
-                if (g_sc[i][j] < 0)
-                {
-                  g_sc[i][j] = 0;
-                }
-                // g_sc[i][j] = 0;
+              } else {
+                g_sc[i][j] = 0;
+                g_fc[i][j] = 0;
+                g_fogcookies[i][j] = 0;
               }
             }
           }
@@ -693,36 +703,38 @@ void ExplorationLoop() {
       // save cookies that are just dark because they are inside of walls to g_savedcookies
       // AND if they tile infront is at 255
 
-      for (long long unsigned i = 0; i < g_fogwidth; i++)
+      for (long long unsigned i = 5; i < 15; i++)
       {
-        for (long long unsigned j = 0; j < g_fogheight; j++)
+        for (long long unsigned j = 4; j < 15; j++)
         {
-          int xpos = ((i - 10) * 64) + functionalX;
-          int ypos = ((j - 9) * 55) + functionalY;
-          // is this cookie in a wall? or behind a wall
-
-          if (g_focus->stableLayer > g_layers)
-          {
-            break;
-          }
-          if (j + 1 < g_fogheight && g_fc[i][j + 1] > 0)
-          {
-            bool firsttrace = LineTrace(xpos, ypos, xpos, ypos, 0, 15, g_focus->stableLayer + 1, 2, 1, 1);
-            bool secondtrace = LineTrace(xpos, ypos + 55, xpos, ypos + 55, 0, 15, g_focus->stableLayer + 1, 2, 1, 1);
-            rect a = {xpos, ypos, 5, 5};
-
-            // for large entities
-            // if(firsttrace == -1) {
-            //	g_fc[i][j] = 255;
-            //	g_sc[i][j] = 255;
-            // } else {
-            if ((!firsttrace || !secondtrace))
+          if(g_fog_relevent[i][j]) {
+            int xpos = ((i - 10) * 64) + functionalX;
+            int ypos = ((j - 9) * 55) + functionalY;
+            // is this cookie in a wall? or behind a wall
+  
+            if (g_focus->stableLayer > g_layers)
             {
-              // !!!
-              // g_fc[i][j] += g_tile_fade_speed*2; if (g_fc[i][j] >255) {g_fc[i][j] = 255;}
-              g_fc[i][j] = 255;
+              break;
             }
-            //}
+            if (j + 1 < g_fogheight && g_fc[i][j + 1] > 0)
+            {
+              bool firsttrace = LineTrace(xpos, ypos, xpos, ypos, 0, 15, g_focus->stableLayer + 1, 2, 1, 1);
+              bool secondtrace = LineTrace(xpos, ypos + 55, xpos, ypos + 55, 0, 15, g_focus->stableLayer + 1, 2, 1, 1);
+              rect a = {xpos, ypos, 5, 5};
+  
+              // for large entities
+              // if(firsttrace == -1) {
+              //	g_fc[i][j] = 255;
+              //	g_sc[i][j] = 255;
+              // } else {
+              if ((!firsttrace || !secondtrace))
+              {
+                // !!!
+                // g_fc[i][j] += g_tile_fade_speed*2; if (g_fc[i][j] >255) {g_fc[i][j] = 255;}
+                g_fc[i][j] = 255;
+              }
+              //}
+            }
           }
         }
       }
@@ -731,23 +743,25 @@ void ExplorationLoop() {
       for (auto x : g_large_entities)
       {
         // if(XYWorldDistance(functionalX, functionalY, x->getOriginX(), x->getOriginY()) < g_viewdist) {
-        for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
+        for (long long unsigned i = 5; i < 15; i++)
         {
-          for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
+          for (long long unsigned j = 4; j < 15; j++)
           {
-            int xpos = ((i - 10) * 64) + functionalX;
-            int ypos = ((j - 9) * 55) + functionalY;
-            rect a = {xpos, ypos, 1, 1};
-
-            if (RectOverlap(a, x->getMovedBounds()))
-            {
-              if (j > 0)
+            if(g_fog_relevent[i][j]) {
+              int xpos = ((i - 10) * 64) + functionalX;
+              int ypos = ((j - 9) * 55) + functionalY;
+              rect a = {xpos, ypos, 1, 1};
+  
+              if (RectOverlap(a, x->getMovedBounds()))
               {
-                g_fc[i][j - 1] = 255;
+                if (j > 0)
+                {
+                  g_fc[i][j - 1] = 255;
+                }
+                g_fc[i][j] = 255;
+                // g_sc[i][j] = 255;
               }
-              g_fc[i][j] = 255;
-              // g_sc[i][j] = 255;
-            }
+          }
           }
         }
         //}
@@ -773,33 +787,35 @@ void ExplorationLoop() {
       //}
 
       // if a cookie is light, and it is intersecting a triangle, not that in g_shc
-      for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
+      for (long long unsigned i = 4; i < 16; i++)
       {
-        for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
+        for (long long unsigned j = 3; j < 16; j++)
         {
-          g_shc[i][j] = -1;
-          int xpos = ((i - g_fogMiddleX) * 64) + functionalX;
-          int ypos = ((j - g_fogMiddleY) * 55) + functionalY;
-          rect r = {xpos - 10, ypos - 10, 20, 20};
-          if (1)
-          {
-            for (auto t : g_triangles[g_focus->stableLayer + 1])
+          if(g_fog_relevent[i][j] || 1) {
+            g_shc[i][j] = -1;
+            int xpos = ((i - g_fogMiddleX) * 64) + functionalX;
+            int ypos = ((j - g_fogMiddleY) * 55) + functionalY;
+            rect r = {xpos - 10, ypos - 10, 20, 20};
+            if (1)
             {
-              if (TriRectOverlap(t, r))
+              for (auto t : g_triangles[g_focus->stableLayer + 1])
               {
-                if (g_fogcookies[i][j])
+                if (TriRectOverlap(t, r))
                 {
-                  g_shc[i][j] = t->type;
-                  g_fc[i][j] += g_tile_fade_speed * (elapsed / 60);
-                  if (g_fc[i][j] > 255)
+                  if (g_fogcookies[i][j])
                   {
+                    g_shc[i][j] = t->type;
+                    g_fc[i][j] += g_tile_fade_speed * (elapsed / 60);
+                    if (g_fc[i][j] > 255)
+                    {
+                      g_fc[i][j] = 255;
+                    }
                     g_fc[i][j] = 255;
+                    g_shc[i][j] += 4 * t->style;
                   }
-                  g_fc[i][j] = 255;
-                  g_shc[i][j] += 4 * t->style;
+  
+                  break;
                 }
-
-                break;
               }
             }
           }
@@ -909,10 +925,11 @@ void ExplorationLoop() {
       FoWrect.y -= 67 * XtoZ;
       // SDL_RenderCopy(renderer, TextureB, NULL, &FoWrect);
     }
+    B("After fog of war");
 
 
     // don't render triangles hidden behind fogofwar
-    if (g_fogofwarEnabled && g_trifog_optimize)
+    if (g_fogofwarEnabled && g_trifog_optimize && 0)
     {
       // make a list of the triangular walls on the screen
       vector<tri *> onscreentris;
@@ -957,27 +974,26 @@ void ExplorationLoop() {
         D(t->y);
         M("------");
       }
-      // SDL_Delay(1000);
       // decide which cookie each one falls under.
-      for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
-      {
-        for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
-        {
-        }
-      }
+//      for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
+//      {
+//        for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
+//        {
+//        }
+//      }
 
       // if that cookie, and the adjacent cookies, are all turned off, don't render the traingle
 
       // check which of them are completely hidden behind fog
-      for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
-      {
-        for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
-        {
-        }
-      }
+//      for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
+//      {
+//        for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
+//        {
+//        }
+//      }
     }
 
-    { //behemoth ui
+    if(0){ //behemoth ui
       if(g_behemoth0 != nullptr && g_behemoth0->tangible) {
         adventureUIManager->b0_element->show = 1;
         
@@ -1191,70 +1207,11 @@ void ExplorationLoop() {
 
     }
 
-    //check if protag is within hearing-range of any behemoths
-    adventureUIManager->hearingDetectable->show = 0;
-    for(auto x : g_behemoths) {
-      if(!x->tangible) {break;}
-      if(x->opacity != 255) {break;}
-      float hearingRadiusSquared = pow(x->hearingRadius, 2);
-      float distToProtagSquared = XYWorldDistanceSquared(x->getOriginX(), x->getOriginY(), protag->getOriginX(), protag->getOriginY());
-//      D(distToProtagSquared);
-//      D(hearingRadiusSquared);
-
-      x->hearsPotentialTarget = 0;
-      if(distToProtagSquared <= hearingRadiusSquared) {
-        adventureUIManager->hearingDetectable->show = 1;
-        g_protagIsInHearingRange = 1;
-        x->aggressiveness += elapsed * x->aggressivenessNoiseGain;
-        x->hearsPotentialTarget = 1;
-        break;
-
-      } else {
-        g_protagIsInHearingRange = 0;
-      }
-
-    }
-
     //should we show the visionDetectable?
     adventureUIManager->seeingDetectable->show = 0;
     if(g_protagIsBeingDetectedBySight) {
       adventureUIManager->seeingDetectable->show = 1;
       adventureUIManager->hearingDetectable->show = 0;
-    }
-
-    //do global nav calcs (shared intelligence for behemoths)
-    if(protag != nullptr) {
-     
-      navCalcMs += elapsed;
-      if(navCalcMs > maxNavCalcMs) {
-        navCalcMs = 0;
-        //precedeProtagNode = Get_Closest_Node(g_navNodes, protag->x, protag->y);
-
-
-        //!!! remove this before shipping
-        for(auto u : g_navNodes) {
-          u->costFromUsage = 0;
-        }
-
-
-
-        for(auto x : g_entities) {
-          if(x->aiIndex > 0 && x->customMovement == 0) {
-            x->timeSinceLastDijkstra = -1; //force a dijkstra update
-            //navNode* zombieNode = x->Get_Closest_Node(g_navNodes);
-            //navNode* zombieNode = Get_Closest_Node(g_navNodes, x->getOriginX() + 15*x->xvel, x->getOriginY() + 15*x->yvel);
-            //zombieNode->costFromUsage = 10000;
-//            for(auto u : zombieNode->friends) {
-//              u->costFromUsage = 10000;
-//              for(auto y : u->friends) {
-//                y->costFromUsage = 10000;
-//              }
-//            }
-          }
-        }
-
-      }
-
     }
 
     // tiles
@@ -1329,16 +1286,6 @@ void ExplorationLoop() {
 
     }
 
-    //move shadow to feet
-//    g_protag_s_ent->x = protag->x;
-//    g_protag_s_ent->y = protag->y;
-//    g_protag_s_ent->z = protag->z;
-//    g_protag_s_ent->xvel = protag->xvel;
-//    g_protag_s_ent->yvel = protag->yvel;
-//    g_protag_s_ent->xaccel = protag->xaccel;
-//    g_protag_s_ent->yaccel = protag->yaccel;
-
-
     // sort
     sort_by_y(g_actors);
     for (long long unsigned int i = 0; i < g_actors.size(); i++)
@@ -1353,6 +1300,7 @@ void ExplorationLoop() {
         g_tiles[i]->render(renderer, g_camera);
       }
     }
+    B("After tiles");
 
     //render black bars
     {
@@ -1564,6 +1512,7 @@ void ExplorationLoop() {
         devinput[i] = 0;
       }
     }
+    B("After mapedit");
 
     {
       g_lt_collisions.clear();
@@ -1604,6 +1553,7 @@ void ExplorationLoop() {
       }
       
     }
+    B("close collision check");
 
     // ui
     if (!inPauseMenu && g_showHUD && !g_inTitleScreen)
@@ -1733,32 +1683,7 @@ void ExplorationLoop() {
       //adventureUIManager->healthText->show = 0;
       //adventureUIManager->hungerText->show = 0;
     }
-
-    //get hungry
-//    if(g_currentFoodpointsDecreaseIntervalMs < 0) {
-//      g_currentFoodpointsDecreaseIntervalMs = g_foodpointsDecreaseIntervalMs;
-//      g_foodpoints -= g_foodpointsDecreaseAmount;
-//      if(g_foodpoints < 0) { g_foodpoints = 0; }
-//    }
-//    g_currentFoodpointsDecreaseIntervalMs -= elapsed;
-
-    // move the healthbar properly to the protagonist
-    //rect obj; // = {( , (((protag->y - ((protag->height))) - protag->z * XtoZ) - g_camera.y) * g_camera.zoom, (protag->width * g_camera.zoom), (protag->height * g_camera.zoom))};
-//    obj.x = ((protag->x - g_camera.x) * g_camera.zoom);
-//    obj.y = (((protag->y - ((floor(protag->height) * 0.9))) - protag->z * XtoZ) - g_camera.y) * g_camera.zoom;
-//    obj.width = (protag->width * g_camera.zoom);
-//    obj.height = (floor(protag->height) * g_camera.zoom);
-//
-//    protagHealthbarA->x = (((float)obj.x + obj.width / 2) / (float)WIN_WIDTH) - protagHealthbarA->width / 2.0;
-//    protagHealthbarA->y = ((float)obj.y) / (float)WIN_HEIGHT;
-//    protagHealthbarB->x = protagHealthbarA->x;
-//    protagHealthbarB->y = protagHealthbarA->y;
-//
-//    protagHealthbarC->x = protagHealthbarA->x;
-//    protagHealthbarC->y = protagHealthbarA->y;
-//    protagHealthbarC->width = (protag->hp / protag->maxhp) * 0.05;
-//    adventureUIManager->healthText->boxX = protagHealthbarA->x + protagHealthbarA->width / 2;
-//    adventureUIManager->healthText->boxY = protagHealthbarA->y - 0.005;
+    B("UI");
 
     //shade
     SDL_RenderCopy(renderer, g_shade, NULL, NULL);
@@ -2099,35 +2024,37 @@ void ExplorationLoop() {
       inventoryMarker->show = 0;
       inventoryText->show = 0;
     }
+    B("Inventory ui");
 
     // sines for item bouncing
-    g_elapsed_accumulator += elapsed;
-    g_itemsines[0] = ( sin(g_elapsed_accumulator / 300) * 10 + 30);
-    g_itemsines[1] = ( sin((g_elapsed_accumulator + (235 * 1) ) / 300) * 10 + 30);
-    g_itemsines[2] = ( sin((g_elapsed_accumulator + (235 * 2) ) / 300) * 10 + 30);
-    g_itemsines[3] = ( sin((g_elapsed_accumulator + (235 * 3) ) / 300) * 10 + 30);
-    g_itemsines[4] = ( sin((g_elapsed_accumulator + (235 * 4) ) / 300) * 10 + 30);
-    g_itemsines[5] = ( sin((g_elapsed_accumulator + (235 * 5) ) / 300) * 10 + 30);
-    g_itemsines[6] = ( sin((g_elapsed_accumulator + (235 * 6) ) / 300) * 10 + 30);
-    g_itemsines[7] = ( sin((g_elapsed_accumulator + (235 * 7) ) / 300) * 10 + 30);
+    //g_elapsed_accumulator += elapsed;
+//    g_itemsines[0] = ( sin(g_elapsed_accumulator / 300) * 10 + 30);
+//    g_itemsines[1] = ( sin((g_elapsed_accumulator + (235 * 1) ) / 300) * 10 + 30);
+//    g_itemsines[2] = ( sin((g_elapsed_accumulator + (235 * 2) ) / 300) * 10 + 30);
+//    g_itemsines[3] = ( sin((g_elapsed_accumulator + (235 * 3) ) / 300) * 10 + 30);
+//    g_itemsines[4] = ( sin((g_elapsed_accumulator + (235 * 4) ) / 300) * 10 + 30);
+//    g_itemsines[5] = ( sin((g_elapsed_accumulator + (235 * 5) ) / 300) * 10 + 30);
+//    g_itemsines[6] = ( sin((g_elapsed_accumulator + (235 * 6) ) / 300) * 10 + 30);
+//    g_itemsines[7] = ( sin((g_elapsed_accumulator + (235 * 7) ) / 300) * 10 + 30);
+//    B("Itemsines");
+//
+//
+//    if (g_elapsed_accumulator > 1800 * M_PI)
+//    {
+//      g_elapsed_accumulator -= 1800* M_PI;
+//    }
+//
 
-
-    if (g_elapsed_accumulator > 1800 * M_PI)
-    {
-      g_elapsed_accumulator -= 1800* M_PI;
-    }
-
-    g_wAcc+= 0.1;
-    if(g_wAcc > 512) {
-      g_wAcc -= 512;
-    }
-
-    if(g_waterAllocated) {
+    if(g_waterAllocated && g_waterOnscreen) {
+      g_wAcc+= 0.1;
+      if(g_wAcc > 512) {
+        g_wAcc -= 512;
+      }
       g_waterTexture = animateWater(renderer, g_waterTexture, g_waterSurface, g_wAcc);
     }
+    g_waterOnscreen = 0;
+    B("Animate water");
 
-    g_protagIsBeingDetectedBySmell = 0; //this will be set in the entity update loop
-    //g_protagIsBeingDetectedBySight = 0;
 
     if(g_dungeonDoorActivated == 0) {
       g_dungeonDarkEffectDelta = -16;
@@ -2333,6 +2260,7 @@ void ExplorationLoop() {
       g_lastGrassX = grassX;
       g_lastGrassY = grassY;
     }
+    B("Tall grass update");
 
 
     // ENTITY MOVEMENT (ENTITY UPDATE)
@@ -2427,6 +2355,7 @@ void ExplorationLoop() {
 
       }
     }
+    B("Entity update");
 
 
     //dungeon door flash
@@ -2583,6 +2512,7 @@ void ExplorationLoop() {
   
       }
     }
+    B("familiars");
 
     g_spurl_entity->setOriginX(protag->getOriginX());
     g_spurl_entity->setOriginY(protag->getOriginY());
@@ -2613,56 +2543,41 @@ void ExplorationLoop() {
       }
     }
 
-    string systemTimePrint = "";
-    if(g_dungeonSystemOn) {
-      //timer display
-      int ms = g_dungeonMs;
-      int sec = (ms / 1000) % 60;
-      int min = ms / 60000;
-      string secstr = to_string(sec);
-      if(secstr.size() < 2) {secstr = "0" + secstr;}
-      string minstr = to_string(min);
-      if(minstr.size() < 2) {minstr = "0" + minstr;}
-      
-      systemTimePrint = minstr + ":" + secstr;
-    } else {
-      //system clock display
-      time_t ttime = time(0);
-      tm *local_time = localtime(&ttime);
-      
-      int useHour = local_time->tm_hour;
-      if(useHour == 0) {useHour = 12;}
-      string useMinString = to_string(local_time->tm_min);
-      if(useMinString.size() == 1) { 
-        useMinString = "0" + useMinString;
-      }
-      string useHourString = to_string(useHour%12);
-      if(useHourString == "0") {useHourString = "12";}
-      systemTimePrint+= useHourString + ":" + useMinString;
-      
-      if(local_time->tm_hour >=12){
-        systemTimePrint += " PM";
-      } else {
-        systemTimePrint += " AM";
-      }
-    }
+//    string systemTimePrint = "";
+//    if(g_dungeonSystemOn) {
+//      //timer display
+//      int ms = g_dungeonMs;
+//      int sec = (ms / 1000) % 60;
+//      int min = ms / 60000;
+//      string secstr = to_string(sec);
+//      if(secstr.size() < 2) {secstr = "0" + secstr;}
+//      string minstr = to_string(min);
+//      if(minstr.size() < 2) {minstr = "0" + minstr;}
+//      
+//      systemTimePrint = minstr + ":" + secstr;
+//    } else {
+//      //system clock display
+//      time_t ttime = time(0);
+//      tm *local_time = localtime(&ttime);
+//      
+//      int useHour = local_time->tm_hour;
+//      if(useHour == 0) {useHour = 12;}
+//      string useMinString = to_string(local_time->tm_min);
+//      if(useMinString.size() == 1) { 
+//        useMinString = "0" + useMinString;
+//      }
+//      string useHourString = to_string(useHour%12);
+//      if(useHourString == "0") {useHourString = "12";}
+//      systemTimePrint+= useHourString + ":" + useMinString;
+//      
+//      if(local_time->tm_hour >=12){
+//        systemTimePrint += " PM";
+//      } else {
+//        systemTimePrint += " AM";
+//      }
+//    }
 
     //adventureUIManager->systemClock->updateText(systemTimePrint, -1, 1);
-
-    // did the protag die?
-    if (protag->hp <= 0 && protag->essential)
-    {
-      //playSound(-1, g_deathsound, 0);
-
-      if (!canSwitchOffDevMode)
-      {
-        clear_map(g_camera);
-        SDL_Delay(5000);
-        load_map(renderer, "resources/maps/sp-death/sp-death.map", "a");
-      }
-      protag->hp = 0.1;
-      // if(canSwitchOffDevMode) { init_map_writing(renderer);}
-    }
 
     // update projectiles
     for (auto n : g_projectiles)
@@ -2710,6 +2625,7 @@ void ExplorationLoop() {
         g_triggers[i]->active = 0;
       }
     }
+    B("Triggers update");
 
     //hitboxes
     for(auto a : g_hitboxes) {
@@ -2768,6 +2684,7 @@ void ExplorationLoop() {
         g_grossupShowMs -= elapsed;
       }
     }
+    B("Sounds & grossup");
 
     // transition
     {
@@ -2804,6 +2721,8 @@ void ExplorationLoop() {
 
         ticks = SDL_GetTicks();
         elapsed = ticks - lastticks;
+//        D(elapsed);
+//        M("What did I break?");
 
         SDL_UnlockTexture(transitionTexture);
         SDL_RenderCopy(renderer, transitionTexture, NULL, NULL);
@@ -2931,6 +2850,7 @@ void ExplorationLoop() {
         }
       }
     }
+    B("Music update");
 
     // wakeup manager if it is sleeping
     if (adventureUIManager->sleepflag)
@@ -2953,6 +2873,7 @@ void ExplorationLoop() {
     }
 
     SDL_RenderPresent(renderer);
+    B("End of frame");
 }
 
 
@@ -3472,6 +3393,8 @@ int WinMain()
   g_gradient_f = loadTexture(renderer, "resources/engine/fade-f.qoi");
   g_gradient_g = loadTexture(renderer, "resources/engine/fade-g.qoi");
   g_gradient_h = loadTexture(renderer, "resources/engine/fade-h.qoi");
+  g_gradient_i = loadTexture(renderer, "resources/engine/fade-i.qoi");
+  g_gradient_j = loadTexture(renderer, "resources/engine/fade-j.qoi");
 
   SDL_FreeSurface(SurfaceA);
 
@@ -3768,6 +3691,12 @@ int WinMain()
             }
             break;
           }
+
+        case SDL_MOUSEBUTTONUP:
+          if(event.button.button == SDL_BUTTON_RIGHT) {
+            g_holddelete = 0;
+          }
+          break;
         case SDL_MOUSEBUTTONDOWN:
           if (event.button.button == SDL_BUTTON_LEFT)
           {
@@ -3779,6 +3708,7 @@ int WinMain()
           }
           if (event.button.button == SDL_BUTTON_RIGHT)
           {
+            g_holddelete = 1;
             devinput[4] = 1;
           }
           break;
@@ -3790,10 +3720,12 @@ int WinMain()
     }
 
     ticks = SDL_GetTicks();
+    g_globalAccumulator += ticks;
     elapsed = ticks - lastticks;
     lastticks = ticks;
+    B("On Tick");
+    D(elapsed);
 
-    //D(elapsed);
 
     // lock time
     elapsed = 16.6666666667;
@@ -4048,12 +3980,6 @@ int interact(float elapsed, entity *protag)
       }
 
       srect = transformRect(srect);
-      // if(drawhitboxes) {
-      // 	SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
-      // 	SDL_RenderFillRect(renderer, &srect);
-      // 	SDL_RenderPresent(renderer);
-      // 	SDL_Delay(500);
-      // }
       break;
     case 4:
       srect.h = protag->bounds.height;
@@ -4065,12 +3991,6 @@ int interact(float elapsed, entity *protag)
       srect.y += 55;
 
       srect = transformRect(srect);
-      // if(drawhitboxes) {
-      // 	SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
-      // 	SDL_RenderFillRect(renderer, &srect);
-      // 	SDL_RenderPresent(renderer);
-      // 	SDL_Delay(500);
-      // }
       break;
   }
 
@@ -5528,8 +5448,8 @@ void getExplorationInput(float &elapsed)
   {
     //make a dungeondoor
     //devinput[9] = 1;
-    
-    boxsenabled = !boxsenabled;
+    devinput[41] = 1;
+    //boxsenabled = !boxsenabled;
   }
   if (keystate[SDL_SCANCODE_KP_5] && devMode)
   {

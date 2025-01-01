@@ -146,6 +146,8 @@ SDL_Texture* g_gradient_e = 0;
 SDL_Texture* g_gradient_f = 0;
 SDL_Texture* g_gradient_g = 0;
 SDL_Texture* g_gradient_h = 0;
+SDL_Texture* g_gradient_i = 0;
+SDL_Texture* g_gradient_j = 0;
 
 map<string, int> enemiesMap; // stores (file,cost) for enemies to be spawned procedurally in the map
 int g_budget = 0;						 // how many points this map can spend on enemies;
@@ -284,6 +286,55 @@ std::vector<std::vector<int>>g_fog_window = {
   {0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0},
   {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
   {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+};
+
+std::vector<std::vector<int>>g_fog_relevent = {
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0},
+  {0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0},
+  {0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+};
+
+
+std::vector<std::vector<int>>g_fog_relevent_b = {
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0},
+  {0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0},
+  {0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0},
   {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
   {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
   {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
@@ -497,11 +548,12 @@ camera::camera(float fx, float fy)
 }
 
 void camera::update_movement(float elapsed, float targetx, float targety) {
-  desiredX = targetx;
-  desiredY = targety;
     if (!isfinite(targetx) || !isfinite(targety)) {
         return;
     }
+
+    desiredX = targetx;
+    desiredY = targety;
 
     if (lag == 0) {
         x = targetx;
@@ -522,6 +574,7 @@ void camera::update_movement(float elapsed, float targetx, float targety) {
     }
 
     if (devMode == 0) {
+      g_camera.free = 1;
 
         // Check for collisions with camBlockers and adjust camera position
         for (const auto& blocker : g_camBlockers) {
@@ -531,53 +584,114 @@ void camera::update_movement(float elapsed, float targetx, float targety) {
             if(intersectsX && intersectsY) {
               cameraIsFree = 0;
             }
-
-            if (intersectsX && intersectsY) {
-                // Determine the axis to adjust based on proximity
-                float xOverlap = std::min((float)(blocker->bounds.x + blocker->bounds.width - x), x + width - blocker->bounds.x);
-                float yOverlap = std::min((float)(blocker->bounds.y + blocker->bounds.height - y), y + height - blocker->bounds.y);
-
-                if (!blocker->xAdjusted && !blocker->yAdjusted) {
-                    if (xOverlap < yOverlap) {
-                        // Adjust X axis
-                        if (x < blocker->bounds.x) {
-                            x = blocker->bounds.x - width;
-                        } else {
-                            x = blocker->bounds.x + blocker->bounds.width;
-                        }
-                        blocker->xAdjusted = true;
-                    } else {
-                        // Adjust Y axis
-                        if (y < blocker->bounds.y) {
-                            y = blocker->bounds.y - height;
-                        } else {
-                            y = blocker->bounds.y + blocker->bounds.height;
-                        }
-                        blocker->yAdjusted = true;
-                    }
-                } else if (!blocker->yAdjusted) {
-                    // Adjust X axis
-                    if (x < blocker->bounds.x) {
-                        x = blocker->bounds.x - width;
-                    } else {
-                        x = blocker->bounds.x + blocker->bounds.width;
-                    }
-                    blocker->xAdjusted = true;
-                } else if (!blocker->xAdjusted) {
-                    // Adjust Y axis
-                    if (y < blocker->bounds.y) {
-                        y = blocker->bounds.y - height;
-                    } else {
-                        y = blocker->bounds.y + blocker->bounds.height;
-                    }
-                    blocker->yAdjusted = true;
-                }
+            if(!cameraIsFree) {
+              g_camera.free = 0;
             }
 
-          if(cameraIsFree) {
-            blocker->xAdjusted = false;
-            blocker->yAdjusted = false;
+            if (intersectsX && intersectsY) {
+              if (blocker->direction == 0 || blocker->direction == 2) {
+                  // Adjust X axis
+                  if (blocker->direction == 2) {
+                      x = blocker->bounds.x - width;
+                  } else {
+                      x = blocker->bounds.x + blocker->bounds.width;
+                  }
+              } else {
+                  // Adjust Y axis
+                  if (blocker->direction == 3) {
+                      y = blocker->bounds.y - height;
+                  } else {
+                      y = blocker->bounds.y + blocker->bounds.height;
+                  }
+              }
+            }
+        }
+        if(g_camera.free) {
+
+          repoAccu += elapsed;
+          if(repoAccu > 200) {
+            repoMag++;
+            repoAccu = 0;
           }
+          int total = 0;
+          if(repoX != -1) {total+= abs(repoX - x);}
+          if(repoY != -1) {total+= abs(repoY - y);}
+          if(total > 600) {
+            repoX = -1;
+            repoY = -1;
+          }
+          //lerp from repoX, repoY to x, y
+          if(repoX != -1) {
+            if(abs(repoX - x) > repoMag) {
+              if(x > repoX) {
+                repoX += repoMag;
+              } else {
+                repoX -= repoMag;
+              }
+              x = repoX;
+            } else {
+              repoX = -1;
+            }
+          }
+
+          if(repoY != -1) {
+            if(abs(repoY - y) > repoMag) {
+              if(y > repoY) {
+                repoY += repoMag;
+              } else if(y < repoY) {
+                repoY -= repoMag;
+              }
+              y = repoY;
+            } else {
+              repoY = -1;
+            }
+          }
+          natX = x;
+          natY = y;
+          natMag = 5;
+          natAccu = 0;
+        } else {
+          natAccu += elapsed;
+          if(natAccu > 200) {
+            natMag++;
+            natAccu = 0;
+          }
+          int total = 0;
+          if(natX != -1) {total+= abs(natX - x);}
+          if(natY != -1) {total+= abs(natY - y);}
+          if(total > 600) {
+            natX = -1;
+            natY = -1;
+          }
+          if(natX != -1) {
+            if(abs(natX - x) > natMag) {
+              if(x > natX) {
+                natX += natMag;
+              } else {
+                natX -= natMag;
+              }
+              x = natX;
+            } else {
+              natX = -1;
+            }
+          }
+    
+          if(natY != -1) {
+            if(abs(natY - y) > natMag) {
+              if(y > natY) {
+                natY += natMag;
+              } else if(y < natY) {
+                natY -= natMag;
+              }
+              y = natY;
+            } else {
+              natY = -1;
+            }
+          }
+          repoX = x;
+          repoY = y;
+          repoMag = 5;
+          repoAccu = 0;
         }
 
 
@@ -914,7 +1028,10 @@ tile *doorIcon;
 tile *ddoorIcon;
 tile *triggerIcon;
 SDL_Texture* grassTexture;
-SDL_Texture* cameraBlockerTexture;
+SDL_Texture* cameraBlockerTextureA;
+SDL_Texture* cameraBlockerTextureB;
+SDL_Texture* cameraBlockerTextureC;
+SDL_Texture* cameraBlockerTextureD;
 textbox *nodeInfoText;
 string entstring = ""; // last entity spawned;
 
@@ -948,6 +1065,7 @@ bool g_hide_protag = 0;
 SDL_Texture* g_waterTexture = 0;
 SDL_Surface* g_waterSurface = 0;
 bool g_waterAllocated = 0;
+bool g_waterOnscreen = 0;
 Uint32* g_wPixels = 0;
 const int g_wNumPixels = 512 * 440;
 SDL_Surface* g_wDistort = 0;
@@ -998,6 +1116,14 @@ vector<pair<int, Mix_Chunk*>> g_loadPlaySounds;
 
 //for preventing the player from begining dialog after closing a menu
 int g_menuTalkReset = 0;
+
+float g_entlineDistance = 64;
+
+int g_holddelete = 0;
+
+int g_globalAccumulator = 0;
+int g_tempAccumulator = 0;
+bool g_benchmarking = 0;
 
 gamemode g_gamemode = gamemode::TITLE; //exploration, combat, gameover
 

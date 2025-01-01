@@ -2227,6 +2227,7 @@ public:
 
 class camBlocker {
 public:
+  int direction = 0;
   bool xAdjusted = 0;
   bool yAdjusted = 0;
   rect bounds;

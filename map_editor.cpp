@@ -154,12 +154,13 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
     }
 
     if (word == "camblocker") {
-      iss >> s0 >> p0 >> p1 >> p2 >> p3;
+      iss >> s0 >> p0 >> p1 >> p2 >> p3 >> p4;
       camBlocker* a = new camBlocker();
       a->bounds.x = p0;
       a->bounds.y = p1;
       a->bounds.width = p2;
       a->bounds.height = p3;
+      a->direction = p4;
     }
 
     if(word == "gradient") {
@@ -179,6 +180,8 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
       else if(p4 == 5) { a->texture = g_gradient_f;}
       else if(p4 == 6) { a->texture = g_gradient_g;}
       else if(p4 == 7) { a->texture = g_gradient_h;}
+      else if(p4 == 8) { a->texture = g_gradient_i;}
+      else if(p4 == 9) { a->texture = g_gradient_j;}
 
     }
 
@@ -1863,7 +1866,9 @@ bool mapeditor_save_map(string word)
     ofile << "camblocker " << g_camBlockers[i]->bounds.x << " " 
                       << g_camBlockers[i]->bounds.y << " "
                       << g_camBlockers[i]->bounds.width << " "
-                      << g_camBlockers[i]->bounds.height << " " << endl;
+                      << g_camBlockers[i]->bounds.height << " "
+                      << g_camBlockers[i]->direction << " "
+                      << endl;
 
   }
 
@@ -1876,7 +1881,9 @@ bool mapeditor_save_map(string word)
     else if(x->texture == g_gradient_e) { texture = 4;}
     else if(x->texture == g_gradient_f) { texture = 5;}
     else if(x->texture == g_gradient_g) { texture = 6;}
-    else { texture = 7;}
+    else if(x->texture == g_gradient_h) { texture = 7;}
+    else if(x->texture == g_gradient_i) { texture = 8;}
+    else { texture = 9;}
 
 
     ofile << "gradient " << x->x << " " << x->y << " " << x->width << " " << x->height << " " << texture << endl;
@@ -1933,7 +1940,10 @@ void init_map_writing(SDL_Renderer *renderer)
 
   grassTexture = loadTexture(renderer, "resources/engine/grass-select.qoi");
 
-  cameraBlockerTexture = loadTexture(renderer, "resources/engine/camera-blocker.qoi");
+  cameraBlockerTextureA = loadTexture(renderer, "resources/engine/camera-blocker-a.qoi");
+  cameraBlockerTextureB = loadTexture(renderer, "resources/engine/camera-blocker-b.qoi");
+  cameraBlockerTextureC = loadTexture(renderer, "resources/engine/camera-blocker-c.qoi");
+  cameraBlockerTextureD = loadTexture(renderer, "resources/engine/camera-blocker-d.qoi");
 
   //i thought i was leaking data but its okay since all tiles are deleted in clear_map();
 
@@ -2167,7 +2177,28 @@ void write_map(entity *mapent)
     drect.w = x->bounds.width;
     drect.h = x->bounds.height;
     drect = transformRect(drect);
-    SDL_RenderCopyF(renderer, cameraBlockerTexture, NULL, &drect);
+    switch(x->direction) {
+      case 0:
+        {
+          SDL_RenderCopyF(renderer, cameraBlockerTextureA, NULL, &drect);
+          break;
+        }
+      case 1:
+        {
+          SDL_RenderCopyF(renderer, cameraBlockerTextureB, NULL, &drect);
+          break;
+        }
+      case 2:
+        {
+          SDL_RenderCopyF(renderer, cameraBlockerTextureC, NULL, &drect);
+          break;
+        }
+      default:
+        {
+          SDL_RenderCopyF(renderer, cameraBlockerTextureD, NULL, &drect);
+          break;
+        }
+    }
   }
   
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -2629,7 +2660,7 @@ void write_map(entity *mapent)
     new navNode(marker->x + 0.5 * marker->width, marker->y + 0.5 * marker->height, wallstart);
   }
 
-  if (devinput[4] && !olddevinput[4])
+  if (g_holddelete)
   { //search terms: delete button, delete functionality, manual delete
     if (nudge != 0)
     {
@@ -4551,10 +4582,27 @@ void write_map(entity *mapent)
         }
         break;
       }
+      if(word == "randomspin") {
+        line >> word;
+        for(auto x : g_entities) {
+          if(x->name == word) {
+            x->steeringAngle = frng(0, 2*M_PI);
+            x->animation = convertAngleToFrame(x->steeringAngle);
+          }
+        }
+      }
       if (word == "set" || word == "s")
       {
         line >> word;
         D(word);
+
+        if(word == "entline") {
+          line >> word;
+          float val = stof(word);
+          if(val > 0) { 
+            g_entlineDistance = val;
+          }
+        }
         if(word == "collisionresolver" || word == "cr") {
           line >> word;
           int val = stoi(word);
@@ -6065,14 +6113,39 @@ void write_map(entity *mapent)
   }
 
   if(devinput[39] && !olddevinput[39] && makingbox == 0) {
-    //make camblocker
-    lx = px;
-    ly = py;
-    makingbox = 1;
-    selection->texture = loadTexture(renderer, "resources/engine/camera-blocker.qoi");
+
+    //are we hovering over any existing camblockers?
+    //if so, cycle their textures
+    int cycleTexture = 0;
+    for(auto x : g_camBlockers) {
+      rect a = {marker->x, marker->y, 32, 32};
+      rect b = {x->bounds.x, x->bounds.y, x->bounds.width, x->bounds.height};
+      if(RectOverlap(a,b)) {
+          cycleTexture = 1;
+          if(x->direction == 0) {
+            x->direction = 1;
+          } else if(x->direction == 1) {
+            x->direction = 2;
+          } else if(x->direction == 2) {
+            x->direction = 3;
+          } else if(x->direction == 3) {
+            x->direction = 0;
+          }
+          break;
+      }
+    }
+
+    if(!cycleTexture) {
+      //make camblocker
+      lx = px;
+      ly = py;
+      makingbox = 1;
+      selection->texture = loadTexture(renderer, "resources/engine/camera-blocker.qoi");
+    }
   } else if(devinput[39] && !olddevinput[39] && makingbox == 1){
     makingbox = 0;
     camBlocker* a = new camBlocker();
+    a->direction = 0;
     a->bounds.x = selection->x;
     a->bounds.y = selection->y;
     a->bounds.width = selection->width;
@@ -6104,6 +6177,10 @@ void write_map(entity *mapent)
           } else if(x->texture == g_gradient_g) {
             x->texture = g_gradient_h;
           } else if(x->texture == g_gradient_h) {
+            x->texture = g_gradient_i;
+          } else if(x->texture == g_gradient_i) {
+            x->texture = g_gradient_j;
+          } else if(x->texture == g_gradient_j) {
             x->texture = g_gradient_a;
           }
           break;
@@ -6128,8 +6205,32 @@ void write_map(entity *mapent)
     a->sortingOffset = 500;
     a->width = selection->width;
     a->height = selection->height;
-    D(a->width);
-    D(a->height);
+  }
+
+  //entline feature
+  if(devinput[41] && !olddevinput[41]) { 
+    if(makingbox) {
+      makingbox = 0;
+
+      for(float i = 32; i < selection->width; i+= g_entlineDistance) {
+        for(float j = 32; j < selection->height; j+= g_entlineDistance) {
+          const char* plik = entstring.c_str();
+          entity* e = new entity(renderer, plik);
+          e->setOriginX(selection->x + i);
+          e->setOriginY(selection->y + j);
+          e->z = wallstart;
+          e->shadow->x = e->x + e->shadow->xoffset;
+          e->shadow->y = e->y + e->shadow->yoffset;
+        }
+      }
+
+
+    } else {
+      lx = px;
+      ly = py;
+      makingbox = 1;
+      selection->texture = loadTexture(renderer, "resources/engine/entline.qoi");
+    }
   }
 
   // change wall, cap, and floor textures

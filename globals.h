@@ -150,6 +150,15 @@ class camera
     int y = 200;
     int desiredX = 0;
     int desiredY = 0;
+    int repoX = -1;
+    int repoY = -1;
+    int repoMag = 5;
+    int repoAccu = 0;
+    int natX = -1;
+    int natY = -1;
+    int natMag = 5;
+    int natAccu = 0;
+    int free = 0;
     float width = 640;
     float height = 480;
     float lag = 0;
@@ -294,6 +303,8 @@ extern SDL_Texture* g_gradient_e;
 extern SDL_Texture* g_gradient_f;
 extern SDL_Texture* g_gradient_g;
 extern SDL_Texture* g_gradient_h;
+extern SDL_Texture* g_gradient_i;
+extern SDL_Texture* g_gradient_j;
 
 struct cmpCoord
 {
@@ -322,6 +333,20 @@ struct cmpCoord
 #define E(a)                                \
 {                                         \
   std::cout << "ERROR: " << (a) << endl; \
+}
+
+extern int g_globalAccumulator;
+extern int g_tempAccumulator;
+extern bool g_benchmarking;
+
+#define B(a) \
+{ \
+  if(g_benchmarking){ \
+    int ticks = SDL_GetTicks(); \
+    int diff = ticks - g_tempAccumulator; \
+    std::cout << "Benchmark: " << (a) << " " << diff <<  endl; \
+    g_tempAccumulator = ticks; \
+  } \
 }
 
 
@@ -434,6 +459,8 @@ extern float g_viewdist;
 //instead of calculating distance every frame, lookup which boxes should be open in a table
 
 extern std::vector<std::vector<int>>g_fog_window;
+extern std::vector<std::vector<int>>g_fog_relevent;
+extern std::vector<std::vector<int>>g_fog_relevent_b;
 
 extern bool g_fogIgnoresLOS;
 extern int g_tile_fade_speed;
@@ -878,7 +905,10 @@ extern tile *doorIcon;
 extern tile *ddoorIcon;
 extern tile *triggerIcon;
 extern SDL_Texture* grassTexture;
-extern SDL_Texture* cameraBlockerTexture;
+extern SDL_Texture* cameraBlockerTextureA;
+extern SDL_Texture* cameraBlockerTextureB;
+extern SDL_Texture* cameraBlockerTextureC;
+extern SDL_Texture* cameraBlockerTextureD;
 extern textbox *nodeInfoText;
 extern string entstring;
 
@@ -912,6 +942,7 @@ extern bool g_hide_protag;
 extern SDL_Texture* g_waterTexture;
 extern SDL_Surface* g_waterSurface;
 extern bool g_waterAllocated;
+extern bool g_waterOnscreen;
 extern Uint32* g_wPixels;
 extern const int g_wNumPixels;
 extern SDL_Surface* g_wDistort;
@@ -954,6 +985,11 @@ extern int g_maxGrossupShowMs;
 extern vector<pair<int, Mix_Chunk*>> g_loadPlaySounds;
 
 extern int g_menuTalkReset;
+
+extern float g_entlineDistance;
+
+extern int g_holddelete;
+
 
 enum gamemode {
   EXPLORATION,

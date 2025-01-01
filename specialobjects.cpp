@@ -290,6 +290,7 @@ void specialObjectsInit(entity* a) {
     case 24:
     {
       //fireball
+      M("spawned fireball");
       a->msPerFrame = 70;
       a->loopAnimation = 1;
       a->scriptedAnimation = 1;
