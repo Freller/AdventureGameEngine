@@ -389,6 +389,7 @@ class tile {
     float dyoffset = 0;
     int texwidth = 0;
     int texheight = 0;
+    bool specular = 0;
 
     bool wraptexture = 1; //should we tile the image or stretch it?
     bool wall = 0; //darken image if it is used for a wall as opposed to a floor
@@ -1045,7 +1046,7 @@ class adventureUI {
     ui* b3_element = 0;
 
     //this element is shown when the player is within hearing range to a behemoth
-    ui* hearingDetectable = 0;
+    //ui* hearingDetectable = 0;
     
     //shown when a behemoth is finding the player by sight
     ui* seeingDetectable = 0;

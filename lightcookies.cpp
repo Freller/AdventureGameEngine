@@ -1,13 +1,14 @@
 #include <SDL2/SDL_image.h>
 #include <iostream>
 #include <vector>
+#include <array>
 
 #include "lightcookies.h"
 #include "globals.h"
 
 using namespace std;
 
-SDL_Texture *addTextures(SDL_Renderer *renderer, vector<vector<int>> fogcookies, SDL_Texture *&illuminateMe, SDL_Texture *&lightspot, int widthOfIlluminateMe, int heightOfIlluminateMe, int paddingx, int paddingy, int layer)
+SDL_Texture *addTextures(SDL_Renderer *renderer, array<array<int, g_fogheight>, g_fogwidth> fogcookies, SDL_Texture *&illuminateMe, SDL_Texture *&lightspot, int widthOfIlluminateMe, int heightOfIlluminateMe, int paddingx, int paddingy, int layer)
 {
 	SDL_SetRenderTarget(renderer, illuminateMe);
 	SDL_RenderClear(renderer);

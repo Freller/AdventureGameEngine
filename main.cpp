@@ -593,11 +593,11 @@ void ExplorationLoop() {
             auto fccopy = g_fc;
             auto sccopy = g_sc;
 
-            for (long long unsigned i = 5; i < 15; i++)
+            for (long long unsigned i = 5; i < 16; i++)
             {
               for (long long unsigned j = 4; j < 16; j++)
               {
-                if(g_fog_relevent_b[i][j] == 1) { //this one must be g_fog_relevent_b
+                if(g_fog_relevent[i][j] == 1) {
                   // check if there was an "old" cookie
                   if ((i + xtileshift >= 0 && i + xtileshift < g_fogcookies.size()) && (j + ytileshift >= 0 && j + ytileshift < g_fogheight) && i >= 0 && i < g_fogwidth && j >= 0 && j < g_fogheight)
                   {
@@ -703,11 +703,11 @@ void ExplorationLoop() {
       // save cookies that are just dark because they are inside of walls to g_savedcookies
       // AND if they tile infront is at 255
 
-      for (long long unsigned i = 5; i < 15; i++)
+      for (long long unsigned i = 0; i < g_fogwidth; i++)
       {
-        for (long long unsigned j = 4; j < 15; j++)
+        for (long long unsigned j = 0; j < g_fogheight; j++)
         {
-          if(g_fog_relevent[i][j]) {
+          if(g_fog_relevent_c[i][j]) {
             int xpos = ((i - 10) * 64) + functionalX;
             int ypos = ((j - 9) * 55) + functionalY;
             // is this cookie in a wall? or behind a wall
@@ -1211,7 +1211,6 @@ void ExplorationLoop() {
     adventureUIManager->seeingDetectable->show = 0;
     if(g_protagIsBeingDetectedBySight) {
       adventureUIManager->seeingDetectable->show = 1;
-      adventureUIManager->hearingDetectable->show = 0;
     }
 
     // tiles
@@ -1359,6 +1358,7 @@ void ExplorationLoop() {
     if (devMode)
     {
       nodeInfoText->textcolor = {0, 0, 0};
+      nodeInfoText->show = 1;
 
       // draw nodes
       for (long long unsigned int i = 0; i < g_worldsounds.size(); i++)
@@ -1429,13 +1429,21 @@ void ExplorationLoop() {
         SDL_RenderCopy(renderer, waypointIcon->texture, NULL, &obj);
         SDL_Rect textrect = {(int)obj.x, (int)(obj.y + 20), (int)(obj.w - 15), (int)(obj.h - 15)};
 
-        SDL_Surface *textsurface = TTF_RenderText_Blended_Wrapped(nodeInfoText->font, g_waypoints[i]->name.c_str(), {15, 15, 15}, 1 * WIN_WIDTH);
-        SDL_Texture *texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
+        nodeInfoText->boxX = (float)obj.x / (float)WIN_WIDTH * g_zoom_mod;
+        nodeInfoText->boxY = (float)obj.y / (float) WIN_HEIGHT* g_zoom_mod;
+        nodeInfoText->boxX -= 0.02;
+        nodeInfoText->boxY -= 0.03;
+        nodeInfoText->updateText(g_waypoints[i]->name, -1, 15);
+        nodeInfoText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
 
-        SDL_RenderCopy(renderer, texttexture, NULL, &textrect);
+        //SDL_Surface *textsurface = TTF_RenderText_Blended_Wrapped(nodeInfoText->font, g_waypoints[i]->name.c_str(), {15, 15, 15}, 1 * WIN_WIDTH);
+        //SDL_Texture *texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
+        //nodeInfoText->updateText(g_waypoints[i]->name
 
-        SDL_FreeSurface(textsurface);
-        SDL_DestroyTexture(texttexture);
+        //SDL_RenderCopy(renderer, texttexture, NULL, &textrect);
+
+        //SDL_FreeSurface(textsurface);
+        //SDL_DestroyTexture(texttexture);
       }
 
       for (auto x : g_setsOfInterest)
@@ -1460,13 +1468,13 @@ void ExplorationLoop() {
       // doors
       for (long long unsigned int i = 0; i < g_doors.size(); i++)
       {
-        SDL_Rect obj = {(int)((g_doors[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_doors[i]->y - g_camera.y - (g_doors[i]->zeight) * XtoZ) * g_camera.zoom)), (int)((g_doors[i]->width * g_camera.zoom)), (int)((g_doors[i]->height * g_camera.zoom))};
+        SDL_Rect obj = {(int)((g_doors[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_doors[i]->y - g_camera.y ) * g_camera.zoom)), (int)((g_doors[i]->width * g_camera.zoom)), (int)((g_doors[i]->height * g_camera.zoom))};
         SDL_RenderCopy(renderer, doorIcon->texture, NULL, &obj);
         // the wall
         SDL_Rect obj2 = {(int)((g_doors[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_doors[i]->y - g_camera.y - (g_doors[i]->zeight) * XtoZ) * g_camera.zoom)), (int)((g_doors[i]->width * g_camera.zoom)), (int)(((g_doors[i]->zeight - g_doors[i]->z) * XtoZ * g_camera.zoom) + (g_doors[i]->height * g_camera.zoom))};
-        SDL_RenderCopy(renderer, doorIcon->texture, NULL, &obj2);
-        nodeInfoText->x = obj.x + 25;
-        nodeInfoText->y = obj.y + 25;
+        //SDL_RenderCopy(renderer, doorIcon->texture, NULL, &obj2);
+        nodeInfoText->boxX = (float)obj.x / (float)WIN_WIDTH * g_zoom_mod;
+        nodeInfoText->boxY = (float)obj.y / (float) WIN_HEIGHT* g_zoom_mod;
         nodeInfoText->updateText(g_doors[i]->to_map + "->" + g_doors[i]->to_point, -1, 15);
         nodeInfoText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
       }
@@ -1511,6 +1519,7 @@ void ExplorationLoop() {
       {
         devinput[i] = 0;
       }
+      nodeInfoText->show = 0;
     }
     B("After mapedit");
 
@@ -2981,7 +2990,9 @@ int WinMain()
   {
     //init_map_writing(renderer);
     // done once, because textboxes aren't cleared during clear_map()
-    nodeInfoText = new textbox(renderer, "",  g_fontsize, 0, 0, WIN_WIDTH);
+    nodeInfoText = new textbox(renderer, "floof", 1000* g_fontsize, 50, 50, WIN_WIDTH);
+    nodeInfoText->dropshadow = 1;
+    nodeInfoText->align = 0;
     g_config = "dev";
     nodeDebug = loadTexture(renderer, "resources/engine/walkerYellow.qoi");
   }
@@ -3724,7 +3735,7 @@ int WinMain()
     elapsed = ticks - lastticks;
     lastticks = ticks;
     B("On Tick");
-    D(elapsed);
+    //D(elapsed);
 
 
     // lock time

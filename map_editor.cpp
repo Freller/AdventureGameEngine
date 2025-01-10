@@ -5608,7 +5608,19 @@ void write_map(entity *mapent)
       { // consider renaming this "link" or something other than "door" because it doesnt make doors
         string mapdest, waydest;
         line >> mapdest >> waydest;
-        if (g_doors.size() > 0)
+        
+        //look for the door under the cursor
+        int founddoor = 0;
+        for(auto x : g_doors) {
+          if(RectOverlap( rect(marker->x, marker->y, marker->width, marker->height), rect(x->x, x->y, x->width, x->height))) {
+            founddoor = 1;
+            x->to_map = mapdest;
+            x->to_point = waydest;
+
+          }
+        }
+
+        if (!founddoor && g_doors.size() > 0)
         {
           g_doors[g_doors.size() - 1]->to_map = mapdest;
           g_doors[g_doors.size() - 1]->to_point = waydest;

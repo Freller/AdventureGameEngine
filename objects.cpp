@@ -915,7 +915,11 @@ tile::tile(SDL_Renderer * renderer, const char* filename, const char* mask_filen
     }
 
     SDL_QueryTexture(texture, NULL, NULL, &texwidth, &texheight);
+    if(fileaddress.find("spec") != std::string::npos) {
+      specular = 1;
+    }
     if(g_waterAllocated == 0 && fileaddress.find("sp-water") != std::string::npos) {
+      specular = 1;
       g_waterAllocated = 1;
       g_waterSurface = loadSurface(filename); // the values of this data will not be modified
       g_waterTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, 512, 440);
@@ -1138,6 +1142,8 @@ void tile::render(SDL_Renderer * renderer, camera fcamera) {
 // render specular over water
 if (texture == g_waterTexture) {
   g_waterOnscreen = 1;
+}
+if(specular) {
   SDL_FRect dstrect = {0, 0, WIN_WIDTH, WIN_HEIGHT};
   SDL_Rect srcrect = {0, 0, 256, 220};
   // minimize the shine if it wouldn't be drawn over the
@@ -8248,6 +8254,59 @@ void clear_map(camera& cameraToReset) {
       }
 
       drawUI();
+
+      //render black bars
+      {
+        SDL_Rect blackrect;
+        
+        blackrect = {
+          g_camera.desiredX - g_camera.width,
+          g_camera.desiredY - g_camera.height,
+          g_camera.width,
+          g_camera.height*3
+        };
+  
+  
+        blackrect = transformRect(blackrect);
+  
+        SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+  
+        blackrect = {
+          g_camera.desiredX + g_camera.width,
+          g_camera.desiredY - g_camera.height,
+          g_camera.width,
+          g_camera.height*3
+        };
+  
+  
+        blackrect = transformRect(blackrect);
+  
+        SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+  
+        blackrect = {
+          g_camera.desiredX,
+          g_camera.desiredY - g_camera.height,
+          g_camera.width,
+          g_camera.height
+        };
+  
+        blackrect = transformRect(blackrect);
+  
+        SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+  
+        blackrect = {
+          g_camera.desiredX,
+          g_camera.desiredY + g_camera.height,
+          g_camera.width,
+          g_camera.height
+        };
+  
+        blackrect = transformRect(blackrect);
+  
+        SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+  
+  
+      }
     }
 
     D(g_dungeonDarkEffect);
@@ -9010,11 +9069,11 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     b3_element->frameheight = 128;
     b3_element->priority = -5; //crosshair goes ontop usable icons
     
-    hearingDetectable = new ui(renderer, "resources/static/ui/detection-hearing.qoi", 0.85, 0.05, 0.1, 1, -10);
-    hearingDetectable->persistent = 1;
-    hearingDetectable->heightFromWidthFactor = 1.3392;
-    hearingDetectable->show = 1;
-    hearingDetectable->priority = -3;
+//    hearingDetectable = new ui(renderer, "resources/static/ui/detection-hearing.qoi", 0.85, 0.05, 0.1, 1, -10);
+//    hearingDetectable->persistent = 1;
+//    hearingDetectable->heightFromWidthFactor = 1.3392;
+//    hearingDetectable->show = 1;
+//    hearingDetectable->priority = -3;
 
     seeingDetectable = new ui(renderer, "resources/static/ui/detection-seeing.qoi", 0.85, 0.075, 0.1, 1, -10);
     seeingDetectable->persistent = 1;

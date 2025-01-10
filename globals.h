@@ -449,18 +449,85 @@ extern SDL_Texture *TextureC;
 extern SDL_Texture *TextureD;
 extern SDL_Texture *blackbarTexture;
 
-extern int g_fogheight;
-extern int g_fogwidth;
+#define g_fogheight 19
+#define g_fogwidth 21
 extern int g_lastFunctionalX;
 extern int g_lastFunctionalY;
 extern int g_fogMiddleX;
 extern int g_fogMiddleY;
 extern float g_viewdist;
-//instead of calculating distance every frame, lookup which boxes should be open in a table
 
-extern std::vector<std::vector<int>>g_fog_window;
-extern std::vector<std::vector<int>>g_fog_relevent;
-extern std::vector<std::vector<int>>g_fog_relevent_b;
+inline constexpr std::array<std::array<int, g_fogheight>, g_fogwidth> g_fog_window = {{
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0},
+  {0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0},
+  {0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+}};
+
+inline constexpr std::array<std::array<bool, g_fogheight>, g_fogwidth> g_fog_relevent = {{
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0},
+  {0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0},
+  {0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+}};
+
+inline constexpr std::array<std::array<bool, g_fogheight>, g_fogwidth> g_fog_relevent_c = {{
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
+  {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0},
+  {0,0,0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0},
+  {0,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+}};
 
 extern bool g_fogIgnoresLOS;
 extern int g_tile_fade_speed;
@@ -471,9 +538,9 @@ extern bool g_force_cookies_update;
 extern std::vector<std::vector<int>> g_fogcookies;
 extern std::vector<std::vector<int>> g_savedcookies;
 
-extern std::vector<std::vector<int>> g_fc;
-extern std::vector<std::vector<int>> g_sc;
-extern std::vector<std::vector<int>> g_shc;
+extern std::array<std::array<int, g_fogheight>, g_fogwidth> g_fc;
+extern std::array<std::array<int, g_fogheight>, g_fogwidth> g_sc;
+extern std::array<std::array<int, g_fogheight>, g_fogwidth> g_shc;
 
 extern std::vector<entity *> g_fogslates;
 extern std::vector<entity *> g_fogslatesA;
@@ -502,7 +569,7 @@ extern int px;
 extern bool g_protagHasBeenDrawnThisFrame;
 extern bool g_protagIsBeingDetectedBySmell;
 extern bool g_protagIsBeingDetectedBySight;
-extern bool g_protagIsInHearingRange;
+//extern bool g_protagIsInHearingRange;
 
 extern float oldSummationXVel;
 extern float oldSummationYVel;
