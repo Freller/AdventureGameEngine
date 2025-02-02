@@ -39,7 +39,7 @@ bground::bground(SDL_Renderer* renderer, const char* configFilePath) {
             if (std::getline(iss, key, ':')) {
                 std::string value;
                 if (std::getline(iss, value)) {
-                    if(key == "scene") scene = std::stoi(value);
+                    if(key == "scene") scene = value;
                     else if (key == "texture") texture = std::stoi(value);
                     else if (key == "interleaved") interleaved = std::stoi(value);
                     else if (key == "horizontalIntensity") horizontalIntensity = std::stof(value);
@@ -1180,6 +1180,7 @@ void combatUI::calculateXP() {
 }
 
 combatUI::combatUI(SDL_Renderer* renderer) {
+  M("combatUI constructor");
   initTables();
 
   partyHealthBox = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0, 0.65, 1, 0.35, 0);
@@ -1681,6 +1682,7 @@ void drawCombatants() {
 }
 
 void CombatLoop() {
+  breakpoint();
 
   getCombatInput();
 
@@ -1688,7 +1690,7 @@ void CombatLoop() {
    
   updateWindowResolution();
 
-  if(combatUIManager->loadedBackground.scene == -1) {
+  if(combatUIManager->loadedBackground.scene[0] == '>') {
     drawBackground();
   } else {
     drawSimpleBackground();
@@ -1771,7 +1773,7 @@ void CombatLoop() {
         SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
         SDL_SetRenderTarget(renderer, frame);
 
-        if(combatUIManager->loadedBackground.scene == -1) {
+        if(combatUIManager->loadedBackground.scene[0] == '>') {
           drawBackground();
         } else {
           drawSimpleBackground();
@@ -1827,7 +1829,7 @@ void CombatLoop() {
           SDL_RenderClear(renderer);
           //render last frame
           //SDL_RenderCopy(renderer, frame, NULL, NULL);
-          if(combatUIManager->loadedBackground.scene == -1) {
+          if(combatUIManager->loadedBackground.scene[0] == '>') {
             drawBackground();
           } else {
             drawSimpleBackground();
@@ -1848,6 +1850,17 @@ void CombatLoop() {
         SDL_DestroyTexture(frame);
         SDL_GL_SetSwapInterval(1);
       }
+
+       if(g_combatWorldEnt != nullptr) {
+         for(auto x : g_combatWorldEnt->children) {
+           //x->tangible = 0;
+           x->opacity_delta = -3;
+           x->semisolid = 0;
+         }
+         //g_combatWorldEnt->tangible = 0;
+         g_combatWorldEnt->opacity_delta = -3;
+         g_combatWorldEnt->semisolid = 0;
+       }
 
        g_gamemode = gamemode::EXPLORATION;
        transition = 1;
@@ -1903,7 +1916,7 @@ void CombatLoop() {
         SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
         SDL_SetRenderTarget(renderer, frame);
 
-        if(combatUIManager->loadedBackground.scene == -1) {
+        if(combatUIManager->loadedBackground.scene[0] == '>') {
           drawBackground();
         } else {
           drawSimpleBackground();
@@ -1959,7 +1972,7 @@ void CombatLoop() {
           SDL_RenderClear(renderer);
           //render last frame
           //SDL_RenderCopy(renderer, frame, NULL, NULL);
-          if(combatUIManager->loadedBackground.scene == -1) {
+          if(combatUIManager->loadedBackground.scene[0] == '>') {
             drawBackground();
           } else {
             drawSimpleBackground();
@@ -2275,7 +2288,8 @@ void CombatLoop() {
 
       drawOptionsPanel();
 
-      combatUIManager->targetText->updateText("To " + g_enemyCombatants.at(combatUIManager->currentTarget)->name, -1, 34);
+      //combatUIManager->targetText->updateText("To " + g_enemyCombatants.at(combatUIManager->currentTarget)->name, -1, 34);
+      combatUIManager->targetText->updateText("L." + to_string(g_enemyCombatants.at(combatUIManager->currentTarget)->level) + " " + g_enemyCombatants.at(combatUIManager->currentTarget)->name, -1, 34);
 
       combatUIManager->targetPanel->render(renderer, g_camera, elapsed);
       combatUIManager->targetText->render(renderer, WIN_WIDTH, WIN_HEIGHT);

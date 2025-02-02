@@ -39,7 +39,7 @@ enum class turnAction {
 };
 
 struct bground {
-  int scene = 0;
+  string scene = "0";
   int texture = 1;
   bool interleaved = 0;
 

@@ -1018,6 +1018,7 @@ extern SDL_Texture* g_wSpec;
 
 extern vector<mapCollision*> g_lt_collisions;
 extern vector<mapCollision*> g_is_collisions;
+extern vector<entity*> g_l_entities;
 
 extern vector<dungeonFloorInfo> g_dungeon;
 extern int g_dungeonIndex;
@@ -1079,6 +1080,8 @@ extern int curCombatantIndex;
 extern int curLevelIndex;
 
 extern vector<int> g_combatInventory;
+
+extern entity* g_combatWorldEnt;
 
 extern int g_maxInventorySize;
 

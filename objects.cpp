@@ -3008,6 +3008,7 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
     entity* a = new entity(renderer, line);
     a->dontSave = 1;
     spawnlist.push_back(a);
+
     if(a->parentName == this->name) {
       a->parent = this;
     }
@@ -3087,6 +3088,15 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
   //walkMsPerSecond
   file >> comment;
   file >> walkAnimMsPerFrame;
+
+  if(animationconfig == 2) {
+    //make objects animate staticly
+    loopAnimation = 1;
+    scriptedAnimation = 1;
+    msPerFrame = walkAnimMsPerFrame;
+    animation = 0;
+    animationconfig = 0;
+  }
 
   //identity
   file >> comment;
@@ -3370,7 +3380,7 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
   }
 }
 
-//copy constructor
+//entity copy constructor
 //first intended for spawning in cannonballs
 entity::entity(SDL_Renderer* renderer, entity* a) {
   this->growFromFloor = a->growFromFloor;
@@ -3406,6 +3416,8 @@ entity::entity(SDL_Renderer* renderer, entity* a) {
   this->tangible = a->tangible;
   this->width = a->width;
   this->height = a->height;
+  this->curwidth = a->curwidth;
+  this->curheight = a->curheight;
   this->zeight = a->zeight;
   this->sortingOffset = a->sortingOffset;
   this->bounds = a->bounds;
@@ -3419,6 +3431,28 @@ entity::entity(SDL_Renderer* renderer, entity* a) {
   this->shadow->yoffset = a->shadow->yoffset;
   this->shadow->x = a->shadow->x;
   this->shadow->y = a->shadow->y;
+  this->shadow->texture = a->shadow->texture;
+  this->rectangularshadow = a->rectangularshadow;
+  this->parentName = a->parentName;
+  this->isOrbital = a->isOrbital;
+  this->orbitRange = a->orbitRange;
+  this->orbitalIgnoreZ = a->orbitalIgnoreZ;
+  this->solid = a->solid;
+  this->semisolid = a->semisolid;
+  if(this->solid) {
+    this->solidify();
+    this->canBeSolid = 1;
+  }
+  for(auto x : a->spawnlist) {
+    entity* b = new entity(renderer, x);
+    b->dontSave = 1;
+    this->spawnlist.push_back(b);
+    if(b->parentName == this->name) {
+      b->parent = this;
+      b->setOriginX(this->getOriginX());
+      b->setOriginY(this->getOriginY());
+    }
+  }
 
   
 
@@ -3742,16 +3776,16 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
   if(shrinking) {
     if(growFromFloor) {
       obj = rect(
-          (floor(x) -fcamera.x + (originalWidth-floor(curwidth))/2)* 1 ,
-          (floor(y) - ((floor(curheight) * (XtoY) + (originalHeight * (1-XtoY)))) - (floor(z) + floatheight) * XtoZ) - fcamera.y,
-          floor(curwidth),
-          floor(curheight)
+          ((x) -fcamera.x + (originalWidth-(curwidth))/2)* 1 ,
+          ((y) - (((curheight) * (XtoY) + (originalHeight * (1-XtoY)))) - ((z) + floatheight) * XtoZ) - fcamera.y,
+          (curwidth),
+          (curheight)
           );
     } else {
       obj = rect(
-          (floor(x) -fcamera.x + (originalWidth-floor(curwidth))/2)* 1 ,
+          ((x) -fcamera.x + (originalWidth-(curwidth))/2)* 1 ,
 
-          (floor(y) - ((floor(curheight) * (XtoY) + (originalHeight * (1-XtoY)))) 
+          ((y) - (((curheight) * (XtoY) + (originalHeight * (1-XtoY)))) 
 
            - ( 
                (originalHeight * (XtoY))
@@ -3759,26 +3793,26 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
                (curheight * XtoY)
              )*0.5
 
-           - (floor(z) + floatheight) * XtoZ) - fcamera.y,
+           - ((z) + floatheight) * XtoZ) - fcamera.y,
 
-          floor(curwidth),
-          floor(curheight)
+          (curwidth),
+          (curheight)
           );
     }
   } else {
 
     if(growFromFloor) {
       obj = rect(
-          (floor(x) -fcamera.x + (width-floor(curwidth))/2)* 1 ,
-          (floor(y) - ((floor(curheight) * (XtoY) + (height * (1-XtoY)))) - (floor(z) + floatheight) * XtoZ) - fcamera.y,
-          floor(curwidth),
-          floor(curheight)
+          ((x) -fcamera.x + (width-(curwidth))/2)* 1 ,
+          ((y) - (((curheight) * (XtoY) + (height * (1-XtoY)))) - ((z) + floatheight) * XtoZ) - fcamera.y,
+          (curwidth),
+          (curheight)
           );
     } else {
       obj = rect(
-          (floor(x) -fcamera.x + (width-floor(curwidth))/2)* 1 ,
+          ((x) -fcamera.x + (width-(curwidth))/2)* 1 ,
 
-          (floor(y) - ((floor(curheight) * (XtoY) + (height * (1-XtoY)))) 
+          ((y) - (((curheight) * (XtoY) + (height * (1-XtoY)))) 
 
            - ( 
                (height * (XtoY))
@@ -3786,10 +3820,10 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
                (curheight * XtoY)
              )*0.5
 
-           - (floor(z) + floatheight) * XtoZ) - fcamera.y,
+           - ((z) + floatheight) * XtoZ) - fcamera.y,
 
-          floor(curwidth),
-          floor(curheight)
+          (curwidth),
+          (curheight)
           );
     }
   }
@@ -4158,7 +4192,9 @@ door* entity::update(vector<door*> doors, float elapsed) {
           this->setOriginX(parent->getOriginX() - cos(fangle) * orbitRange);
           this->setOriginY(parent->getOriginY() - sin(fangle) * orbitRange);
 
-          this->sortingOffset = baseSortingOffset + sin(fangle) * 21 + 10 + (parent->height - parent->curheight);
+          if(this->dynamic) {
+            this->sortingOffset = baseSortingOffset + sin(fangle) * 21 + 10 + (parent->height - parent->curheight);
+          }
 
           if(yframes == 8) {
             this->animation = convertAngleToFrame(fangle);
@@ -5334,6 +5370,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
           //this->z = ((oldz) + this->z) / 2 ;
 
         }
+        // ... return nullptr; and there was no slowdown
 
         layer = max(z /64, 0.0f);
         layer = min(layer, (int)g_boxs.size() - 1);
@@ -6046,6 +6083,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
         }
         */
 
+        // ... return nullptr; and there was no slowdown
 
         //apply statuseffect
         this->stunned = hisStatusComponent.stunned.updateStatuses(elapsed);
@@ -6178,6 +6216,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
 //          return nullptr;
 //        }
 
+        // ... return nullptr; and there was no slowdown
         //shooting ai
         if(canFight && agrod && 0) {
           //do we have a target?
@@ -6347,8 +6386,10 @@ door* entity::update(vector<door*> doors, float elapsed) {
             BasicNavigate(Destination);
           }
         }
-
-
+        
+        // ... return nullptr; and there was no slowdown
+        // pretty sure the slowdown is due to code after this point
+        //double checked, left it going for about an hour
 
         float dist = XYWorldDistanceSquared(this->getOriginX(), this->getOriginY(), protag->getOriginX(), protag->getOriginY());
         if(dist < g_entitySleepDistance || this->isAI) {
@@ -7061,6 +7102,9 @@ int loadSave() {
 
     entity* a = new entity(renderer, name);
     party.push_back(a);
+    a->semisolid = 0;
+    a->semisolidwaittoenable = 0;
+    a->storedSemisolidValue = 0;
     a->inParty = 1;
 
     combatant* b = new combatant(name, exp);
@@ -7389,13 +7433,14 @@ int LineTrace(int x1, int y1, int x2, int y2, bool display, int size, int layer,
 //    }
 
     if(fogOfWar) {
-      for(auto x : g_large_entities) {
-        if(RectOverlap(a, x->getMovedBounds())) {
-          lineTraceX = a.x + a.width/2;
-          lineTraceY = a.y + a.height/2;
-          return true;
-        }
-      }
+//      //detect large entities
+//      for(auto x : g_l_entities) {
+//        if(RectOverlap(a, x->getMovedBounds())) {
+//          lineTraceX = a.x + a.width/2;
+//          lineTraceY = a.y + a.height/2;
+//          return true;
+//        }
+//      }
     } else {
 
       for (long long unsigned int j = 0; j < g_is_collisions.size(); j++) {
@@ -7420,6 +7465,9 @@ int LineTrace(int x1, int y1, int x2, int y2, bool display, int size, int layer,
     for(auto x : g_solid_entities) {
       if(visibility) {
         if(!x->navblock) {continue;}
+      }
+      if(fogOfWar) {
+        if(x->large) {continue;}
       }
       if(RectOverlap(a, x->getMovedBounds())) {
         lineTraceX = a.x + a.width/2;
@@ -9568,7 +9616,7 @@ void adventureUI::continueDialogue()
     if(combatUIManager->scene !=0) {
       SDL_DestroyTexture(combatUIManager->scene);
     }
-    loadme = "resources/static/backgrounds/scenes/" + to_string(combatUIManager->loadedBackground.scene) + ".qoi";
+    loadme = "resources/static/backgrounds/scenes/" + combatUIManager->loadedBackground.scene + ".qoi";
     combatUIManager->scene = loadTexture(renderer, loadme);
 
 
@@ -10527,7 +10575,41 @@ I("s");
     this->continueDialogue();
     return;
   }
+  
+  //banish entity
+  // why did i remove this lol
+  if (scriptToUse->at(dialogue_index + 1).substr(0, 7) == "/banish")
+  {
+    string s = scriptToUse->at(dialogue_index + 1);
+    s.erase(0, 8);
 
+    entity* x = searchEntities(s, talker);
+    x->banished = 1;
+    x->zaccel = 220;
+    x->shadow->enabled = 0;
+    x->navblock = 0;
+
+    dialogue_index++;
+    this->continueDialogue();
+    return;
+  }
+
+  if (scriptToUse->at(dialogue_index + 1).substr(0, 9) == "/unbanish")
+  {
+    string s = scriptToUse->at(dialogue_index + 1);
+    s.erase(0, 10);
+
+    entity* x = searchEntities(s, talker);
+    x->banished = 0;
+    x->dynamic = 1;
+    x->opacity = 255;
+    x->shadow->enabled = 1;
+    x->navblock = 1;
+
+    dialogue_index++;
+    this->continueDialogue();
+    return;
+  }
 
   // fade out entity
   if (scriptToUse->at(dialogue_index + 1).substr(0, 8) == "/fadeout")
@@ -10558,6 +10640,52 @@ I("s");
     if(hopeful != nullptr) {
       D(stoi(x[2]));
       hopeful->opacity = stoi(x[2]);
+    }
+
+
+    dialogue_index++;
+    this->continueDialogue();
+    return;
+  }
+
+  //add existing entity, in map, to party
+  if (scriptToUse->at(dialogue_index + 1).substr(0, 9) == "/addparty")
+  {
+    string s = scriptToUse->at(dialogue_index + 1);
+    vector<string> x = splitString(s, ' ');
+    if(x.size() > 1) {
+      string name = x[1];
+      entity* e = searchEntities(name, talker);
+      if(e != nullptr) {
+        party.push_back(e);
+        e->semisolid = 0;
+        e->semisolidwaittoenable = 0;
+        e->storedSemisolidValue = 0;
+        e->inParty = 1;
+
+        //configure starting combatant here;
+        combatant* b = new combatant(e->name, 0);
+        b->health = b->maxHealth;
+        b->sp = b->maxSp;
+        g_partyCombatants.push_back(b);
+
+        //set up the party to follow each other
+        if(party.size() > 1) { //protag is party[0]
+          party[1]->agrod = 1;
+          party[1]->target = party[0];
+        }
+        if(party.size() > 2) { //protag is party[0]
+          party[2]->agrod = 1;
+          party[2]->target = party[1];
+        }
+        if(party.size() > 3) { //protag is party[0]
+          party[3]->agrod = 1;
+          party[3]->target = party[2];
+        }
+
+      }
+    } else {
+      E("/addparty missing argument");
     }
 
 
@@ -11327,6 +11455,12 @@ I("s");
   }
 
   // check savefield
+  /*
+   * {hideout_onion_a}
+   * *1:despawna
+   * ...
+   *
+   */
   if (regex_match(scriptToUse->at(dialogue_index + 1), regex("\\{([a-zA-Z0-9_]){1,}\\}")))
   {
     M("Tried to check a save field");

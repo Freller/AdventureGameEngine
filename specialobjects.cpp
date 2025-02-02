@@ -16,6 +16,7 @@
 #include "globals.h"
 #include "objects.h"
 #include "specialobjects.h"
+#include "utils.h"
 
 //shared cooldown data
 float cannonCooldown = 0;
@@ -290,7 +291,6 @@ void specialObjectsInit(entity* a) {
     case 24:
     {
       //fireball
-      M("spawned fireball");
       a->msPerFrame = 70;
       a->loopAnimation = 1;
       a->scriptedAnimation = 1;
@@ -1367,10 +1367,255 @@ void specialObjectsUpdate(entity* a, float elapsed) {
       a->scriptedAnimation = 1;
       a->animation = 0;
       break;
+    }
+    case 34:
+    {
+      //overworld enemy, which inits an encounter from the map's enc file
+      //use the "faction" field to choose which one
+      
+      bool seesPlayer = LineTrace(protag->getOriginX(), protag->getOriginY(), a->getOriginX(), a->getOriginY(), false, 30, 0, 10, false);
+      float dist = XYWorldDistance(protag->getOriginX(), protag->getOriginY(), a->getOriginX(), a->getOriginY());
+      if(seesPlayer && !g_protagIsWithinBoardable && protag->tangible && dist < 435 && a->opacity_delta >= 0) {
+        float angleToTarget = atan2(protag->getOriginX() - a->getOriginX(), protag->getOriginY() - a->getOriginY()) - M_PI/2;
+        a->targetSteeringAngle = wrapAngle(angleToTarget);
+        a->forwardsVelocity = a->xagil;
+      }
 
+      if(RectOverlap(protag->getMovedBounds(), a->getMovedBounds()) && a->opacity_delta >= 0) {
+        //init fight
+        
+        g_combatWorldEnt = a;
+
+        for(auto x : loadedEncounters[a->faction]) {
+          combatant* c = new combatant(x.first, x.second);
+          c->level = x.second;
+          c->maxHealth = c->baseHealth + (c->healthGain * c->level);
+          c->health = c->maxHealth;
+          g_enemyCombatants.push_back(c);
+        }
+
+        string bgstr;
+        if(loadedBackgrounds.size() > a->faction) {
+          bgstr = loadedBackgrounds[a->faction];
+        } else {
+          if(loadedBackgrounds.size() == 0) {E("No loaded combat backgrounds for map " + g_mapdir + "/" + g_map); abort();}
+          bgstr = loadedBackgrounds[0];
+        }
+
+        string loadme = "resources/static/backgrounds/json/" + bgstr + ".json";
+        combatUIManager->loadedBackground = bground(renderer, loadme.c_str());
+        
+        if(combatUIManager->sb1 != 0) {
+          SDL_FreeSurface(combatUIManager->sb1);
+        }
+        
+        loadme = "resources/static/backgrounds/textures/" + to_string(combatUIManager->loadedBackground.texture) + ".qoi";
+        combatUIManager->sb1 = IMG_Load(loadme.c_str());
+
+        if(combatUIManager->scene !=0) {
+          SDL_DestroyTexture(combatUIManager->scene);
+        }
+        loadme = "resources/static/backgrounds/scenes/" + combatUIManager->loadedBackground.scene + ".qoi";
+        combatUIManager->scene = loadTexture(renderer, loadme);
+
+        
+        cyclePalette(combatUIManager->sb1, combatUIManager->db1, combatUIManager->loadedBackground.palette);
+
+        {
+          g_gamemode = gamemode::COMBAT;
+          g_submode = submode::INWIPE;
+          writeSave();
+          transitionDelta = transitionImageHeight;
+          g_combatEntryType = 1;
+        
+          combatUIManager->partyHealthBox->show = 1;
+          combatUIManager->partyText->show = 1;
+          combatUIManager->finalText = "It's an enemy encounter!";
+          combatUIManager->currentText = "";
+          combatUIManager->dialogProceedIndicator->y = 0.25;
+        
+          {
+            //SDL_GL_SetSwapInterval(0);
+            bool cont = false;
+            float ticks = 0;
+            float lastticks = 0;
+            float transitionElapsed = 5;
+            float mframes = 60;
+            float transitionMinFrametime = 5;
+            transitionMinFrametime = 1/mframes * 1000;
+          
+          
+            SDL_Surface* transitionSurface = loadSurface("resources/engine/transition.qoi");
+          
+            int imageWidth = transitionSurface->w;
+            int imageHeight = transitionSurface->h;
+          
+            SDL_Texture* transitionTexture = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, transitionSurface->w, transitionSurface->h );
+            SDL_SetTextureBlendMode(transitionTexture, SDL_BLENDMODE_BLEND);
+          
+          
+            void* pixelReference;
+            int pitch;
+          
+            float offset = imageHeight;
+          
+            SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
+            SDL_SetRenderTarget(renderer, frame);
+        
+            // tiles
+            for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+            {
+              if (g_tiles[i]->z == 0)
+              {
+                g_tiles[i]->render(renderer, g_camera);
+              }
+            }
+        
+            for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+            {
+              if (g_tiles[i]->z == 1)
+              {
+                g_tiles[i]->render(renderer, g_camera);
+              }
+            }
+        
+            // sort
+            sort_by_y(g_actors);
+            for (long long unsigned int i = 0; i < g_actors.size(); i++)
+            {
+              g_actors[i]->render(renderer, g_camera);
+            }
+        
+            for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+            {
+              if (g_tiles[i]->z == 2)
+              {
+                g_tiles[i]->render(renderer, g_camera);
+              }
+            }
+
+            {
+              SDL_Rect blackrect;
+              
+              blackrect = {
+                g_camera.desiredX - g_camera.width,
+                g_camera.desiredY - g_camera.height,
+                g_camera.width,
+                g_camera.height*3
+              };
+        
+        
+              blackrect = transformRect(blackrect);
+        
+              SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+        
+              blackrect = {
+                g_camera.desiredX + g_camera.width,
+                g_camera.desiredY - g_camera.height,
+                g_camera.width,
+                g_camera.height*3
+              };
+        
+        
+              blackrect = transformRect(blackrect);
+        
+              SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+        
+              blackrect = {
+                g_camera.desiredX,
+                g_camera.desiredY - g_camera.height,
+                g_camera.width,
+                g_camera.height
+              };
+        
+              blackrect = transformRect(blackrect);
+        
+              SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+        
+              blackrect = {
+                g_camera.desiredX,
+                g_camera.desiredY + g_camera.height,
+                g_camera.width,
+                g_camera.height
+              };
+        
+              blackrect = transformRect(blackrect);
+        
+              SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+        
+        
+            }
+          
+            SDL_SetRenderTarget(renderer, NULL);
+            while (!cont) {
+          
+              //onframe things
+              SDL_LockTexture(transitionTexture, NULL, &pixelReference, &pitch);
+          
+              memcpy( pixelReference, transitionSurface->pixels, transitionSurface->pitch * transitionSurface->h);
+              Uint32 format = SDL_PIXELFORMAT_ARGB8888;
+              SDL_PixelFormat* mappingFormat = SDL_AllocFormat( format );
+              Uint32* pixels = (Uint32*)pixelReference;
+              Uint32 transparent = SDL_MapRGBA( mappingFormat, 0, 0, 0, 255);
+          
+              offset += g_transitionSpeed + 0.02 * offset;
+          
+              for(int x = 0;  x < imageWidth; x++) {
+                for(int y = 0; y < imageHeight; y++) {
+          
+          
+                  int dest = (y * imageWidth) + x;
+                  //int src =  (y * imageWidth) + x;
+          
+                  if(pow(pow(imageWidth/2 - x,2) + pow(imageHeight + y,2),0.5) < offset) {
+                    pixels[dest] = transparent;
+                  } else {
+                    pixels[dest] = 0;
+                  }
+          
+                }
+              }
+          
+          
+          
+          
+          
+              ticks = SDL_GetTicks();
+              transitionElapsed = ticks - lastticks;
+              
+
+              //lock framerate
+              if(transitionElapsed < transitionMinFrametime) {
+                SDL_Delay(transitionMinFrametime - transitionElapsed);
+                ticks = SDL_GetTicks();
+                transitionElapsed = ticks - lastticks;
+              }
+              lastticks = ticks;
+          
+              SDL_RenderClear(renderer);
+              //render last frame
+              SDL_RenderCopy(renderer, frame, NULL, NULL);
+              SDL_UnlockTexture(transitionTexture);
+              SDL_RenderCopy(renderer, transitionTexture, NULL, NULL);
+              SDL_RenderPresent(renderer);
+          
+              if(offset > imageHeight + pow(pow(imageWidth/2,2) + pow(imageHeight,2),0.5)) {
+                cont = 1;
+              }
+            }
+            SDL_FreeSurface(transitionSurface);
+            SDL_DestroyTexture(transitionTexture);
+            SDL_DestroyTexture(frame);
+            transition = 1;
+            titleUIManager->hideAll();
+            SDL_GL_SetSwapInterval(1);
+          }
+        
+        }
+
+      }
     }
 
-   
     case 100: 
     {
 

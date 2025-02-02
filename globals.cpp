@@ -977,6 +977,7 @@ SDL_Texture* g_wSpec;
 //close to the player
 vector<mapCollision*> g_lt_collisions;
 vector<mapCollision*> g_is_collisions;
+vector<entity*> g_l_entities;
 
 
 //DUNGEON SYSTEM ( :DD )
@@ -1039,6 +1040,8 @@ int curCombatantIndex = 0; //the party combatant for which the player currently 
 int curLevelIndex = 0;
 
 vector<int> g_combatInventory;
+
+entity* g_combatWorldEnt; //the ent that walked into the player to start combat
 
 int g_maxInventorySize = 14;
 

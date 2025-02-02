@@ -319,7 +319,22 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
       // M("loading entity" << endl;
       iss >> s0 >> s1 >> p0 >> p1 >> p2 >> p3 >> p4;
       const char *plik = s1.c_str();
-      entity *e = new entity(renderer, plik);
+
+      //try to copy from something already in the scene
+      int copy = -1;
+      for(int i = 0; i < g_entities.size(); i++) {
+        if(g_entities[i]->name == s1) {
+          copy = i;
+          break;
+        }
+      }
+
+      entity* e;
+      if(copy > -1) {
+        e = new entity(renderer, g_entities[copy]);
+      } else {
+        e = new entity(renderer, plik);
+      }
       e->x = p0;
       e->y = p1;
       e->z = p2;
@@ -327,6 +342,15 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
       e->shadow->y = e->y + e->shadow->yoffset;
       e->defaultAnimation = p3;
       e->animation = p3;
+
+//      for(auto x : e->spawnlist) {
+//        if(x->parentName == e->name) {
+//          x->parent->cachedOriginValsAreGood = 0;
+//          x->setOriginX(x->parent->getOriginX());
+//          x->setOriginY(x->parent->getOriginY());
+//        }
+//      }
+
       if (p4 == 1)
       {
         e->flip = SDL_FLIP_HORIZONTAL;
@@ -1490,6 +1514,17 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
   }
   g_zoom_mod = 1;
   g_update_zoom = 1;
+
+  //make sure children are with their parents
+  //bandaid solution
+  //try to remove this !!!
+//  for(auto x : g_entities) {
+//    if(x->parent != nullptr) {
+//      x->setOriginX(x->parent->getOriginX());
+//      x->setOriginY(x->parent->getOriginY());
+//      D(x->x);
+//    }
+//  }
 }
 
 void changeTheme(string str)
@@ -2344,7 +2379,7 @@ void write_map(entity *mapent)
       {
         continue;
       }
-      if (RectOverlap(n->getMovedBounds(), marker->getMovedBounds()) && n->tangible)
+      if (RectOverlap(n->getMovedBounds(), marker->getMovedBounds()) && n->tangible && n->parent == nullptr)
       {
         protag = n;
         nudge = n;
@@ -4494,8 +4529,15 @@ void write_map(entity *mapent)
         }
         if (word == "waypoints")
         {
-          for(auto x : g_waypoints) {
-            delete x;
+          int size = g_waypoints.size();
+          for(int i = 0; i < size; i++) {
+            delete g_waypoints[0];
+          }
+        }
+        if(word == "doors") {
+          int size = g_doors.size();
+          for(int i = 0; i < size; i++) {
+            delete g_doors[0];
           }
         }
       }
@@ -4935,7 +4977,7 @@ void write_map(entity *mapent)
         }
         if (word == "tiling")
         {
-          bool num;
+          int num;
           if (line >> num)
           {
             tiling = num;

@@ -168,7 +168,7 @@ void ExplorationLoop() {
       g_blinkingMS = g_blinkHidden? g_maxBlinkingMS * 0.9 : 0;
     }
 
-    if (inPauseMenu)
+    if (inPauseMenu || g_inSettingsMenu)
     {
       // if we're paused, freeze gametime
       elapsed = 0;
@@ -462,7 +462,7 @@ void ExplorationLoop() {
 
     // update ui
     curTextWait += elapsed * text_speed_up;
-    if (curTextWait >= textWait)
+    if (curTextWait >= textWait && protag_is_talking)
     {
       adventureUIManager->updateText();
       curTextWait = 0;
@@ -530,6 +530,7 @@ void ExplorationLoop() {
                 g_fc[i][j] = 255;
 
                 g_sc[i][j] = 255;
+
               }
               else
               {
@@ -1524,14 +1525,39 @@ void ExplorationLoop() {
     B("After mapedit");
 
     {
-      g_lt_collisions.clear();
-      //for fog of war, keep a list of map Collisions to use 
-      //which are close to the player and on layer 0
+      //to fix a problem with too many trees which were large entities
+      g_l_entities.clear();
       SDL_FRect cam;
       cam.x = 0;
       cam.y = 0;
       cam.w = g_camera.width;
       cam.h = g_camera.height;
+      for(auto x : g_large_entities) {
+        SDL_FRect obj;
+        obj.x = ((x->x) - g_camera.x + (x->width-(x->curwidth))/2)* 1;
+
+          obj.y = ((x->y) - (((x->curheight) * (XtoY) + (x->height * (1-XtoY)))) 
+
+           - ( 
+               (x->height * (XtoY))
+                -
+               (x->curheight * XtoY)
+             )*0.5
+
+           - ((x->z) + x->floatheight) * XtoZ) - g_camera.y;
+
+          obj.w = (x->curwidth);
+          obj.h =(x->curheight);
+          
+        if(RectOverlap(obj, cam)) {
+          g_l_entities.push_back(x);
+        }
+      }
+
+
+      g_lt_collisions.clear();
+      //for fog of war, keep a list of map Collisions to use 
+      //which are close to the player and on layer 0
       for(auto x : g_impliedSlopes) {
         SDL_FRect obj;
         obj.x = (x->bounds.x -g_camera.x)* g_camera.zoom;
@@ -1542,7 +1568,6 @@ void ExplorationLoop() {
         if(RectOverlap(obj, cam))
         {
           g_is_collisions.push_back(x);
-
         }
 
       }
@@ -2094,6 +2119,7 @@ void ExplorationLoop() {
                 g_enemyCombatants.push_back(a);
               }
 
+              M("Lets load some bgrounds");
               string bgstr;
               if(loadedBackgrounds.size() > randomIndex) {
                 bgstr = loadedBackgrounds[randomIndex];
@@ -2103,6 +2129,7 @@ void ExplorationLoop() {
               }
 
               string loadme = "resources/static/backgrounds/json/" + bgstr + ".json";
+              M("Fuck");
               combatUIManager->loadedBackground = bground(renderer, loadme.c_str());
             
               if(combatUIManager->sb1 != 0) {
@@ -2115,7 +2142,7 @@ void ExplorationLoop() {
               if(combatUIManager->scene !=0) {
                 SDL_DestroyTexture(combatUIManager->scene);
               }
-              loadme = "resources/static/backgrounds/scenes/" + to_string(combatUIManager->loadedBackground.scene) + ".qoi";
+              loadme = "resources/static/backgrounds/scenes/" + combatUIManager->loadedBackground.scene + ".qoi";
               combatUIManager->scene = loadTexture(renderer, loadme);
 
             
@@ -2293,7 +2320,7 @@ void ExplorationLoop() {
         {
           // player took this door
           // clear level
-
+         
           // we will now clear the map, so we will save the door's destination map as a string
           const string savemap = "resources/maps/" + taken->to_map + ".map";
           const string dest_waypoint = taken->to_point;
@@ -2309,7 +2336,7 @@ void ExplorationLoop() {
             init_map_writing(renderer);
           }
 
-          D(g_mapdir);
+          writeSave();
 
           break;
         }
@@ -2892,7 +2919,6 @@ int WinMain()
   devMode = 1;
 
   canSwitchOffDevMode = devMode;
-
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
   IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG);
   TTF_Init();
@@ -3523,7 +3549,6 @@ int WinMain()
     x->texture = TextureC;
   }
 
-
   //this is used when spawning in entities
   smokeEffect = new effectIndex("puff", renderer);
   smokeEffect->persistent = 1;
@@ -4019,7 +4044,7 @@ int interact(float elapsed, entity *protag)
         g_ignoreInput = 1;
         dialogue_cooldown = 500;
       }
-      if (g_entities[i]->tangible && g_entities[i]->sayings.size() > 0)
+      if (g_entities[i]->tangible && g_entities[i]->sayings.size() > 0 && g_entities[i]->inParty == 0)
       {
         if (g_entities[i]->animlimit != 0)
         {
