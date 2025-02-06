@@ -2099,7 +2099,7 @@ void ExplorationLoop() {
     }
 
     //tallgrass update
-    {
+    /*{
       int grassX = protag->getOriginX();
       int grassY = protag->getOriginY();
       grassX -= grassX % 64;
@@ -2295,7 +2295,7 @@ void ExplorationLoop() {
       }
       g_lastGrassX = grassX;
       g_lastGrassY = grassY;
-    }
+    }*/
     B("Tall grass update");
 
 

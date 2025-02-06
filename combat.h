@@ -38,6 +38,15 @@ enum class turnAction {
   FLEE
 };
 
+enum class status {
+  NONE,
+  TOUGHENED, //increased defense
+  CHANTED, //next attack is a garanteed crit
+  MARKED, //chance to attract enemy attacks
+  BLINDED, //chance
+  SLIMED //take additional damage from Slime
+};
+
 struct bground {
   string scene = "0";
   int texture = 1;
@@ -71,32 +80,58 @@ struct turnSerialization {
   int actionIndex;
 };
 
+struct statusEntry {
+  status type = status::NONE;
+  int turns = 0;
+  float magnitude = 0;
+};
+
 class combatant {
 public:
 
   std::string name;
   std::string filename;
 
-  float baseAttack;
-  float attackGain;
+  float l0Strength;
+  float strengthGain;
+  int baseStrength;
+  int curStrength;
+  int health;
 
-  float baseDefense;
+  int l0Mind;
+  int mindGain;
+  int baseMind; //max spirit points
+  int curMind;
+
+  float l0Attack; //misleading, refers to the attack stat at level 0
+  float attackGain; //refers to the average attack gain per level
+  float baseAttack; //refers to base attack
+  float curAttack;
+
+  float l0Defense;
   float defenseGain;
+  float baseDefense;
+  float curDefense;
 
-  float baseHealth;
-  float healthGain;
-
-  float baseCritical; //chance to dodge/crit
-  float criticalGain;
-
-  float baseSkill; //effectiveness of items
-  float skillGain;
-
-  float baseSoul; //power of spirit moves
+  float l0Soul; 
   float soulGain;
+  float baseSoul; //power of spirit moves
+  float curSoul;
 
-  float baseMind; //max spirit points
-  float mindGain;
+  float l0Skill;
+  float skillGain;
+  float baseSkill; //effectiveness of items
+  float curSkill;
+
+  float l0Critical;
+  float criticalGain;
+  float baseCritical;
+  float curCritical; //chance to crit
+
+  float l0Recovery;
+  float recoveryGain;
+  float baseRecovery; //%hp/sp regen after a battle
+  float curRecovery;
 
   type myType;
 
@@ -112,11 +147,7 @@ public:
   float width;
   float height;
 
-  int health;
-  int maxHealth;
-
   int sp;
-  int maxSp;
 
   float offset = 0; //screen percentage to offset the combat sprite
 
@@ -133,6 +164,8 @@ public:
   vector<int> spiritMoves;
 
   vector<pair<int, int>> spiritTree;
+
+  vector<statusEntry> statuses;
 
   combatant(string filename, int level);
 
@@ -155,11 +188,14 @@ struct itemInfo {
 
 struct spiritInfo {
   std::string name = "";
-  int targeting = 0;
+  int targeting = 0; //0 - enemy
+                     //1 - teammate
+                     //2 - none
   int cost = 0;
   spiritInfo(std::string a, int b, int c);
   spiritInfo();
 };
+
 
 //extern std::vector<std::pair<int, std::string>> itemNamesTable;
 extern std::unordered_map<int, itemInfo> itemsTable;
@@ -183,7 +219,6 @@ enum turn {
   PLAYER,
   ENEMY
 };
-
 
 type stringToType(const std::string& str);
 
@@ -220,7 +255,11 @@ enum class submode {
   FORGETCONFIRM,
   MEMBERDEADTEXT,
   ALLDEADTEXT,
-  OUTWIPEL
+  OUTWIPEL,
+  STATUS_P,
+  TEXT_STATUS_P,
+  STATUS_E,
+  TEXT_STATUS_E
 };
 
 

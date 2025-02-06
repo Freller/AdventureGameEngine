@@ -1077,6 +1077,10 @@ extern combatUI* combatUIManager;
 
 extern int curCombatantIndex;
 
+extern int curStatusIndex;
+
+extern int g_autoFight;
+
 extern int curLevelIndex;
 
 extern vector<int> g_combatInventory;

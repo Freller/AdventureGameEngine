@@ -773,7 +773,7 @@ string g_keyboardSaveToField = ""; //the save-field to write keyboard input to, 
 SDL_Color g_textcolor = { 155, 115, 115 };
 SDL_Color g_goldcolor = { 156, 127, 11 };
 SDL_Color g_healthtextcolor = { 220, 203, 25 };
-SDL_Color g_healthtextlowcolor = { 25, 25, 220 };
+SDL_Color g_healthtextlowcolor = { 130, 24, 48 };
 
 string g_levelSequenceName = "default"; //use the default level sequence for the base game by default
 levelSequence* g_levelSequence;
@@ -1036,6 +1036,10 @@ submode g_submode = submode::TEXT;
 combatUI* combatUIManager;
 
 int curCombatantIndex = 0; //the party combatant for which the player currently builds the turnserial
+
+int curStatusIndex = 0;
+
+int g_autoFight = 0;
 
 int curLevelIndex = 0;
 

@@ -1386,11 +1386,29 @@ void specialObjectsUpdate(entity* a, float elapsed) {
         
         g_combatWorldEnt = a;
 
+        if(a->faction < 0) { E("Check faction value of entity with name " + a->name); abort();}
         for(auto x : loadedEncounters[a->faction]) {
           combatant* c = new combatant(x.first, x.second);
           c->level = x.second;
-          c->maxHealth = c->baseHealth + (c->healthGain * c->level);
-          c->health = c->maxHealth;
+          c->baseStrength = c->l0Strength + (c->strengthGain * c->level);
+          c->baseMind = c->l0Mind + (c->mindGain * c->level);
+          c->baseAttack = c->l0Attack + (c->attackGain * c->level);
+          c->baseDefense = c->l0Defense + (c->defenseGain * c->level);
+          c->baseSoul = c->l0Soul + (c->soulGain * c->level);
+          c->baseSkill = c->l0Skill + (c->skillGain * c->level);
+          c->baseCritical = c->l0Critical + (c->criticalGain * c->level);
+          c->baseRecovery = c->l0Recovery + (c->recoveryGain * c->level);
+          
+          c->health = c->baseStrength;
+          c->curStrength = c->baseStrength;
+          c->curMind = c->baseMind;
+          c->curAttack = c->baseAttack;
+          c->curDefense = c->baseDefense;
+          c->curSoul = c->baseSoul;
+          c->curSkill = c->baseSkill;
+          c->curRecovery = c->baseSoul;
+
+
           g_enemyCombatants.push_back(c);
         }
 

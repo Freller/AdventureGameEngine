@@ -7087,18 +7087,28 @@ int loadSave() {
 
   bool setMainProtag = 0;
   //load party
+  //entityfile xp health mana maxhp maxmana attack defense soul skill critical recovery s1 s2 s3 s4
   while(getline(file, line)) {
     if(line[0] == '&') {break;}
 
     auto tokens = splitString(line, ' ');
     string name = tokens[0];
     float exp = stoi(tokens[1]);
-    float currentHP = stof(tokens[2]);
+    int currentHP = stoi(tokens[2]);
     int currentSP = stoi(tokens[3]);
-    int spiritOne = stoi(tokens[4]);
-    int spiritTwo = stoi(tokens[5]);
-    int spiritThree = stoi(tokens[6]);
-    int spiritFour = stoi(tokens[7]);
+    int mhp = stoi(tokens[4]);
+    int msp = stoi(tokens[5]);
+    float atk = stof(tokens[6]);
+    float def = stof(tokens[7]);
+    float soul = stof(tokens[8]);
+    float skill = stof(tokens[9]);
+    float critical = stof(tokens[10]);
+    float recovery = stof(tokens[11]);
+
+    int spiritOne = stoi(tokens[12]);
+    int spiritTwo = stoi(tokens[13]);
+    int spiritThree = stoi(tokens[14]);
+    int spiritFour = stoi(tokens[15]);
 
     entity* a = new entity(renderer, name);
     party.push_back(a);
@@ -7110,11 +7120,20 @@ int loadSave() {
     combatant* b = new combatant(name, exp);
     b->health = currentHP;
     b->sp = currentSP;
-    if(b->health > b->maxHealth) {
-      b->health = b->maxHealth;
+    b->baseStrength = mhp;
+    b->baseMind = msp;
+    b->baseAttack = atk;
+    b->baseDefense = def;
+    b->baseSoul = soul;
+    b->baseSkill = skill;
+    b->baseCritical = critical;
+    b->baseRecovery = recovery;
+
+    if(b->health > b->baseStrength) {
+      b->health = b->baseStrength;
     }
-    if(b->sp > b->maxSp) {
-      b->sp = b->maxSp;
+    if(b->sp > b->baseMind) {
+      b->sp = b->baseMind;
     }
     if(spiritOne != -1) {
       b->spiritMoves.push_back(spiritOne);
@@ -7261,7 +7280,22 @@ int writeSave() {
       spiritFour = y->spiritMoves[3];
     }
 
-    file << x->name << " " << y->xp << " " << y->health << " " << y->sp << " " << spiritOne << " " << spiritTwo << " " << spiritThree << " " << spiritFour << endl;
+    file << x->name << " " 
+      << y->xp << " " 
+      << y->health << " " 
+      << y->sp << " " 
+      << y->baseStrength << " "
+      << y->baseMind << " "
+      << y->baseAttack << " "
+      << y->baseDefense << " "
+      << y->baseSoul << " "
+      << y->baseSkill << " "
+      << y->baseCritical << " "
+      << y->baseRecovery << " "
+      << spiritOne << " "
+      << spiritTwo << " " 
+      << spiritThree << " " 
+      << spiritFour << endl;
   }
   file << "&" << endl;
   
@@ -9589,8 +9623,24 @@ void adventureUI::continueDialogue()
     vector<string> x = splitString(s, ' ');
     combatant* a = new combatant (x[1], stoi(x[2]));
     a->level = stoi(x[2]);
-    a->maxHealth = a->baseHealth + (a->healthGain * a->level);
-    a->health = a->maxHealth;
+    a->baseStrength = a->l0Strength + (a->strengthGain * a->level);
+    a->baseMind = a->l0Mind + (a->mindGain * a->level);
+    a->baseAttack = a->l0Attack + (a->attackGain * a->level);
+    a->baseDefense = a->l0Defense + (a->defenseGain * a->level);
+    a->baseSoul = a->l0Soul + (a->soulGain * a->level);
+    a->baseSkill = a->l0Skill + (a->skillGain * a->level);
+    a->baseCritical = a->l0Critical + (a->criticalGain * a->level);
+    a->baseRecovery = a->l0Recovery + (a->recoveryGain * a->level);
+    
+    a->health = a->baseStrength;
+    a->curStrength = a->baseStrength;
+    a->curMind = a->baseMind;
+    a->curAttack = a->baseAttack;
+    a->curDefense = a->baseDefense;
+    a->curSoul = a->baseSoul;
+    a->curSkill = a->baseSkill;
+    a->curRecovery = a->baseSoul;
+
     g_enemyCombatants.push_back(a);
 
     dialogue_index++;
@@ -10568,7 +10618,7 @@ I("s");
       } else {
         hopeful->tangible = 0;
       }
-      smokeEffect->happen(hopeful->getOriginX(), hopeful->getOriginY(), hopeful->z, 0);
+      //smokeEffect->happen(hopeful->getOriginX(), hopeful->getOriginY(), hopeful->z, 0);
     }
 
     dialogue_index++;
@@ -10665,8 +10715,8 @@ I("s");
 
         //configure starting combatant here;
         combatant* b = new combatant(e->name, 0);
-        b->health = b->maxHealth;
-        b->sp = b->maxSp;
+        b->health = b->baseStrength;
+        b->sp = b->baseSoul;
         g_partyCombatants.push_back(b);
 
         //set up the party to follow each other

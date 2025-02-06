@@ -233,46 +233,52 @@ combatant::combatant(string ffilename, int fxp) {
   myType = stringToType(temp);
 
   file >> temp;
-  file >> baseAttack;
+  file >> l0Attack;
 
   file >> temp;
   file >> attackGain;
 
   file >> temp;
-  file >> baseDefense;
+  file >> l0Defense;
 
   file >> temp;
   file >> defenseGain;
 
   file >> temp;
-  file >> baseHealth;
+  file >> l0Strength;
 
   file >> temp;
-  file >> healthGain;
+  file >> strengthGain;
 
   file >> temp;
-  file >> baseCritical;
+  file >> l0Critical;
 
   file >> temp;
   file >> criticalGain;
 
   file >> temp;
-  file >> baseSkill;
+  file >> l0Skill;
 
   file >> temp;
   file >> skillGain;
 
   file >> temp;
-  file >> baseSoul;
+  file >> l0Soul;
 
   file >> temp;
   file >> soulGain;
 
   file >> temp;
-  file >> baseMind;
+  file >> l0Mind;
 
   file >> temp;
   file >> mindGain;
+
+  file >> temp;
+  file >> l0Recovery;
+  
+  file >> temp;
+  file >> recoveryGain;
 
   file >> temp;
   file >> deathText;
@@ -312,10 +318,6 @@ combatant::combatant(string ffilename, int fxp) {
 
   xp = fxp;
   level = xpToLevel(xp);
-
-  maxHealth = baseHealth + (healthGain * level);
-  maxSp = baseMind + (mindGain * level);
-  
 
   int fw, fh;
   SDL_QueryTexture(texture, NULL, NULL, &fw, &fh);
@@ -1038,36 +1040,24 @@ void initTables() {
   }
   
   {
-    spiritTable[0] = spiritInfo("Poison", 0, 1); //good damage over time
-    spiritTable[1] = spiritInfo("Slime", 0, 1); //does more damage with continued use
-    spiritTable[2] = spiritInfo("Bite", 0, 1);
-    spiritTable[3] = spiritInfo("Mindblast", 0, 3);
-    spiritTable[4] = spiritInfo("Protect", 1, 5);
-    spiritTable[5] = spiritInfo("Buffen", 2, 1); //increase attack power
-    spiritTable[6] = spiritInfo("Chant", 2, 4); //garantee a crit
-    spiritTable[7] = spiritInfo("Curse", 0, 5); //sacrifice health to deal damage
-    spiritTable[8] = spiritInfo("Leech", 0, 5); //gain some health by dealing damage
-    spiritTable[9] = spiritInfo("Exploit", 0, 2); //bonus damage to status'ed foes
-    spiritTable[10] = spiritInfo("Finale", 0, 10); //gain attack for three turns, then die
-    spiritTable[11] = spiritInfo("Explode", 2, 10); //self-detonate and deal massive area damage
-    spiritTable[12] = spiritInfo("Earthquake", 2, 5); //area damage
-    spiritTable[13] = spiritInfo("Frost", 0, 5); //damage and reduce attack
-    spiritTable[14] = spiritInfo("Magma", 0, 5); //Inflict burn
-    spiritTable[15] = spiritInfo("Slice", 0, 1); //High damage to animals
-    spiritTable[16] = spiritInfo("Plague", 0, 1); //High damage to plant
-    spiritTable[17] = spiritInfo("Swat", 0, 1); //High damage to bug
-    spiritTable[18] = spiritInfo("Comet", 0, 1); //high damage to flying
-    spiritTable[19] = spiritInfo("Crush", 0, 1); //high damage to swimming
-    spiritTable[20] = spiritInfo("Shock", 0, 1); //high damage to robot
-    spiritTable[21] = spiritInfo("Fling", 0, 1); //high damage to alien
-    spiritTable[22] = spiritInfo("Antimagic", 0, 1); //High damage to undead
-    spiritTable[23] = spiritInfo("Flash", 0, 1); //High damage to ghost
-    spiritTable[24] = spiritInfo("Distract", 0, 4); // Chance for enemy to not attack
+    //intargted, enemy-targeted, untargeted
+    //name, targeting, cost
+    spiritTable[0] = spiritInfo("Sp. Test", 0, 1);
+    spiritTable[1] = spiritInfo("Sp. Harden", 2, 5);
+    spiritTable[2] = spiritInfo("Sp. Tackle", 0, 2);
+    spiritTable[3] = spiritInfo("Sp. Coffee", 1, 15);
+    spiritTable[4] = spiritInfo("Sp. Chant", 2, 2);
+    spiritTable[5] = spiritInfo("Sp. Search", 2, 5);
+    spiritTable[6] = spiritInfo("Sp. Taunt", 2, 2);
+    spiritTable[7] = spiritInfo("Sp. Slime", 0, 2);
+    spiritTable[8] = spiritInfo("Sp. Flash", 0, 2);
+
 
   }
 }
 
 void initCombat() {
+
 }
 
 int xpToLevel(int xp) {
@@ -1088,14 +1078,14 @@ void useItem(int item, int target, combatant* user) {
     case 0:
     {
       //Bandage
-      int mag = 50.0f * frng(0.70, 1.30) * (float)((float)user->baseSkill + ((float)user->skillGain * user->level));
+      int mag = 50.0f * frng(0.70, 1.30) * (user->baseSkill);
       g_partyCombatants[target]->health += mag;
       string message = user->name + " healed " + g_partyCombatants[target]->name + " for " + to_string(mag) + ".";
       combatUIManager->finalText = message;
       combatUIManager->currentText = "";
       combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
-      if(g_partyCombatants[target]->health >= g_partyCombatants[target]->maxHealth) {
-        g_partyCombatants[target]->health = g_partyCombatants[target]->maxHealth;
+      if(g_partyCombatants[target]->health >= g_partyCombatants[target]->curStrength) {
+        g_partyCombatants[target]->health = g_partyCombatants[target]->curStrength;
       }
       combatUIManager->dialogProceedIndicator->y = 0.25;
       break;
@@ -1103,7 +1093,7 @@ void useItem(int item, int target, combatant* user) {
     case 1:
     {
       //Bomb
-      int mag = 50.0f * frng(0.70, 1.30) * (float)((float)user->baseSkill + ((float)user->skillGain * user->level));
+      int mag = 50.0f * frng(0.70, 1.30) * user->baseSkill;
       for(int i = 0; i < g_enemyCombatants.size(); i++) {
         g_enemyCombatants[i]->health -= mag;
         string message = g_enemyCombatants[i]->name + " took " + to_string(mag) + " from the bomb.";
@@ -1139,14 +1129,14 @@ void useItem(int item, int target, combatant* user) {
 void useSpiritMove(int spiritNumber, int target, combatant* user) {
   user->sp -= spiritTable[spiritNumber].cost;
   switch(spiritNumber) {
-    case 19:
+    case 0: //test move
       {
         float baseDmg = 10;
         if(g_enemyCombatants[target]->myType == type::DEMON) {
           baseDmg *= 2;
         }
 
-        int mag = baseDmg * frng(0.70, 1.30) * (float)((float)user->baseSoul + ((float)user->soulGain * user->level));
+        int mag = baseDmg * frng(0.70, 1.30) * user->curSoul;
         if(mag < 0) {mag = 0;}
         g_enemyCombatants[target]->health -= mag;
         string message = user->name + " hurt " + g_enemyCombatants[target]->name + " for " + to_string(mag) + ".";
@@ -1164,16 +1154,57 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
         }
         break;
       }
+   case 1: //Harden
+      {
+        statusEntry e;
+        e.type = status::TOUGHENED;
+        e.turns = 1;
+        e.magnitude = 1.2;
+        user->statuses.push_back(e);
+        break;
+      }
 
   }
+}
+
+//given a combatant, and a statusEntry with duration, type, and magnitude, apply it to them
+bool applyStatus(combatant* c, statusEntry* e) {
+  switch(e->type) {
+    case status::NONE:
+    {
+      break;
+    }
+    case status::TOUGHENED:
+    {
+      D(e->turns);
+      if(e->turns <= 0) {
+        M("The status wore off");
+        combatUIManager->finalText = c->name + "'s harden effect has worn off";
+        combatUIManager->currentText = "";
+        combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+        combatUIManager->dialogProceedIndicator->y = 0.25;
+        g_submode = submode::TEXT_STATUS_P;
+        return 1;
+
+      } else {
+        M("The status is applied");
+        c->curDefense = c->baseDefense * e->magnitude;
+        e->turns--;
+        D(e->turns);
+        curStatusIndex++;
+      }
+      break;
+    }
+  }
+  return 0;
 }
 
 void combatUI::calculateXP() {
   xpToGrant = 0;
   for(auto x : g_deadCombatants) {
-    int dmg = x->baseAttack + x->attackGain*x->level;
-    int def = x->baseDefense + x->defenseGain*x->level;
-    int het = x->baseHealth + x->healthGain*x->level;
+    int dmg = x->baseAttack;
+    int def = x->baseDefense;
+    int het = x->baseStrength;
     int sum = dmg + def + het;
     xpToGrant += sum;
   }
@@ -1290,7 +1321,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   inventoryText->boxY = 0.22;
   inventoryText->dropshadow = 1;
 
-  spiritPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.4, 0.05, 0.3, 0.42, 0);
+  spiritPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.4, 0.05, 0.4, 0.42, 0);
   spiritPanel->patchwidth = 213;
   spiritPanel->patchscale = 0.4;
   spiritPanel->is9patch = true;
@@ -1551,8 +1582,6 @@ void drawCombatants() {
     for (int i = 0; i < count; ++i) {
         combatant* combatant = g_enemyCombatants[i];
 
-        
-
         // Set renderQuad if it hasn't been initialized
         if (combatant->renderQuad.x == -1) {
 
@@ -1621,15 +1650,20 @@ void drawCombatants() {
 
       }
 
+      combatUIManager->partyText->textcolor = { 155, 115, 115};
+      if(combatant->health <= 0) {
+        combatUIManager->partyText->textcolor = g_healthtextlowcolor;
+      }
+
       if(g_submode == submode::ALLYTARGETING) {
         if(i == combatUIManager->currentTarget) {
           combatUIManager->partyText->textcolor = { 108, 80, 80};
         } else {
           combatUIManager->partyText->textcolor = { 155, 115, 115};
         }
-      } else {
-        combatUIManager->partyText->textcolor = { 155, 115, 115};
       }
+      
+
   
       // Convert percentage-based width and height to actual pixel values
       float actual_width = 0.3 *  WIN_HEIGHT / WIN_WIDTH;
@@ -1647,6 +1681,8 @@ void drawCombatants() {
 
       combatUIManager->partyHealthBox->render(renderer, g_camera, elapsed);
 
+
+
       combatUIManager->partyText->boxX = x + 0.02;
       combatUIManager->partyText->boxY = 0.7 + 0.02 + bonusY;
       combatUIManager->partyText->boxWidth = actual_width;
@@ -1661,6 +1697,7 @@ void drawCombatants() {
       combatUIManager->partyText->updateText(to_string(combatant->sp), -1, 34, combatUIManager->partyText->textcolor);
       combatUIManager->partyText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
 
+          combatUIManager->partyMiniText->textcolor = combatUIManager->partyText->textcolor;
       combatUIManager->partyMiniText->show = 1;
       combatUIManager->partyMiniText->boxX = x + 0.02 + 0.15;
       combatUIManager->partyMiniText->boxY = 0.7 + 0.02 + bonusY + 0.028;
@@ -1668,10 +1705,10 @@ void drawCombatants() {
       combatUIManager->partyMiniText->boxHeight = actual_height;
 
       combatUIManager->partyMiniText->boxY += 0.07;
-      combatUIManager->partyMiniText->updateText('/' + to_string(combatant->maxHealth), -1, 34, combatUIManager->partyMiniText->textcolor);
+      combatUIManager->partyMiniText->updateText('/' + to_string(combatant->curStrength), -1, 34, combatUIManager->partyMiniText->textcolor);
       combatUIManager->partyMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
       combatUIManager->partyMiniText->boxY += 0.07;
-      combatUIManager->partyMiniText->updateText('/' + to_string(combatant->maxSp), -1, 34, combatUIManager->partyMiniText->textcolor);
+      combatUIManager->partyMiniText->updateText('/' + to_string(combatant->curMind), -1, 34, combatUIManager->partyMiniText->textcolor);
       combatUIManager->partyMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
 
   
@@ -1682,8 +1719,6 @@ void drawCombatants() {
 }
 
 void CombatLoop() {
-  breakpoint();
-
   getCombatInput();
 
   SDL_RenderClear(renderer);
@@ -1700,6 +1735,22 @@ void CombatLoop() {
   switch (g_submode) {
     case submode::INWIPE:
     {
+      for(int i = 0; i < 4; i ++) {
+        combatUIManager->dodgingThisTurn[i] = 0;
+      }
+
+      //clear statuses
+      for(auto x : g_partyCombatants) {
+        x->statuses.clear();
+        x->curStrength = x->baseStrength;
+        x->curMind = x->baseMind;
+        x->curAttack = x->baseAttack;
+        x->curDefense = x->baseDefense;
+        x->curSoul = x->baseSoul;
+        x->curSkill = x->baseSkill;
+        x->curRecovery = x->baseSoul;
+      }
+
       g_forceEndDialogue = 0;
       // onframe things
       SDL_LockTexture(transitionTexture, NULL, &transitionPixelReference, &transitionPitch);
@@ -2100,6 +2151,27 @@ void CombatLoop() {
     }
     case submode::MAIN:
     {
+      if(input[8]) {
+        g_autoFight = 0;
+      }
+
+      if(g_autoFight) {
+
+        while(curCombatantIndex < g_partyCombatants.size()) {
+          g_partyCombatants[curCombatantIndex]->serial.action = turnAction::ATTACK;
+          g_partyCombatants[curCombatantIndex]->serial.actionIndex = 0;
+          g_partyCombatants[curCombatantIndex]->serial.target = 0;
+          curCombatantIndex++;
+
+        }
+        g_submode = submode::EXECUTE_P;
+        combatUIManager->executePIndex = 0;
+        curCombatantIndex = 0;
+
+        break;
+      }
+
+
       if(input[0] && !oldinput[0]) {
         if(combatUIManager->currentOption == 1 ||
            combatUIManager->currentOption == 3 ||
@@ -2206,6 +2278,18 @@ void CombatLoop() {
           case 5:
           {
             //Autofight
+            g_autoFight = 1;
+
+            while(curCombatantIndex < g_partyCombatants.size()) {
+              g_partyCombatants[curCombatantIndex]->serial.action = turnAction::ATTACK;
+              g_partyCombatants[curCombatantIndex]->serial.actionIndex = 0;
+              g_partyCombatants[curCombatantIndex]->serial.target = 0;
+              curCombatantIndex++;
+
+            }
+            g_submode = submode::EXECUTE_P;
+            combatUIManager->executePIndex = 0;
+            curCombatantIndex = 0;
 
             break;
           }
@@ -2325,12 +2409,10 @@ void CombatLoop() {
     }
     case submode::EXECUTE_P:
     {
-      D(combatUIManager->executePIndex);
       while(combatUIManager->executePIndex+1 <= g_partyCombatants.size() && g_partyCombatants[combatUIManager->executePIndex]->health <= 0) {
         combatUIManager->executePIndex++;
       }
       combatant* c = g_partyCombatants[combatUIManager->executePIndex];
-      D(combatUIManager->executePIndex);
       if(combatUIManager->executePIndex == g_partyCombatants.size() - 1 && g_partyCombatants[combatUIManager->executePIndex]->health <= 0) {
         g_submode = submode::EXECUTE_E;
         combatUIManager->executeEIndex = 0;
@@ -2350,7 +2432,7 @@ void CombatLoop() {
           c->serial.target-= 1;
         }
         combatant* e = g_enemyCombatants[c->serial.target];
-        int damage = c->baseAttack + (c->attackGain * c->level) - (e->baseDefense + (e->defenseGain * e->level));
+        int damage = c->curAttack - e->curDefense;
         damage *= frng(0.70,1.30);
         if(damage < 0) {damage = 0;}
         e->health -= damage;
@@ -2392,9 +2474,14 @@ void CombatLoop() {
           g_submode = submode::FINAL;
           break;
         }
+
         while(c->serial.target >= g_enemyCombatants.size()) {
+          int a = c->serial.target;
+          int b = g_enemyCombatants.size();
+          if(a < b) break; //I don't know why, but this is needed
           c->serial.target-= 1;
         }
+
         combatant* com = g_partyCombatants[combatUIManager->executePIndex];
         int whichSpiritAbility = com->serial.actionIndex; //which spirit ability
         int target = com->serial.target;
@@ -2538,8 +2625,6 @@ void CombatLoop() {
     }
     case submode::EXECUTE_E:
     {
-      M("EXECUTE_E");
-      D(combatUIManager->executeEIndex);
         if(combatUIManager->executeEIndex >= g_enemyCombatants.size()) {
           //fight over
           g_submode = submode::FINAL;
@@ -2586,8 +2671,7 @@ void CombatLoop() {
           adjustedDIndex++;
         }
         combatUIManager->partyDodgingCombatant = e;
-        D(combatUIManager->partyDodgingCombatant->name);
-        int damage = c->baseAttack + (c->attackGain * c->level) - (e->baseDefense + (e->defenseGain * e->level));
+        int damage = c->curAttack - e->curDefense;
         damage *= frng(0.70,1.30);
         if(damage < 0) {damage = 0;}
         combatUIManager->damageFromEachHit = damage;
@@ -2676,6 +2760,13 @@ void CombatLoop() {
             abort();
           }
           combatUIManager->curPatterns = e->attackPatterns[rng(0, e->attackPatterns.size()-1)];
+          M("Spawning bullets for");
+
+          for(auto x : combatUIManager->curPatterns) {
+            cout << x << " ";
+          }
+          cout << endl;
+
           for(int i = 0; i < g_miniEnts.size(); i++) {
             delete g_miniEnts[i];
             i--;
@@ -2841,13 +2932,28 @@ void CombatLoop() {
       combatUIManager->currentText = "";
       combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
       combatUIManager->finalText = g_partyCombatants[curCombatantIndex]->name + " has reached level " + to_string(combatUIManager->thisLevel) + ".";
-      combatUIManager->queuedStrings.push_back(make_pair("New Attack is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseAttack + g_partyCombatants[curCombatantIndex]->attackGain* combatUIManager->thisLevel) + ".",0));
-      combatUIManager->queuedStrings.push_back(make_pair("New Defense is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseDefense + g_partyCombatants[curCombatantIndex]->defenseGain* combatUIManager->thisLevel) + ".",0));
-      combatUIManager->queuedStrings.push_back(make_pair("New Health is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseHealth + g_partyCombatants[curCombatantIndex]->healthGain * combatUIManager->thisLevel)  + ".",0));
-      combatUIManager->queuedStrings.push_back(make_pair("New Critical is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseCritical + g_partyCombatants[curCombatantIndex]->criticalGain * combatUIManager->thisLevel) + ".",0));
-      combatUIManager->queuedStrings.push_back(make_pair("New Skill is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseSkill + g_partyCombatants[curCombatantIndex]->skillGain * combatUIManager->thisLevel) + ".",0));
-      combatUIManager->queuedStrings.push_back(make_pair("New Soul is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseSoul + g_partyCombatants[curCombatantIndex]->soulGain * combatUIManager->thisLevel) + ".",0));
+
+      g_partyCombatants[curCombatantIndex]->baseAttack += g_partyCombatants[curCombatantIndex]->attackGain * rng(0.8, 1.2);
+      combatUIManager->queuedStrings.push_back(make_pair("New Attack is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseAttack) + ".",0));
+
+      g_partyCombatants[curCombatantIndex]->baseDefense += g_partyCombatants[curCombatantIndex]->defenseGain * rng(0.8, 1.2);
+      combatUIManager->queuedStrings.push_back(make_pair("New Defense is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseDefense) + ".",0));
+
+      g_partyCombatants[curCombatantIndex]->baseStrength += g_partyCombatants[curCombatantIndex]->strengthGain * rng(0.8, 1.2);
+      combatUIManager->queuedStrings.push_back(make_pair("New Strength is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseStrength * combatUIManager->thisLevel)  + ".",0));
+
+      g_partyCombatants[curCombatantIndex]->baseCritical += g_partyCombatants[curCombatantIndex]->criticalGain * rng(0.8, 1.2);
+      combatUIManager->queuedStrings.push_back(make_pair("New Critical is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseCritical) + ".",0));
+
+      g_partyCombatants[curCombatantIndex]->baseSkill += g_partyCombatants[curCombatantIndex]->skillGain * rng(0.8, 1.2);
+      combatUIManager->queuedStrings.push_back(make_pair("New Skill is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseSkill) + ".",0));
+
+      g_partyCombatants[curCombatantIndex]->baseSoul += g_partyCombatants[curCombatantIndex]->soulGain * rng(0.8, 1.2);
+      combatUIManager->queuedStrings.push_back(make_pair("New Soul is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseSoul) + ".",0));
+
+      g_partyCombatants[curCombatantIndex]->baseMind += g_partyCombatants[curCombatantIndex]->mindGain * rng(0.8, 1.2);
       combatUIManager->queuedStrings.push_back(make_pair("New Mind is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseMind + g_partyCombatants[curCombatantIndex]->mindGain * combatUIManager->thisLevel) + ".",0));
+
       g_submode = submode::LEVELTEXT;
 
 
@@ -3545,8 +3651,10 @@ void CombatLoop() {
         //does he have enough sp?
         int cost = spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption]].cost;
         int currentSp = g_partyCombatants[curCombatantIndex]->sp;
+        string name = spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption]].name;
+
         if(currentSp < cost) {
-          combatUIManager->finalText = g_partyCombatants[curCombatantIndex]->name + " doesn't have enough SP!";
+          combatUIManager->finalText = g_partyCombatants[curCombatantIndex]->name + " doesn't have enough SP for " + name + ".";
           combatUIManager->currentText = "";
           combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
           combatUIManager->dialogProceedIndicator->y = 0.25;
@@ -3579,6 +3687,7 @@ void CombatLoop() {
             {
               //none
               g_partyCombatants[curCombatantIndex]->serial.action = turnAction::SPIRITMOVE;
+              g_partyCombatants[curCombatantIndex]->serial.target = -1;
               int spiritNumber = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
               g_partyCombatants[curCombatantIndex]->serial.actionIndex = spiritNumber;
               g_submode = submode::CONTINUE;
@@ -3604,14 +3713,24 @@ void CombatLoop() {
             string spiritName = "";
             spiritName = spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[index]].name;
   
+            combatUIManager->spiritText->align = 0;
             combatUIManager->spiritText->updateText(spiritName, -1, 0.85, g_textcolor, g_font);
             if(index == combatUIManager->currentInventoryOption) {
               combatUIManager->menuPicker->x = initialX + (i * width) - 0.035;
               combatUIManager->menuPicker->y = initialY + (j * height) + 0.005;
             }
-            //if(index < g_partyCombatants[curCombatantIndex]->spiritMoves.size()) {
             combatUIManager->spiritText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-            //}
+
+            //render cost
+            if(g_partyCombatants[curCombatantIndex]->spiritMoves[index] != -1)
+            {
+              combatUIManager->spiritText->align = 1;
+              combatUIManager->spiritText->boxX += 0.3;
+              combatUIManager->spiritText->boxWidth = 0;
+              combatUIManager->spiritText->updateText(to_string(spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[index]].cost), -1, 0.85, g_textcolor, g_font);
+              combatUIManager->spiritText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+            }
+
        
        
             index++;
@@ -3625,7 +3744,7 @@ void CombatLoop() {
     }
     case submode::SPWARNING: 
     {
-      curCombatantIndex = 0;
+      //curCombatantIndex = 0;
       combatUIManager->mainPanel->show = 1;
       combatUIManager->mainText->show = 1;
       combatUIManager->optionsPanel->show = 0;
@@ -3773,7 +3892,7 @@ void CombatLoop() {
           combatUIManager->dodgerY = 1024 - margin;
         }
       }
-      if(combatUIManager->partyDodgingCombatant->health <= 0) {
+      if(combatUIManager->partyDodgingCombatant->health <= 0 || (devMode && input[8])) {
         //end early
         combatUIManager->dodgeTimer = combatUIManager->maxDodgeTimer + 1;
       }
@@ -3786,7 +3905,6 @@ void CombatLoop() {
         }
 
         if(combatUIManager->executeEIndex + 1 ==  g_enemyCombatants.size()) {
-          M("A");
 
           int deadPartyMembers = 0;
           for(auto x : g_partyCombatants) {
@@ -3796,8 +3914,6 @@ void CombatLoop() {
           }
 
           if(combatUIManager->partyDodgingCombatant->health <= 0) {
-            M("B");
-
             combatUIManager->finalText = combatUIManager->partyDodgingCombatant->name + " passed out!";
             combatUIManager->currentText = "";
             combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
@@ -3805,7 +3921,6 @@ void CombatLoop() {
 
 
           if(deadPartyMembers == g_partyCombatants.size()) {
-            M("C");
             string message = "All party members are knocked-out!";
             combatUIManager->queuedStrings.clear();
             combatUIManager->queuedStrings.push_back(make_pair(message,0));
@@ -3815,7 +3930,6 @@ void CombatLoop() {
           }
 
           if(combatUIManager->partyDodgingCombatant->health <= 0) {
-            M("D");
             g_submode = submode::MEMBERDEADTEXT;
             break;
           }
@@ -3823,14 +3937,24 @@ void CombatLoop() {
           combatUIManager->mainPanel->show = 0;
           combatUIManager->mainText->show = 0;
           combatUIManager->dialogProceedIndicator->show = 0;
-          g_submode = submode::MAIN;
+          curCombatantIndex = 0;
+          curStatusIndex = 0;
+          
+          //give fomm three statuses
+          g_submode = submode::STATUS_P;
+
+          //do this before going to submode::MAIN and starting a new turn for the player
+          /*
           combatUIManager->currentOption = 0;
           for(int i = 0; i < 4; i ++) {
-            combatUIManager->dodgingThisTurn[combatUIManager->executePIndex] = 0;
+            combatUIManager->dodgingThisTurn[i] = 0;
           }
           while(g_partyCombatants[curCombatantIndex]->health <= 0 && curCombatantIndex+1 < g_partyCombatants.size()) {
             curCombatantIndex ++;
           }
+          combatUIManager->currentOption = 0;
+          g_submode = submode::MAIN;
+          */
 
         } else {
           //if the character died, report on it with MEMBERDEADTEXT. If all characters are dead, report on it with ALLDEADTEXT
@@ -3871,9 +3995,116 @@ void CombatLoop() {
       }
       break;
     }
+    case submode::STATUS_P:
+    {
+      M("Gettin here?");
+      int breakout = 0;
+      while(curStatusIndex >= g_partyCombatants[curCombatantIndex]->statuses.size()) {
+        curStatusIndex = 0;
+        curCombatantIndex++;
+        if(curCombatantIndex == g_partyCombatants.size()) {
+          combatUIManager->currentOption = 0;
+          curCombatantIndex = 0;
+          for(int i = 0; i < 4; i ++) {
+            combatUIManager->dodgingThisTurn[i] = 0;
+          }
+          while(g_partyCombatants[curCombatantIndex]->health <= 0 && curCombatantIndex+1 < g_partyCombatants.size()) {
+            curCombatantIndex ++;
+          }
+          combatUIManager->currentOption = 0;
+          g_submode = submode::MAIN;
+          breakout = 1;
+          break;
+        }
+      }
+      if(breakout) {break;}
+
+      combatant* c = g_partyCombatants[curCombatantIndex];
+      if(applyStatus(c, &c->statuses[curStatusIndex])) {
+        c->statuses.erase(c->statuses.begin() + curStatusIndex);
+        curStatusIndex--;
+      }
+      break;
+    }
+    case submode::TEXT_STATUS_P:
+    {
+      combatUIManager->mainPanel->show = 1;
+      combatUIManager->mainText->show = 1;
+      combatUIManager->optionsPanel->show = 0;
+
+      if(input[8]) {
+        text_speed_up = 50;
+      } else {
+        text_speed_up = 1;
+      }
+
+
+      curTextWait += elapsed * text_speed_up;
+      
+      if(combatUIManager->finalText == combatUIManager->currentText) {
+        combatUIManager->dialogProceedIndicator->show = 1;
+      } else {
+        combatUIManager->dialogProceedIndicator->show = 0;
+      }
+
+      if (curTextWait >= textWait)
+      {
+       
+        if(combatUIManager->finalText != combatUIManager->currentText) {
+          if(input[8]) {
+            combatUIManager->currentText = combatUIManager->finalText;
+          } else {
+            combatUIManager->currentText += combatUIManager->finalText.at(combatUIManager->currentText.size());
+            playSound(6, g_ui_voice, 0);
+          }
+          combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+  
+        }
+        
+        curTextWait = 0;
+      }
+
+      if(combatUIManager->finalText == combatUIManager->currentText) {
+        if(input[11] && !oldinput[11]) {
+          //advance dialog
+          if(combatUIManager->queuedStrings.size() > 0) {
+            combatUIManager->dialogProceedIndicator->y = 0.25;
+            combatUIManager->currentText = "";
+            combatUIManager->finalText = combatUIManager->queuedStrings.at(0).first;
+            combatUIManager->queuedStrings.erase(combatUIManager->queuedStrings.begin());
+          } else {
+            combatUIManager->mainPanel->show = 0;
+            combatUIManager->mainText->show = 0;
+            combatUIManager->dialogProceedIndicator->show = 0;
+            combatUIManager->optionsPanel->show = 1;
+            curStatusIndex++;
+            g_submode = submode::STATUS_P;
+            combatUIManager->currentOption = 0;
+          }
+        }
+      }
+
+      //animate dialogproceedarrow
+      {
+        combatUIManager->c_dpiDesendMs += elapsed;
+        if(combatUIManager->c_dpiDesendMs > combatUIManager->dpiDesendMs) {
+          combatUIManager->c_dpiDesendMs = 0;
+          combatUIManager->c_dpiAsending = !combatUIManager->c_dpiAsending;
+  
+        }
+        
+        if(combatUIManager->c_dpiAsending) {
+          combatUIManager->dialogProceedIndicator->y += combatUIManager->dpiAsendSpeed;
+        } else {
+          combatUIManager->dialogProceedIndicator->y -= combatUIManager->dpiAsendSpeed;
+  
+        }
+      }
+
+      break;
+    }
     case submode::RUNWARNING: 
     {
-      //curCombatantIndex = 0;
       combatUIManager->mainPanel->show = 1;
       combatUIManager->mainText->show = 1;
       combatUIManager->optionsPanel->show = 0;
@@ -4147,14 +4378,10 @@ void CombatLoop() {
               combatUIManager->mainPanel->show = 0;
               combatUIManager->mainText->show = 0;
               combatUIManager->dialogProceedIndicator->show = 0;
-              g_submode = submode::MAIN;
-              combatUIManager->currentOption = 0;
-              for(int i = 0; i < 4; i ++) {
-                combatUIManager->dodgingThisTurn[combatUIManager->executePIndex] = 0;
-              }
-              while(g_partyCombatants[curCombatantIndex]->health <= 0 && curCombatantIndex+1 < g_partyCombatants.size()) {
-                curCombatantIndex ++;
-              }
+              curCombatantIndex = 0;
+              curStatusIndex = 0;
+              g_submode = submode::STATUS_P;
+              //g_submode = submode::MAIN;
               break;
             } else {
               combatUIManager->executeEIndex++;
