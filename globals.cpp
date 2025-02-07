@@ -1441,6 +1441,11 @@ float clamp(float value, float min, float max) {
 }
 
 void hurtProtag(int dmg) {
+  
+}
+
+/* Restart dungeon floor upon taking damage
+void hurtProtag(int dmg) {
   if(devMode) {return;}
   if(protag->invincibleMS > 0) {return;}
   if(g_dungeonDoorActivated) {return;} //don't trigger multiple times at once, don't get hurt if he already finished the level
@@ -1450,8 +1455,8 @@ void hurtProtag(int dmg) {
   g_dungeonIndex--;
 
   g_dungeonRedo = 1; //don't deactive behemoths
-  
 }
+*/
 
 void transform3dPoint(float x, float y, float z, float &u, float &v) {
   u = floor(x) - g_camera.x;

@@ -9,6 +9,8 @@ void ExplorationLoop();
 
 void CombatLoop();
 
+void toggleDevmode();
+
 void toggleFullscreen();
 
 void drawUI();

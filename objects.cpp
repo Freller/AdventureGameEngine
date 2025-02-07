@@ -4282,6 +4282,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
 
         if(msPerFrame != 0) {
+
           msTilNextFrame += elapsed;
           if(msTilNextFrame > msPerFrame && xframes > 1) {
             msTilNextFrame = 0; //should be msTilNextFrame - msPerFrame

@@ -167,6 +167,8 @@ public:
 
   vector<statusEntry> statuses;
 
+  int gender = 0; //0- male, 1- female, 2-ungendered
+
   combatant(string filename, int level);
 
   ~combatant();
@@ -259,7 +261,9 @@ enum class submode {
   STATUS_P,
   TEXT_STATUS_P,
   STATUS_E,
-  TEXT_STATUS_E
+  TEXT_STATUS_E,
+  MEMBERDEADTEXT_P, //member dead from self damage
+    
 };
 
 

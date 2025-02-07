@@ -5584,6 +5584,10 @@ void write_map(entity *mapent)
           //god this is so annoying, keep it off
           //smokeEffect->happen(e->getOriginX(), e->getOriginY(), e->z );
         }
+        specialObjectsInit(e);
+        for(auto x : e->children) {
+          specialObjectsInit(x);
+        }
         break;
       }
       if (word == "item")
