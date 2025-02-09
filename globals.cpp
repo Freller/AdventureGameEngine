@@ -172,7 +172,9 @@ const bool g_useSimpleImpliedGeometry = 1;
 
 bool genericmode = 0;
 bool freecamera = 0;
-bool devMode = 0;
+bool devMode = 1;
+bool g_ship = 0; //!!!
+string g_language = "english";
 bool canSwitchOffDevMode = 0;
 bool inputRefreshCanSwitchOffDevMode = 0;
 bool showDevMessages = 1;
@@ -1498,10 +1500,12 @@ string getCurrentDir() {
 //  return curdir;
 //}
 
+//trim remove trailing zeroes zeros
 string to_stringF(double value) {
-  std::ostringstream out;
-  out << value;
-  string result = out.str();
+//  std::ostringstream out;
+//  out << value;
+//  string result = out.str();
+  string result = to_string(value);
 
   result.erase(result.find_last_not_of('0') + 1, std::string::npos);
 

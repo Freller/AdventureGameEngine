@@ -42,9 +42,10 @@ enum class status {
   NONE,
   TOUGHENED, //increased defense
   CHANTED, //next attack is a garanteed crit
-  MARKED, //chance to attract enemy attacks
+  TAUNTED, //chance to attract enemy attacks
   BLINDED, //chance
-  SLIMED //take additional damage from Slime
+  SLIMED, //take additional damage from Slime
+  SYNCHRONIZED, //increased soul
 };
 
 struct bground {
@@ -84,6 +85,8 @@ struct statusEntry {
   status type = status::NONE;
   int turns = 0;
   float magnitude = 0;
+  int data = 0; //used for which protag to attack when taunted, or anything
+  string datastr = "";
 };
 
 class combatant {
@@ -98,10 +101,10 @@ public:
   int curStrength;
   int health;
 
-  int l0Mind;
-  int mindGain;
-  int baseMind; //max spirit points
-  int curMind;
+  float l0Mind;
+  float mindGain;
+  float baseMind; //max spirit points
+  float curMind;
 
   float l0Attack; //misleading, refers to the attack stat at level 0
   float attackGain; //refers to the average attack gain per level
@@ -281,7 +284,8 @@ public:
   int c_dpiAsendTarget = 0.9;
   bool c_dpiAsending = 0;
   const float dpiAsendSpeed = 0.0002;
-  std::vector<std::string> options = {"Attack", "Spirit", "Bag", "Shrink", "Run", "Auto"};
+  string directionalPreposition = "";
+  std::vector<std::string> options = {"", "", "", "", "", ""};
   std::string finalText = "";
   std::string currentText = "";
   std::vector<pair<std::string,int>> queuedStrings;

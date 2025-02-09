@@ -2915,9 +2915,6 @@ B("End of frame");
 
 int WinMain()
 {
-
-  devMode = 1;
-
   canSwitchOffDevMode = devMode;
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
   IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG);
@@ -2959,6 +2956,14 @@ int WinMain()
   } else {
     M("Archive is NOT present");
   }
+
+  if(devMode) {
+    generateIndicesFile();
+  }
+
+  //language pack
+  initLanguageIndices();
+
 
   // for brightness
   // reuse texture for transition, cuz why not

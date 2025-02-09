@@ -120,6 +120,17 @@ void parseScriptForLabels(vector<string> &sayings) {
 
 }
 
+void parseScriptForDialogHooks(vector<string> &sayings) {
+  for(auto &x : sayings) {
+    if(x[0] == '(' && x[x.size()-1] == ')') {
+      if(x.back() == '\r') {
+        x.pop_back();
+      }
+      x = getLanguageData(x.substr(1, x.size()-2));
+    }
+  }
+}
+
 
 heightmap::heightmap(string fname, string fbinding, float fmagnitude) {
   image = loadSurface(fbinding.c_str());
@@ -2904,6 +2915,7 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
   if(PHYSFS_exists(txtfilename.c_str())) {
     sayings = loadText(txtfilename);
     parseScriptForLabels(sayings);
+    parseScriptForDialogHooks(sayings);
   }
 
   //has another entity already loaded this texture
@@ -7129,6 +7141,16 @@ int loadSave() {
     b->baseSkill = skill;
     b->baseCritical = critical;
     b->baseRecovery = recovery;
+    if(b->level == 0) {
+      b->baseStrength = b->l0Strength;
+      b->baseMind = b->l0Mind;
+      b->baseAttack = b->l0Attack;
+      b->baseDefense = b->l0Defense;
+      b->baseSoul = b->l0Soul;
+      b->baseSkill = b->l0Skill;
+      b->baseCritical = b->l0Critical;
+      b->baseRecovery = b->l0Recovery;
+    }
 
     if(b->health > b->baseStrength) {
       b->health = b->baseStrength;

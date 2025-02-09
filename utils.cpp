@@ -1,6 +1,11 @@
 #include "utils.h"
+#include "globals.h"
 #include <string>
 #include <sstream>
+
+map<string, string> languagePack;
+
+map<string, pair<int, int>> languagePackIndices;
 
 SDL_Texture* loadTexture(SDL_Renderer* renderer, string fileaddress)
 {
@@ -9,7 +14,7 @@ SDL_Texture* loadTexture(SDL_Renderer* renderer, string fileaddress)
     PHYSFS_getLastErrorCode();
     PHYSFS_file* myfile = PHYSFS_openRead(fileaddress.c_str());
     PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
-    
+
     if(error != 0) {
       D(fileaddress);
       D(error);
@@ -44,7 +49,7 @@ SDL_Surface* loadSurface(string fileaddress)
     PHYSFS_getLastErrorCode();
     PHYSFS_file* myfile = PHYSFS_openRead(fileaddress.c_str());
     PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
-    
+
     if(error != 0) {
       D(fileaddress);
       D(error);
@@ -77,7 +82,7 @@ Mix_Chunk* loadWav(string fileaddress)
     PHYSFS_getLastErrorCode();
     PHYSFS_file* myfile = PHYSFS_openRead(fileaddress.c_str());
     PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
-    
+
     if(error != 0) {
       D(fileaddress);
       D(error);
@@ -110,7 +115,7 @@ vector<string> loadText(string fileaddress)
     PHYSFS_getLastErrorCode();
     PHYSFS_file* myfile = PHYSFS_openRead(fileaddress.c_str());
     PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
-    
+
     if(error != 0) {
       D(fileaddress);
       D(error);
@@ -166,7 +171,7 @@ string loadTextAsString(string fileaddress)
     PHYSFS_getLastErrorCode();
     PHYSFS_file* myfile = PHYSFS_openRead(fileaddress.c_str());
     PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
-    
+
     if(error != 0) {
       D(fileaddress);
       D(error);
@@ -189,9 +194,8 @@ string loadTextAsString(string fileaddress)
 
   } else {
     E("FNF: " + fileaddress);
-    int i = 0;
     breakpoint();
-//    abort();
+    //    abort();
     return {};
   }
 }
@@ -204,7 +208,7 @@ TTF_Font* loadFont(string fileaddress, float fontsize)
     PHYSFS_getLastErrorCode();
     PHYSFS_file* myfile = PHYSFS_openRead(fileaddress.c_str());
     PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
-    
+
     if(error != 0) {
       D(fileaddress);
       D(error);
@@ -241,7 +245,7 @@ Mix_Music* loadMusic(string fileaddress)
     PHYSFS_getLastErrorCode();
     PHYSFS_file* myfile = PHYSFS_openRead(fileaddress.c_str());
     PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
-    
+
     if(error != 0) {
       D(fileaddress);
       D(error);
@@ -267,4 +271,108 @@ Mix_Music* loadMusic(string fileaddress)
     abort();
     return nullptr;
   }
+}
+
+void generateIndicesFile() {
+  if(!devMode || g_ship) {
+    E("Tried to generate languagepack indices file for release!");
+  }
+  string input_file = "resources/languagepack/" + g_language + "/major.txt";
+  string output_file = "resources/languagepack/" + g_language + "/indices.dat";
+  std::istringstream infile(loadTextAsString(input_file));
+  std::ofstream outfile(output_file);
+  std::string line;
+
+  while (std::getline(infile, line)) {
+    if (line.find(':') != std::string::npos) {
+      std::istringstream iss(line);
+      std::string handle;
+      if (std::getline(iss, handle, ':')) {
+        handle = handle.substr(1, handle.size() - 2);  // Remove quotes
+        int pos = (unsigned int)infile.tellg() - (unsigned int)line.length() - 1;
+        int length = line.length();
+        outfile << handle << ":" << pos << "," << length << std::endl;
+      }
+    }
+  }
+}
+
+void initLanguageIndices() {
+  string input_file = "resources/languagepack/" + g_language + "/indices.dat";
+
+  istringstream infile(loadTextAsString(input_file));
+  string line = "";
+  while (std::getline(infile, line)) {
+    auto x = splitString(line, ':');
+    auto y = splitString(x[1], ',');
+    if(y[1].back() == '\r') {
+      y[1].pop_back();
+    }
+
+    string key = x[0];
+    int pos = stoi(y[0]);
+    int length = stoi(y[1]);
+    languagePackIndices[key] = std::make_pair(pos, length);
+  }
+}
+
+
+//first stage: fetch dialog from the major.json file using it's handle
+//this will get to be more wonderful later
+string getLanguageData(string handle) {
+  string fileaddress = "resources/languagepack/" + g_language + "/major.txt";
+
+  int position = 0;
+  int length = 0;
+  try {
+    position = languagePackIndices[handle].first;
+    length = languagePackIndices[handle].second;
+  } catch (...) {
+    E("Languge-pack key error for " + handle + ".");
+    abort();
+  }
+
+  if(PHYSFS_exists(fileaddress.c_str())) {
+    PHYSFS_file* myfile = PHYSFS_openRead(fileaddress.c_str());
+    PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
+
+    if(error != 0) {
+      D(fileaddress);
+      D(error);
+      const char* errorStr = PHYSFS_getErrorByCode(error);
+      D(errorStr);
+      breakpoint();
+      abort();
+    }
+
+    PHYSFS_seek(myfile, position);
+    char* buf;
+    buf = new char[length];
+    PHYSFS_readBytes(myfile, buf, length);
+    PHYSFS_close(myfile);
+    string myString = "";
+    for(int i = 0; i < length; i++) {
+      myString.push_back(buf[i]);
+    }
+    if(myString.back() == '\r') {
+      myString.pop_back();
+    }
+
+    myString.pop_back();
+    int pos = myString.find(':');
+
+    if(pos == string::npos) {
+      E("Missing ':' in language-pack-file, check near " + handle + ".");
+    }
+
+    string ret = myString.substr(pos+2, myString.size()-(pos+2));
+    return ret;
+
+
+  } else {
+    E("No language-pack-file found for " + g_language + ".");
+    abort();
+  }
+
+  return "";
 }

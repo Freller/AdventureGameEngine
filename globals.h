@@ -351,7 +351,7 @@ extern bool g_benchmarking;
 
 
 // Temporary debugging statements- I won't allow myself to block these
-#define T(a) std::cout << #a << ": " << (a) << endl;
+#define TM(a) std::cout << #a << ": " << (a) << endl;
 
 extern map<pair<int, int>, navNode*, cmpCoord> navNodeMap;
 
@@ -375,6 +375,8 @@ extern const bool g_useSimpleImpliedGeometry;
 extern bool genericmode;
 extern bool freecamera;
 extern bool devMode;
+extern bool g_ship;
+extern string g_language;
 extern bool canSwitchOffDevMode;
 extern bool inputRefreshCanSwitchOffDevMode;
 extern bool showDevMessages;

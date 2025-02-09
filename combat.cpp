@@ -23,6 +23,82 @@ void loadPalette(SDL_Renderer* renderer, const char* filePath, std::vector<Uint3
   SDL_FreeSurface(surface);
 }
 
+string getPossessivePronoun(combatant* c) {
+  string pronoun = "";
+  switch(c->gender) {
+    case 0:
+      pronoun = "his";
+      break;
+    case 1:
+      pronoun = "her";
+      break;
+    case 2:
+      pronoun = "its";
+      break;
+    case 3:
+      pronoun = "their";
+      break;
+  }
+  return pronoun;
+}
+
+string getReflexivePronoun(combatant* c) {
+  string pronoun = "";
+  switch(c->gender) {
+    case 0:
+      pronoun = "himself";
+      break;
+    case 1:
+      pronoun = "herself";
+      break;
+    case 2:
+      pronoun = "itself";
+      break;
+    case 3:
+      pronoun = "themselves";
+      break;
+  }
+  return pronoun;
+}
+
+string getSubjectivePronoun(combatant* c) {
+  string pronoun = "";
+  switch(c->gender) {
+    case 0:
+      pronoun = "He";
+      break;
+    case 1:
+      pronoun = "She";
+      break;
+    case 2:
+      pronoun = "It";
+      break;
+    case 3:
+      pronoun = "They";
+      break;
+  }
+  return pronoun;
+}
+
+string getObjectivePronoun(combatant* c) {
+  string pronoun = "";
+  switch(c->gender) {
+    case 0:
+      pronoun = "him";
+      break;
+    case 1:
+      pronoun = "her";
+      break;
+    case 2:
+      pronoun = "it";
+      break;
+    case 3:
+      pronoun = "them";
+      break;
+  }
+  return pronoun;
+}
+
 bground::bground() {};
 
 bground::bground(SDL_Renderer* renderer, const char* configFilePath) {
@@ -210,6 +286,13 @@ combatant::combatant(string ffilename, int fxp) {
 
 
   name = temp;
+  if(name.back() == '\r') {
+    name.pop_back();
+  }
+  
+  name = getLanguageData(name.substr(1, name.size()-2));
+
+
   filename = ffilename;
 
   std::transform(name.begin(), name.end(), name.begin(), 
@@ -218,7 +301,6 @@ combatant::combatant(string ffilename, int fxp) {
   file >> temp;
   file >> temp;
   gender = stoi(temp);
-  D(gender);
 
   file >> temp;
   file >> temp;
@@ -287,11 +369,18 @@ combatant::combatant(string ffilename, int fxp) {
 
   file >> temp;
   file >> deathText;
-  for (char &ch : deathText) {
-    if(ch == '_') {
-      ch = ' ';
-    }
+
+  if(deathText.back() == '\r') {
+    deathText.pop_back();
   }
+
+  deathText = getLanguageData(deathText.substr(1, deathText.size()-2));
+
+//  for (char &ch : deathText) {
+//    if(ch == '_') {
+//      ch = ' ';
+//    }
+//  }
 
   file >> temp;
   file >> temp; // Read the '{'
@@ -383,6 +472,28 @@ type stringToType(const std::string& str) {
   } else {
     return NONE; // Default value if string not found
   }
+}
+
+string typeToString(type t) {
+  static std::unordered_map<type, std::string> typeMap = {
+    {NONE, "None"},
+    {ANIMAL, "Animal"},
+    {PLANT, "Plant"},
+    {BUG, "Bug"},
+    {ROBOT, "Robot"},
+    {ALIEN, "Alien"},
+    {UNDEAD, "Undead"},
+    {GHOST, "Ghost"},
+    {DEMON, "Demon"}
+  };
+
+  auto it = typeMap.find(t);
+  if (it != typeMap.end()) {
+    return it->second;
+  } else {
+    return "None"; // Default value if string not found
+  }
+  
 }
 
 std::unordered_map<int, itemInfo> itemsTable;
@@ -1045,17 +1156,19 @@ void initTables() {
   }
 
   {
-    //intargted, enemy-targeted, untargeted
+    // 0 -> enemy targeted
+    // 1 -> ally targeted
+    // 2 -> untargeted
     //name, targeting, cost
-    spiritTable[0] = spiritInfo("Sp. Test", 0, 1);
-    spiritTable[1] = spiritInfo("Sp. Harden", 2, 5);
-    spiritTable[2] = spiritInfo("Sp. Tackle", 0, 2);
-    spiritTable[3] = spiritInfo("Sp. Coffee", 1, 5);
-    spiritTable[4] = spiritInfo("Sp. Chant", 2, 2);
-    spiritTable[5] = spiritInfo("Sp. Search", 2, 5);
-    spiritTable[6] = spiritInfo("Sp. Taunt", 2, 2);
-    spiritTable[7] = spiritInfo("Sp. Slime", 0, 2);
-    spiritTable[8] = spiritInfo("Sp. Flash", 0, 2);
+    spiritTable[0] = spiritInfo("Debug", 0, 1);
+    spiritTable[1] = spiritInfo("Harden", 2, 5);
+    spiritTable[2] = spiritInfo("Tackle", 0, 2);
+    spiritTable[3] = spiritInfo("Coffee", 1, 5);
+    spiritTable[4] = spiritInfo("Chant", 2, 2);
+    spiritTable[5] = spiritInfo("Inspect", 0, 5);
+    spiritTable[6] = spiritInfo("Taunt", 0, 2);
+    spiritTable[7] = spiritInfo("Slime", 0, 2);
+    spiritTable[8] = spiritInfo("Synchronize", 2, 2);
 
 
   }
@@ -1108,7 +1221,7 @@ void useItem(int item, int target, combatant* user) {
           combatUIManager->dialogProceedIndicator->y = 0.25;
           combatant* e = g_enemyCombatants[i];
           if(e->health < 0) {
-            string deathmessage = e->name + " " +  e->deathText;
+            string deathmessage = e->name +  e->deathText;
             combatUIManager->queuedStrings.push_back(make_pair(deathmessage,1));
             g_enemyCombatants.erase(g_enemyCombatants.begin() + i);
             g_deadCombatants.push_back(e);
@@ -1176,8 +1289,8 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
         for(auto &x : user->statuses) {
           if(x.type == status::TOUGHENED) {
             alreadyHave = 1;
-            if(x.turns < 2) {
-              x.turns = 2;
+            if(x.turns < 6) {
+              x.turns = 6;
             }
             break;
           }
@@ -1186,12 +1299,12 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
         if(!alreadyHave) {
           statusEntry e;
           e.type = status::TOUGHENED;
-          e.turns = 2;
+          e.turns = 6;
           e.magnitude = 1.1 + (0.02 * user->curSoul);
           user->statuses.push_back(e);
         }
 
-        string message = user->name + " hardened their skin.";
+        string message = user->name + " hardens " + getPossessivePronoun(user) + " skin.";
         combatUIManager->finalText = message;
         combatUIManager->currentText = "";
         combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
@@ -1216,7 +1329,7 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
         if(selfdmg > user->health) {selfdmg = user->health;}
         user->health -= selfdmg;
 
-        string message = user->name + " uses Sp. Tackle on " + g_enemyCombatants[target]->name + " for " + to_string(dmg) + ". " + user->name + "  takes " + to_string(selfdmg) + ".";
+        string message = user->name + " tackles " + g_enemyCombatants[target]->name + " for " + to_string(dmg) + ". " + user->name + "  takes " + to_string(selfdmg) + ".";
 
         combatUIManager->finalText = message;
         combatUIManager->currentText = "";
@@ -1293,7 +1406,133 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
 
         break;
       }
+    case 5: //Inspect
+      {
+        combatant* e = g_enemyCombatants[target];
+        string message = "Level " + to_string(e->level) + " " + e->name + " has a base Strength of " + to_string(e->baseStrength) + ", a base Attack of " + to_stringF(e->baseAttack) + ", and a base Defense of " + to_stringF(e->baseDefense) + ".";
+        string message2 = getSubjectivePronoun(e) + " has a health of " + to_string(e->health) + ", a current Strength of " + to_stringF(e->curStrength) + ", and a current Defense of " + to_stringF(e->curDefense) + ".";
+        string message3 = e->name + " has type " + typeToString(e->myType) + ".";
 
+
+
+        combatUIManager->finalText = message;
+        combatUIManager->currentText = "";
+        combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+        combatUIManager->dialogProceedIndicator->y = 0.25;
+
+        combatUIManager->queuedStrings.push_back(make_pair(message2,0));
+        combatUIManager->queuedStrings.push_back(make_pair(message3,0));
+        break;
+      }
+    case 6: //Taunt
+      {
+
+        //see if they already have the status
+        bool alreadyHave = 0;
+        combatant* e = g_enemyCombatants[target];
+        for(auto &x : e->statuses) {
+          if(x.type == status::TAUNTED) {
+            alreadyHave = 1;
+            if(x.turns < 6) {
+              x.turns = 6;
+            }
+            break;
+          }
+        }
+
+        if(!alreadyHave) {
+          statusEntry se;
+          se.type = status::TAUNTED;
+          se.turns = 6;
+          se.magnitude = 40 + (user->curSoul * 1);
+          se.datastr = user->filename;
+          e->statuses.push_back(se);
+        }
+
+        string message = user->name + " taunts " + e->name + ".";
+        combatUIManager->finalText = message;
+        combatUIManager->currentText = "";
+        combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+        combatUIManager->dialogProceedIndicator->y = 0.25;
+
+        break;
+      }
+    case 7: //Slime
+      {
+        bool alreadyHave = 0;
+        combatant* e = g_enemyCombatants[target];
+        int dmg = 0;
+        for(auto &x : e->statuses) {
+          if(x.type == status::SLIMED) {
+            alreadyHave = 1;
+            x.magnitude += x.magnitude * (user->curSoul / 40);
+            dmg = x.magnitude * frng(0.8, 1.2);
+            break;
+          }
+        }
+
+
+        if(!alreadyHave) {
+          statusEntry se;
+          se.type = status::SLIMED;
+          se.turns = 1;
+          se.magnitude = 5;
+          se.datastr = user->filename;
+          e->statuses.push_back(se);
+          dmg = se.magnitude * frng(0.8, 1.2);
+        }
+
+        string message = user->name + " slimes " + e->name + " for " + to_string(dmg) + " damage.";
+        combatUIManager->finalText = message;
+        combatUIManager->currentText = "";
+        combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+        combatUIManager->dialogProceedIndicator->y = 0.25;
+
+        break;
+      }
+    case 8:
+      {
+        vector<string> msgs = {};
+        for(unsigned int i = 0; i < g_partyCombatants.size(); i++) {
+          //see if they already have the status
+          bool alreadyHave = 0;
+          combatant*e = g_partyCombatants[i];
+          for(auto &x : e->statuses) {
+            if(x.type == status::SYNCHRONIZED) {
+              alreadyHave = 1;
+              if(x.turns < 4) {
+                x.turns = 4;
+              }
+              break;
+            }
+          }
+  
+          if(!alreadyHave) {
+            statusEntry se;
+            se.type = status::SYNCHRONIZED;
+            se.turns = 4;
+            //can't boost Synchronize with Synchronize
+            //int soulToUse = min(user->baseSoul, user->curSoul);
+            se.magnitude = 0 + (user->curSoul * 0.01);
+            se.datastr = user->filename;
+            e->statuses.push_back(se);
+          }
+
+          string message = e->name + " is in sync with " + getPossessivePronoun(e) + " friends.";
+          msgs.push_back(message);
+        }
+
+        combatUIManager->finalText = msgs.at(0);
+        combatUIManager->currentText = "";
+        combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+        combatUIManager->dialogProceedIndicator->y = 0.25;
+
+        for(int i = 1; i < msgs.size(); i++) {
+          combatUIManager->queuedStrings.push_back(make_pair(msgs[i], 0));
+        }
+
+        break;
+      }
   }
 }
 
@@ -1319,14 +1558,14 @@ bool applyStatus(combatant* c, statusEntry* e) {
           //the status is applied
           c->curDefense = c->baseDefense * e->magnitude;
           e->turns--;
-          curStatusIndex++;
+          //curStatusIndex++;
         }
         break;
       }
     case status::CHANTED:
       {
         if(e->turns <= 0) {
-          combatUIManager->finalText = c->name + "'s Chant has worn off.";
+          combatUIManager->finalText = c->name + "'s chant has worn off.";
           combatUIManager->currentText = "";
           combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
           combatUIManager->dialogProceedIndicator->y = 0.25;
@@ -1334,9 +1573,46 @@ bool applyStatus(combatant* c, statusEntry* e) {
           return 1;
         }
         c->curCritical = 100;
-        curStatusIndex++;
+        //curStatusIndex++;
+        break;
+      }
+    case status::TAUNTED:
+      {
+        if(e->turns <= 0) {
+          combatUIManager->finalText = c->name + "'s is no longer Taunted.";
+          combatUIManager->currentText = "";
+          combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+          combatUIManager->dialogProceedIndicator->y = 0.25;
+          g_submode = submode::TEXT_STATUS_E;
+          return 1;
+        } else {
+          e->turns--;
+        }
+        break;
+      }
+
+    case status::SLIMED:
+      {
+        //complete
+        break;
+      }
+    case status::SYNCHRONIZED:
+      {
+        if(e->turns <= 0) {
+          combatUIManager->finalText = c->name + " is out-of-sync.";
+          combatUIManager->currentText = "";
+          combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
+          combatUIManager->dialogProceedIndicator->y = 0.25;
+          g_submode = submode::TEXT_STATUS_P;
+          return 1;
+        }
+        c->curSoul *= e->magnitude;
+        e->turns--;
+
+        break;
       }
   }
+  curStatusIndex++;
   return 0;
 }
 
@@ -1352,8 +1628,16 @@ void combatUI::calculateXP() {
 }
 
 combatUI::combatUI(SDL_Renderer* renderer) {
-  M("combatUI constructor");
   initTables();
+
+  directionalPreposition = getLanguageData("DirectionalPreposition");
+
+  options[0] = getLanguageData("CombatOption1");
+  options[1] = getLanguageData("CombatOption2");
+  options[2] = getLanguageData("CombatOption3");
+  options[3] = getLanguageData("CombatOption4");
+  options[4] = getLanguageData("CombatOption5");
+  options[5] = getLanguageData("CombatOption6");
 
   partyHealthBox = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0, 0.65, 1, 0.35, 0);
   partyHealthBox->patchwidth = 213;
@@ -1362,7 +1646,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   partyHealthBox->persistent = true;
   partyHealthBox->show = 0;
 
-  partyText = new textbox(renderer, "Hey", 1500 * g_fontsize, 0, 0, 0.9);
+  partyText = new textbox(renderer, "", 1500 * g_fontsize, 0, 0, 0.9);
   partyText->boxWidth = 0;
   partyText->width = 0.95;
   partyText->boxHeight = 0;
@@ -1372,7 +1656,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   partyText->dropshadow = 1;
   partyText->show = 1;
 
-  partyMiniText = new textbox(renderer, "Hey", 800 * g_fontsize, 0, 0, 0.9);
+  partyMiniText = new textbox(renderer, "", 800 * g_fontsize, 0, 0, 0.9);
   partyMiniText->boxWidth = 0;
   partyMiniText->width = 0.95;
   partyMiniText->boxHeight = 0;
@@ -1851,10 +2135,10 @@ void drawCombatants() {
     combatUIManager->partyMiniText->boxHeight = actual_height;
 
     combatUIManager->partyMiniText->boxY += 0.07;
-    combatUIManager->partyMiniText->updateText('/' + to_string(combatant->curStrength), -1, 34, combatUIManager->partyMiniText->textcolor);
+    combatUIManager->partyMiniText->updateText('/' + to_stringF(combatant->curStrength), -1, 34, combatUIManager->partyMiniText->textcolor);
     combatUIManager->partyMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
     combatUIManager->partyMiniText->boxY += 0.07;
-    combatUIManager->partyMiniText->updateText('/' + to_string(combatant->curMind), -1, 34, combatUIManager->partyMiniText->textcolor);
+    combatUIManager->partyMiniText->updateText('/' + to_stringF(combatant->curMind), -1, 34, combatUIManager->partyMiniText->textcolor);
     combatUIManager->partyMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
 
 
@@ -1884,6 +2168,8 @@ void CombatLoop() {
         for(int i = 0; i < 4; i ++) {
           combatUIManager->dodgingThisTurn[i] = 0;
         }
+
+        g_autoFight = 0;
 
         //clear statuses
         for(auto x : g_partyCombatants) {
@@ -2520,7 +2806,7 @@ void CombatLoop() {
         drawOptionsPanel();
 
         //combatUIManager->targetText->updateText("To " + g_enemyCombatants.at(combatUIManager->currentTarget)->name, -1, 34);
-        combatUIManager->targetText->updateText("L." + to_string(g_enemyCombatants.at(combatUIManager->currentTarget)->level) + " " + g_enemyCombatants.at(combatUIManager->currentTarget)->name, -1, 34);
+        combatUIManager->targetText->updateText(combatUIManager->directionalPreposition + g_enemyCombatants.at(combatUIManager->currentTarget)->name, -1, 34);
 
         combatUIManager->targetPanel->render(renderer, g_camera, elapsed);
         combatUIManager->targetText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
@@ -2622,7 +2908,7 @@ void CombatLoop() {
           e->health -= damage;
           string message;
           if(crit) {
-            message = c->name + " crits " + to_string(damage) + " to " + e->name + ".";
+            message = c->name + " crits " + e->name + " for " + to_string(damage) + ".";
           } else {
             message = c->name + " deals " + to_string(damage) + " to " + e->name + ".";
           }
@@ -2896,6 +3182,22 @@ void CombatLoop() {
           if(validCombatants.size() <=0) { abort();}
 
           int dodgingIndex = rng(0, validCombatants.size() - 1);
+
+          //check for taunt
+          bool breakflag = 0;
+          for(auto &x : c->statuses) {
+            if(x.type == status::TAUNTED) {
+              for(int i = 0; i < validCombatants.size(); i++) {
+                if(validCombatants[i]->filename == x.datastr) {
+                  dodgingIndex = i;
+                  breakflag = 1;
+                  break;
+                }
+              }
+            }
+            if(breakflag) break;
+          }
+
           combatant* e = validCombatants[dodgingIndex];
           int adjustedDIndex = 0;
           for(auto x : g_partyCombatants) {
@@ -2994,12 +3296,13 @@ void CombatLoop() {
               abort();
             }
             combatUIManager->curPatterns = e->attackPatterns[rng(0, e->attackPatterns.size()-1)];
-            M("Spawning bullets for");
 
-            for(auto x : combatUIManager->curPatterns) {
-              cout << x << " ";
-            }
-            cout << endl;
+//            M("Spawning bullets for");
+//
+//            for(auto x : combatUIManager->curPatterns) {
+//              cout << x << " ";
+//            }
+//            cout << endl;
 
             for(int i = 0; i < g_miniEnts.size(); i++) {
               delete g_miniEnts[i];
@@ -3034,12 +3337,12 @@ void CombatLoop() {
         while(curStatusIndex >= (int)g_enemyCombatants[curCombatantIndex]->statuses.size()) {
           curStatusIndex = 0;
           curCombatantIndex++;
-          if(curCombatantIndex == g_enemyCombatants.size()) {
+          if(curCombatantIndex == (int)g_enemyCombatants.size()) {
             curCombatantIndex = 0;
             for(int i = 0; i < 4; i ++) {
               combatUIManager->dodgingThisTurn[i] = 0;
             }
-            while(g_partyCombatants[curCombatantIndex]->health <= 0 && curCombatantIndex+1 < g_partyCombatants.size()) {
+            while(g_partyCombatants[curCombatantIndex]->health <= 0 && curCombatantIndex+1 < (int)g_partyCombatants.size()) {
               curCombatantIndex ++; //used for choosing which protag picks action in submode::MAIN
             }
             combatUIManager->currentOption = 0;
@@ -4092,7 +4395,7 @@ void CombatLoop() {
               combatUIManager->spiritText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
 
               //render cost
-              if(g_partyCombatants[curCombatantIndex]->spiritMoves[index] != -1)
+              if(index < g_partyCombatants[curCombatantIndex]->spiritMoves.size() && spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[index]].cost > 0)
               {
                 combatUIManager->spiritText->align = 1;
                 combatUIManager->spiritText->boxX += 0.3;
