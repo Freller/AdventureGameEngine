@@ -88,7 +88,7 @@ float angleDiff(float a, float b) {
 void parseScriptForLabels(vector<string> &sayings) {
   //parse sayings for lables
   vector<pair<string, int>> symboltable;
-  
+
   for(int i = 0; i < (int)sayings.size(); i++) {
     if(sayings[i][0] == '<') {
       pair<string, int> pushMeBack{ sayings[i].substr(1,sayings[i].length() - 2), i };
@@ -120,13 +120,51 @@ void parseScriptForLabels(vector<string> &sayings) {
 
 }
 
+//this seems to work
+void parseWScriptForDialogHooks(vector<wstring> &sayings) {
+  for(auto &x : sayings) {
+    size_t start = x.find('(');
+    while(start != string::npos) {
+      size_t end = x.find(')', start);
+      if(end != string::npos) {
+        wstring innerText = x.substr(start + 1, end - start - 1);
+
+        using convert_type = std::codecvt_utf8<wchar_t>;
+        std::wstring_convert<convert_type, wchar_t> converter;
+
+        //use converter (.to_bytes: wstr->str, .from_bytes: str->wstr)
+        std::string handle = converter.to_bytes( innerText );
+
+        wstring wres = getLanguageDataSpecial(handle);
+        x.replace(start, end - start + 1, wres);
+        start = x.find('(', start + wres.length());
+      } else {
+        start = string::npos;
+      }
+    }
+    if(x.back() == '\r') {
+      x.pop_back();
+    }
+  }
+}
+
 void parseScriptForDialogHooks(vector<string> &sayings) {
   for(auto &x : sayings) {
-    if(x[0] == '(' && x[x.size()-1] == ')') {
-      if(x.back() == '\r') {
-        x.pop_back();
+    size_t start = x.find('(');
+    while(start != string::npos) {
+      size_t end = x.find(')', start);
+      if(end != string::npos) {
+        string innerText = x.substr(start + 1, end - start - 1);
+        //wstring wres = getLanguageDataSpecial(innerText);
+        string result = getLanguageData(innerText);
+        x.replace(start, end - start + 1, result);
+        start = x.find('(', start + result.length());
+      } else {
+        start = string::npos;
       }
-      x = getLanguageData(x.substr(1, x.size()-2));
+    }
+    if(x.back() == '\r') {
+      x.pop_back();
     }
   }
 }
@@ -1150,70 +1188,70 @@ void tile::render(SDL_Renderer * renderer, camera fcamera) {
       SDL_RenderCopyF(renderer, texture, NULL, &dstrect);
     }
 
-// render specular over water
-if (texture == g_waterTexture) {
-  g_waterOnscreen = 1;
-}
-if(specular) {
-  SDL_FRect dstrect = {0, 0, WIN_WIDTH, WIN_HEIGHT};
-  SDL_Rect srcrect = {0, 0, 256, 220};
-  // minimize the shine if it wouldn't be drawn over the
-  // tile
-  float left, right;
-  float top, bottom;
-  transform3dPoint(x, y, 0, left, top);
-  transform3dPoint(x + width, y + height, 0, right, bottom);
-  float tclip = 0, bclip = 0, lclip = 0, rclip = 0;
-  float tp = 0, lp = 0;
-  if (top > 0) {
-    tclip = top / WIN_HEIGHT;
-  }
-  if (bottom < WIN_HEIGHT) {
-    if(top > 0) {
-      bclip = ((WIN_HEIGHT - bottom) + top) / WIN_HEIGHT;
-    } else {
-      bclip = (WIN_HEIGHT - bottom) / WIN_HEIGHT;
+    // render specular over water
+    if (texture == g_waterTexture) {
+      g_waterOnscreen = 1;
     }
-  }
-  if (left > 0) {
-    lclip = left / WIN_WIDTH;
-  }
-  if (right < WIN_WIDTH) {
-    if(left > 0) {
-      rclip = ((WIN_WIDTH - right) + left) / WIN_WIDTH;
-    } else {
-      rclip = (WIN_WIDTH - right) / WIN_WIDTH;
+    if(specular) {
+      SDL_FRect dstrect = {0, 0, WIN_WIDTH, WIN_HEIGHT};
+      SDL_Rect srcrect = {0, 0, 256, 220};
+      // minimize the shine if it wouldn't be drawn over the
+      // tile
+      float left, right;
+      float top, bottom;
+      transform3dPoint(x, y, 0, left, top);
+      transform3dPoint(x + width, y + height, 0, right, bottom);
+      float tclip = 0, bclip = 0, lclip = 0, rclip = 0;
+      float tp = 0, lp = 0;
+      if (top > 0) {
+        tclip = top / WIN_HEIGHT;
+      }
+      if (bottom < WIN_HEIGHT) {
+        if(top > 0) {
+          bclip = ((WIN_HEIGHT - bottom) + top) / WIN_HEIGHT;
+        } else {
+          bclip = (WIN_HEIGHT - bottom) / WIN_HEIGHT;
+        }
+      }
+      if (left > 0) {
+        lclip = left / WIN_WIDTH;
+      }
+      if (right < WIN_WIDTH) {
+        if(left > 0) {
+          rclip = ((WIN_WIDTH - right) + left) / WIN_WIDTH;
+        } else {
+          rclip = (WIN_WIDTH - right) / WIN_WIDTH;
+        }
+      }
+      dstrect.y += tclip * WIN_HEIGHT;
+      srcrect.y += (tclip) * 220;
+      dstrect.x += lclip * WIN_WIDTH;
+      srcrect.x += (lclip) * 256;
+      dstrect.h -= bclip * WIN_HEIGHT;
+      srcrect.h -= bclip * 220;
+      dstrect.w -= rclip * WIN_WIDTH;
+      srcrect.w -= rclip * 256;
+      if (dstrect.w + dstrect.x > WIN_WIDTH) {
+        dstrect.w += WIN_WIDTH - (dstrect.w + dstrect.x);
+      }
+      if (dstrect.h + dstrect.y > WIN_HEIGHT) {
+        dstrect.h += WIN_HEIGHT - (dstrect.h + dstrect.y);
+      }
+
+      //    //1920 x 1200
+      //    if((float)dstrect.w * (1920.0 / 256.0) > width) {
+      //      dstrect.w = width;
+      //      float a = 256.0 / 1920.0;
+      //      srcrect.w = width * a;
+      //    }
+      //    if((float)dstrect.h * (1200.0 / 220.0) > height) {
+      //      dstrect.h = height;
+      //      float a = 220.0 / 1200.0;
+      //      srcrect.h = width * a;
+      //    }
+
+      SDL_RenderCopyF(renderer, g_wSpec, &srcrect, &dstrect);
     }
-  }
-  dstrect.y += tclip * WIN_HEIGHT;
-  srcrect.y += (tclip) * 220;
-  dstrect.x += lclip * WIN_WIDTH;
-  srcrect.x += (lclip) * 256;
-  dstrect.h -= bclip * WIN_HEIGHT;
-  srcrect.h -= bclip * 220;
-  dstrect.w -= rclip * WIN_WIDTH;
-  srcrect.w -= rclip * 256;
-  if (dstrect.w + dstrect.x > WIN_WIDTH) {
-    dstrect.w += WIN_WIDTH - (dstrect.w + dstrect.x);
-  }
-  if (dstrect.h + dstrect.y > WIN_HEIGHT) {
-    dstrect.h += WIN_HEIGHT - (dstrect.h + dstrect.y);
-  }
-
-//    //1920 x 1200
-//    if((float)dstrect.w * (1920.0 / 256.0) > width) {
-//      dstrect.w = width;
-//      float a = 256.0 / 1920.0;
-//      srcrect.w = width * a;
-//    }
-//    if((float)dstrect.h * (1200.0 / 220.0) > height) {
-//      dstrect.h = height;
-//      float a = 220.0 / 1200.0;
-//      srcrect.h = width * a;
-//    }
-
-    SDL_RenderCopyF(renderer, g_wSpec, &srcrect, &dstrect);
-}
 
 
   }
@@ -1250,15 +1288,15 @@ attack::attack(string filename, bool tryToShareTextures) {
 
   //only try to share textures if this isnt an entity
   //that can ever be part of the party
-//  if(tryToShareTextures) {
-//    for(auto x : g_attacks){
-//      if(x->spritename == this->spritename) {
-//        this->texture = x->texture;
-//        assetsharer = 1;
-//
-//      }
-//    }
-//  }
+  //  if(tryToShareTextures) {
+  //    for(auto x : g_attacks){
+  //      if(x->spritename == this->spritename) {
+  //        this->texture = x->texture;
+  //        assetsharer = 1;
+  //
+  //      }
+  //    }
+  //  }
 
   file >> framewidth;
   file >> frameheight;
@@ -1272,20 +1310,20 @@ attack::attack(string filename, bool tryToShareTextures) {
 
   //SDL_QueryTexture(texture, NULL, NULL, &width, &height);
 
-//  xframes = width / framewidth;
-//  yframes = height / frameheight;
-//
-//  for (int j = 0; j < height; j+=frameheight) {
-//    for (int i = 0; i < width; i+= framewidth) {
-//      coord a;
-//      a.x = i;
-//      a.y = j;
-//      framespots.push_back(a);
-//    }
-//  }
-//
-//  width = framewidth * size;
-//  height = frameheight * size;
+  //  xframes = width / framewidth;
+  //  yframes = height / frameheight;
+  //
+  //  for (int j = 0; j < height; j+=frameheight) {
+  //    for (int i = 0; i < width; i+= framewidth) {
+  //      coord a;
+  //      a.x = i;
+  //      a.y = j;
+  //      framespots.push_back(a);
+  //    }
+  //  }
+  //
+  //  width = framewidth * size;
+  //  height = frameheight * size;
 
 
 
@@ -1327,7 +1365,7 @@ weapon::weapon(string fname, bool tryToShareGraphics) {
 
   //local
   address = "resources/static/weapons/" + name + ".wep";
-  
+
 
   string field = "";
   string value = "";
@@ -1646,7 +1684,7 @@ void effectIndex::happen(int fx, int fy, int fz, float fangle) {
     a->x = fx + tx;
     a->y = fy + ty;
     a->z = fz + tz;
-      
+
     a->alpha = this->alpha;
     a->deltaAlpha = this->deltaAlpha; 
     a->curAlpha = this->alpha;
@@ -1926,8 +1964,8 @@ mapObject::mapObject(SDL_Renderer * renderer, string imageadress, const char* ma
   if(this->framewidth == 0) { this->framewidth = 64;}
   this->xoffset = int(this->x) % int(this->framewidth);
   this->bounds.y = -55; //added after the ORIGIN was used for ent sorting rather than the FOOT.
-  //this essentially just gives the blocks an invisible hitbox starting from their "head" so that their origin is in the middle
-  //of the box
+                        //this essentially just gives the blocks an invisible hitbox starting from their "head" so that their origin is in the middle
+                        //of the box
 
   extraYOffset = extrayoffset;
   this->yoffset = ceil(fmod(this->y - this->height+ extrayoffset, this->frameheight));
@@ -2134,7 +2172,7 @@ void fancychar::render(fancyword* parent) {
 
   dstrect.w *= bonusWidth;
   dstrect.h *= bonusWidth;
-  
+
   dstrect.x -= bonusSize/2;
   dstrect.y -= bonusSize/2;
   dstrect.w += bonusSize;
@@ -2149,7 +2187,7 @@ void fancychar::render(fancyword* parent) {
   SDL_FRect shadowRect = dstrect;
   shadowRect.x += booshAmount;
   shadowRect.y += booshAmount;
-  
+
   SDL_Color cc = adventureUIManager->textcolors[color].second;
 
   //SDL_SetTextureColorMod(texture, 55, 55, 55);
@@ -2159,7 +2197,7 @@ void fancychar::render(fancyword* parent) {
   SDL_RenderCopyF(renderer, texture, NULL, &shadowRect);
 
   SDL_SetTextureColorMod(texture, pow(cc.r,1.0013),pow(cc.g,1.0013),pow(cc.b,1.0013));
-  
+
   SDL_RenderCopyF(renderer, texture, NULL, &dstrect);
 }
 
@@ -2171,131 +2209,131 @@ void fancychar::update(float elapsed) {
 
   switch (movement) {
     case '0': 
-    {
-      break;
-    }
+      {
+        break;
+      }
     case '1':
-    {
-      //frightful shaking
-      xd = ((double)rand() / RAND_MAX) / 500;
-      yd = ((double)rand() / RAND_MAX) / 500;
-      break;
-    }
+      {
+        //frightful shaking
+        xd = ((double)rand() / RAND_MAX) / 500;
+        yd = ((double)rand() / RAND_MAX) / 500;
+        break;
+      }
     case '2':
-    {
-      //lightheaded wave
-      accSpeed = 0.01;
-  
-      float indexOffset = index;
-      indexOffset /= 5;
-  
-      yd = sin(accumulator*2*M_PI + indexOffset) / 120;
-      xd = cos(accumulator*2*M_PI + indexOffset) / 120;
-      
-      break;
-    }
+      {
+        //lightheaded wave
+        accSpeed = 0.01;
+
+        float indexOffset = index;
+        indexOffset /= 5;
+
+        yd = sin(accumulator*2*M_PI + indexOffset) / 120;
+        xd = cos(accumulator*2*M_PI + indexOffset) / 120;
+
+        break;
+      }
     case '3':
-    {
-      //parade, lines dance united
-      accSpeed = 0.02;
-  
-      float indexOffset = index;
-      indexOffset /= 15;
-  
-      yd = sin(accumulator*2*M_PI + indexOffset) / 240;
-      xd = cos(accumulator*2*M_PI + indexOffset) / 240;
-      break;
-    }
+      {
+        //parade, lines dance united
+        accSpeed = 0.02;
+
+        float indexOffset = index;
+        indexOffset /= 15;
+
+        yd = sin(accumulator*2*M_PI + indexOffset) / 240;
+        xd = cos(accumulator*2*M_PI + indexOffset) / 240;
+        break;
+      }
     case '4':
-    {
-      //light swinging
-      accSpeed = 0.02;
-  
-      float indexOffset = index;
-      indexOffset /= 15;
-  
-      yd = sin(accumulator*2*M_PI + indexOffset) / 240;
-      xd = cos(accumulator*2*M_PI + indexOffset) / 240;
-      break;
-    }
+      {
+        //light swinging
+        accSpeed = 0.02;
+
+        float indexOffset = index;
+        indexOffset /= 15;
+
+        yd = sin(accumulator*2*M_PI + indexOffset) / 240;
+        xd = cos(accumulator*2*M_PI + indexOffset) / 240;
+        break;
+      }
     case '5':
-    {
-      //swinging
-      accSpeed = 0.02;
-  
-      float indexOffset = index;
-      indexOffset /= 5;
-  
-      yd = sin(accumulator*2*M_PI + indexOffset) / 240;
-      xd = cos(accumulator*2*M_PI + indexOffset) / 240;
-      break;
-    }
+      {
+        //swinging
+        accSpeed = 0.02;
+
+        float indexOffset = index;
+        indexOffset /= 5;
+
+        yd = sin(accumulator*2*M_PI + indexOffset) / 240;
+        xd = cos(accumulator*2*M_PI + indexOffset) / 240;
+        break;
+      }
     case '6':
-    {
-      //smashed
-      if(xd == 0) {
-        xd = ((double)rand() / RAND_MAX) / 200;
-        yd = ((double)rand() / RAND_MAX) / 200;
+      {
+        //smashed
+        if(xd == 0) {
+          xd = ((double)rand() / RAND_MAX) / 200;
+          yd = ((double)rand() / RAND_MAX) / 200;
+        }
+        break;
       }
-      break;
-    }
     case '7':
-    {
-      //vertical smash
-      if(yd == 0) {
-        yd = ((double)rand() / RAND_MAX) / 200;
+      {
+        //vertical smash
+        if(yd == 0) {
+          yd = ((double)rand() / RAND_MAX) / 200;
+        }
+        break;
       }
-      break;
-    }
     case '8':
-    {
-      //drop in, used by nintendo for shouting, or announcements
-      if(show) {
-        opacity += 25;
-        if(opacity > 255) {
-          opacity = 255;
+      {
+        //drop in, used by nintendo for shouting, or announcements
+        if(show) {
+          opacity += 25;
+          if(opacity > 255) {
+            opacity = 255;
+          }
+          bonusSize -= 0.01;
+          if(bonusSize <= 0) {
+            bonusSize = 0;
+          }
         }
-        bonusSize -= 0.01;
-        if(bonusSize <= 0) {
-          bonusSize = 0;
-        }
+        break;
       }
-      break;
-    }
     case '9':
-    {
-      //drop in big text;
-      if(show) {
-        opacity += 25;
-        if(opacity > 255) {
-          opacity = 255;
+      {
+        //drop in big text;
+        if(show) {
+          opacity += 25;
+          if(opacity > 255) {
+            opacity = 255;
+          }
+          bonusSize -= 0.01;
+          if(bonusSize <= 0) {
+            bonusSize = 0;
+          }
         }
-        bonusSize -= 0.01;
-        if(bonusSize <= 0) {
-          bonusSize = 0;
-        }
+        break;
       }
-      break;
-    }
     case 'a':
-    {
-      //little text
-      break;
-    }
+      {
+        //little text
+        break;
+      }
     case 'b':
-    {
-      //swinging, with a swing tempo
-     
-      accSpeed = abs(xd)*2 + 0.01;
-      float indexOffset = index;
-      indexOffset /= 5;
+      {
+        //swinging, with a swing tempo
 
-  
-      yd = sin(accumulator*2*M_PI + indexOffset) / 240;
-      xd = cos(accumulator*2*M_PI + indexOffset) / 240;
+        accSpeed = abs(xd)*2 + 0.01;
+        float indexOffset = index;
+        indexOffset /= 5;
 
-      break;
-    }
+
+        yd = sin(accumulator*2*M_PI + indexOffset) / 240;
+        xd = cos(accumulator*2*M_PI + indexOffset) / 240;
+
+        break;
+      }
 
   }
 
@@ -2355,7 +2393,7 @@ void fancybox::clear() {
 }
 
 void fancybox::arrange(string fcontent) { 
-  
+
   int i = 0;
   fancyword word;
   int runningIndex = 0;
@@ -2373,80 +2411,80 @@ void fancybox::arrange(string fcontent) {
       if(first == 'c') {
         switch(sc) {
           case 'a':
-          {
-            color = 10;
-            break;
-          }
+            {
+              color = 10;
+              break;
+            }
           case 'b':
-          {
-            color = 11;
-            break;
-          }
+            {
+              color = 11;
+              break;
+            }
           case 'c':
-          {
-            color = 12;
-            break;
-          }
+            {
+              color = 12;
+              break;
+            }
           case 'd':
-          {
-            color = 13;
-            break;
-          }
+            {
+              color = 13;
+              break;
+            }
           case 'e':
-          {
-            color = 14;
-            break;
-          }
+            {
+              color = 14;
+              break;
+            }
           case 'f':
-          {
-            color = 15;
-            break;
-          }
+            {
+              color = 15;
+              break;
+            }
           case 'g':
-          {
-            color = 16;
-            break;
-          }
+            {
+              color = 16;
+              break;
+            }
           case 'h':
-          {
-            color = 17;
-            break;
-          }
+            {
+              color = 17;
+              break;
+            }
           case 'i':
-          {
-            color = 18;
-            break;
-          }
+            {
+              color = 18;
+              break;
+            }
           case 'j':
-          {
-            color = 19;
-            break;
-          }
+            {
+              color = 19;
+              break;
+            }
           case 'k':
-          {
-            color = 20;
-            break;
-          }
+            {
+              color = 20;
+              break;
+            }
           case 'l':
-          {
-            color = 21;
-            break;
-          }
+            {
+              color = 21;
+              break;
+            }
           case 'm':
-          {
-            color = 22;
-            break;
-          }
+            {
+              color = 22;
+              break;
+            }
           case 'n':
-          {
-            color = 23;
-            break;
-          }
+            {
+              color = 23;
+              break;
+            }
           default:
-          {
-            color = stoi(second);
-            break;
-          }
+            {
+              color = stoi(second);
+              break;
+            }
         }
       } else if(first == 'm'){
         movement = second[0];
@@ -2499,8 +2537,8 @@ void fancybox::arrange(string fcontent) {
       word.chars.at(word.chars.size() -1).bonusSize = 0;
     }
 
-    
-    
+
+
   }
 
   words.push_back(word);
@@ -2565,7 +2603,7 @@ worldsound::worldsound(string filename, int fx, int fy) {
   file >> temp;
   string existSTR;
   existSTR = "resources/static/sounds/" + temp + ".wav";
-  
+
 
 
   blip = loadWav(existSTR.c_str());
@@ -2691,6 +2729,7 @@ entity::entity() {
 // ent constructor
 entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) {
 
+
   //bool using_default = 0;
   this->name = filename;
 
@@ -2708,7 +2747,6 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
     spritefilevar = "resources/engine/sp-no-texture.qoi";
   }
 
-  const char* spritefile = spritefilevar.c_str();
   float size;
   string comment;
   file >> comment;
@@ -2839,7 +2877,7 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
 
   file >> comment;
   file >> this->faction;
-  
+
   if(faction != -1 && faction != 0) {
     canFight = 1;
   } else {
@@ -2877,8 +2915,8 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
       this->parent = hopeful;
       parent->children.push_back(this);
 
-//      curwidth = width;
-//      curheight = height;
+      //      curwidth = width;
+      //      curheight = height;
 
 
 
@@ -2901,112 +2939,6 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
 
 
 
-  //load dialogue file
-
-  string txtfilename = "";
-  //open from local folder first
-  txtfilename = "resources/static/scripts/" + filename + ".txt";
-  
-
-  //load voice
-  string voiceSTR = "resources/static/sounds/voice-normal.wav";
-  voice = loadWav(voiceSTR.c_str());
-
-  if(PHYSFS_exists(txtfilename.c_str())) {
-    sayings = loadText(txtfilename);
-    parseScriptForLabels(sayings);
-    parseScriptForDialogHooks(sayings);
-  }
-
-  //has another entity already loaded this texture
-  for (auto x : g_entities) {
-    if(x->name == this->name && !x->isWorlditem) {
-      texture = x->texture;
-      this->asset_sharer = 1;
-    }
-  }
-  if(!asset_sharer) {
-
-    //SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
-    //changing this in june 2023 to use linear interp on low res character sprites
-    //this may have unwanted consequences for engine sprites, e.g. lighting
-    if(!blurPixelsForScaling) {
-      SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
-    } else {
-      SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "3");
-    }
-
-    texture = loadTexture(renderer, spritefile);
-    if(texture == nullptr) {
-      E("Error loading texture for entity " + name);
-    }
-
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "3");
-  }
-
-
-  this->width = size * framewidth;
-  this->height = size * frameheight;
-
-  originalWidth = width;
-  originalHeight = height;
-
-  //move shadow to feet
-  shadow->xoffset += width/2 - shadow->width/2;
-  shadow->yoffset += height - shadow->height/2;
-
-
-
-  this->bounds.x += width/2 - bounds.width/2;
-  this->bounds.y += height - bounds.height/2;
-
-
-  shadow->width += g_extraShadowSize;
-  shadow->height += g_extraShadowSize * XtoY;
-
-  shadow->xoffset -= 0.5 * g_extraShadowSize;
-  shadow->yoffset -= 0.5 * g_extraShadowSize * XtoY;
-
-  shadow->x = x + shadow->xoffset;
-  shadow->y = y + shadow->yoffset;
-
-  int w, h;
-  SDL_QueryTexture(texture, NULL, NULL, &w, &h);
-
-  //make entities pop in unless this is a mapload
-  if(!transition) {
-    curwidth = 0;
-    curheight = 0;
-  } else {
-    curwidth = width;
-    curheight = height;
-  }
-
-  xframes = w / framewidth;
-  yframes = h / frameheight;
-
-
-
-  for (int j = 0; j < h; j+=frameheight) {
-    for (int i = 0; i < w; i+= framewidth) {
-      coord a;
-      a.x = i;
-      a.y = j;
-      framespots.push_back(a);
-    }
-  }
-
-  //if we don't have the frames just set anim to 0
-  if(!(yframes > 3) ) {
-    animation = 0;
-    defaultAnimation = 0;
-  }
-
-  //disabled nodes underneath if we are set to (e.g. doors)
-  
-
-
-  g_entities.push_back(this);
 
   file >> comment;
   //spawn everything on spawnlist
@@ -3026,8 +2958,8 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
     }
 
     //trying to fix orbitals not appearing for the first frame of mapload
-//    a->curheight = a->height;
-//    a->curwidth = a->width;
+    //    a->curheight = a->height;
+    //    a->curwidth = a->width;
   }
 
   //music and radius
@@ -3138,6 +3070,7 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
   file >> comment;
   file >> boardingScriptName;
 
+
   if(boardingScriptName != "0") {
     usesBoardingScript = 1;
     string txtfilename = "";
@@ -3152,10 +3085,114 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
 
   }
 
+  //load voice
+//  string voiceSTR = "resources/static/sounds/voice-normal.wav";
+//  voice = loadWav(voiceSTR.c_str());
+
+  //load dialogue file
+
+  string txtfilename = "";
+  //open from local folder first
+  txtfilename = "resources/static/scripts/" + filename + ".txt";
+  if(PHYSFS_exists(txtfilename.c_str())) {
+    sayings = loadText(txtfilename);
+    parseScriptForLabels(sayings);
+    parseScriptForDialogHooks(sayings);
+  }
+
+  if(identity == 35) {
+    spritefilevar = "resources/static/key-items/" + to_string(faction) + ".qoi";
+    string hook = "KeyItem" + to_string(faction) + "Name";
+    displayName = getLanguageData(hook);
+  }
+
+  for (auto x : g_entities) {
+    if(x->name == this->name) {
+      texture = x->texture;
+      this->asset_sharer = 1;
+    }
+  }
+  g_entities.push_back(this);
+  const char* spritefile = spritefilevar.c_str();
+  if(!asset_sharer) {
+    if(!blurPixelsForScaling) {
+      SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+    } else {
+      SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "3");
+    }
+
+    texture = loadTexture(renderer, spritefile);
+    if(texture == nullptr) {
+      E("Error loading texture for entity " + name);
+      D(spritefilevar);
+    }
+
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "3");
+  }
+
+
+  this->width = size * framewidth;
+  this->height = size * frameheight;
+
+  originalWidth = width;
+  originalHeight = height;
+
+  //move shadow to feet
+  shadow->xoffset += width/2 - shadow->width/2;
+  shadow->yoffset += height - shadow->height/2;
+
+
+
+  this->bounds.x += width/2 - bounds.width/2;
+  this->bounds.y += height - bounds.height/2;
+
+
+  shadow->width += g_extraShadowSize;
+  shadow->height += g_extraShadowSize * XtoY;
+
+  shadow->xoffset -= 0.5 * g_extraShadowSize;
+  shadow->yoffset -= 0.5 * g_extraShadowSize * XtoY;
+
+  shadow->x = x + shadow->xoffset;
+  shadow->y = y + shadow->yoffset;
+
+  int w, h;
+  SDL_QueryTexture(texture, NULL, NULL, &w, &h);
+
+  //make entities pop in unless this is a mapload
+  if(!transition) {
+    curwidth = 0;
+    curheight = 0;
+  } else {
+    curwidth = width;
+    curheight = height;
+  }
+
+  xframes = w / framewidth;
+  yframes = h / frameheight;
+
+
+
+  for (int j = 0; j < h; j+=frameheight) {
+    for (int i = 0; i < w; i+= framewidth) {
+      coord a;
+      a.x = i;
+      a.y = j;
+      framespots.push_back(a);
+    }
+  }
+
+  //if we don't have the frames just set anim to 0
+  if(!(yframes > 3) ) {
+    animation = 0;
+    defaultAnimation = 0;
+  }
+
+
   if(animationconfig == 0) {
     useAnimForWalking = 1;
   }
-  
+
   if(animationconfig == 1) {
     useAnimForWalking = 0;
   }
@@ -3218,17 +3255,17 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
     }
 
     //give us a way to call scripts if we have at least one script
-//    if(hasAtleastOneScript) {
-//      // !!! make another constructor that doesn't have a dialogbox
-//      myScriptCaller = new adventureUI(renderer, 1);
-//      myScriptCaller->playersUI = 0;
-//      myScriptCaller->talker = this;
-//    }
+    //    if(hasAtleastOneScript) {
+    //      // !!! make another constructor that doesn't have a dialogbox
+    //      myScriptCaller = new adventureUI(renderer, 1);
+    //      myScriptCaller->playersUI = 0;
+    //      myScriptCaller->talker = this;
+    //    }
 
 
     stream >> comment; // states
     stream >> comment; // open curly brace character
-    
+
     //a line might look like this 
     //  passive(1300, 3)
     //  duration, range in blocks
@@ -3240,16 +3277,16 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
       //line contains the name of an ability
       state newState;
       string name;
-      
+
       vector<string> x = splitString(line, '(');
       name = x[0];
       x[1].pop_back(); 
 
       string interval = x[1];
-      
+
       stream >> line;
       line.pop_back();
-      
+
       string blocks = line;
 
       newState.name = name;
@@ -3262,7 +3299,7 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
 
     stream >> comment; // stateTransitions
     stream >> comment; // open curly brace character
-    
+
     //a line might look like this 
     //  passive -> active (1)
     for(;;) {
@@ -3272,12 +3309,12 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
       string fromState;
       string toState;
       string probability;
-      
+
       fromState = line;
       stream >> comment; // "->"
       stream >> toState;
       stream >> probability;
-      
+
       probability = probability.substr(1, probability.size()-2);
 
       int fromIndex = -1;
@@ -3297,7 +3334,7 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
         states[fromIndex].nextStateProbabilities.push_back(stof(probability));
 
       }
-      
+
     }
     if(states.size() > 0) {useStateSystem = 1;}
 
@@ -3374,7 +3411,7 @@ entity::entity(SDL_Renderer * renderer, string filename, float sizeForDefaults) 
 
     stream >> comment; //aggressiveness_gain
     stream >> aggressivenessGain;
-                       
+
     stream >> comment; //aggressiveness_loss
     stream >> aggressivenessLoss;
 
@@ -3451,6 +3488,8 @@ entity::entity(SDL_Renderer* renderer, entity* a) {
   this->orbitalIgnoreZ = a->orbitalIgnoreZ;
   this->solid = a->solid;
   this->semisolid = a->semisolid;
+  this->identity = a->identity;
+
   if(this->solid) {
     this->solidify();
     this->canBeSolid = 1;
@@ -3466,204 +3505,10 @@ entity::entity(SDL_Renderer* renderer, entity* a) {
     }
   }
 
-  
+
 
   g_entities.push_back(this);
 }
-
-      //for worlditems, load the ent file but use a texture by name
-entity::entity(SDL_Renderer * renderer, int idk,  string texturename) {
-  //M("entity()");
-  sortingOffset = 16;
-  ifstream file;
-  //bool using_default = 0;
-  this->name = texturename;
-  isWorlditem = 1;
-  this->faction = -1;
-  string loadstr;
-
-  //load from global folder
-  loadstr = "resources/engine/worlditem.ent";
-  const char* plik = loadstr.c_str();
-
-  file.open(plik);
-
-
-
-  string temp;
-  file >> temp;
-  string spritefilevar;
-
-  //!!! do something else if there's none, use a generic image or smt
-  spritefilevar = "resources/static/items/" + texturename + ".qoi";
-  
-
-  if(onionmode) {spritefilevar = "resources/engine/onion.qoi";}
-
-  texture = loadTexture(renderer, spritefilevar);
-  //M(spritefilevar );
-
-
-  string comment;
-  file >> comment;
-  float size;
-  file >> size;
-
-  file >> comment;
-  file >> this->xagil;
-
-
-  file >> comment;
-  file >> this->xmaxspeed;
-
-  file >> comment;
-  file >> this->friction;
-
-  file >> comment;
-  float twidth, theight, tzeight;
-  file >> twidth;
-  file >> theight;
-  file >> tzeight;
-  bounds.width = twidth * 64;
-  bounds.height = theight * 55;
-  bounds.zeight = tzeight * 32;
-
-
-  file >> comment;
-  file >> this->bounds.x;
-  file >> this->bounds.y;
-
-  file >> comment;
-  file >> this->sortingOffset;
-
-  file >> comment;
-  float fsize;
-  file >> fsize;
-
-  shadow = new cshadow(renderer, fsize);
-  if(rectangularshadow) {shadow->texture = g_shadowTextureAlternate;}
-
-  this->shadow->owner = this;
-
-
-  file >> comment;
-  file >> shadow->xoffset;
-  file >> shadow->yoffset;
-
-  int tempshadowSoffset;
-  file >> comment;
-  file >> tempshadowSoffset;
-
-  file >> comment;
-  file >> this->animspeed;
-  file >> this->animlimit;
-
-  file >> comment;
-  file >> growFromFloor;
-
-  file >> comment;
-  file >> this->turnToFacePlayer;
-
-  file >> comment;
-  file >> this->framewidth;
-  file >> this->frameheight;
-  this->shadow->width = framewidth * fsize;
-  this->shadow->height = framewidth * fsize * (1/p_ratio);
-
-  //bigger shadows have bigger sortingoffsets
-  shadow->sortingOffset = 65 * (shadow->height / 44.4) + tempshadowSoffset;
-  //sortingOffset = 8;
-
-
-  file >> comment;
-  file >> this->dynamic;
-  int solidifyHim = 0;
-
-
-  file >> comment;
-  file >> solidifyHim;
-  if(solidifyHim == 1) {
-    this->solidify();
-  }
-
-  if(solidifyHim == 2) {
-    //don't react to solid objects
-    ignoreSolids = 1;
-  }
-
-  file >> comment;
-  file >> semisolid;
-
-  file >> comment;
-  file >> navblock;
-
-  file >> comment;
-  file >> this->rectangularshadow;
-
-  file >> comment;
-  file >> this->faction;
-
-
-  if(faction != 0) {
-    canFight = 1;
-  }
-
-  file >> comment;
-  file >> this->weaponName;
-
-  file >> comment;
-  file >> this->agrod;
-
-  file >> comment;
-  file >> maxhp;
-
-  hp = maxhp;
-
-  file >> comment;
-  file >> invincible;
-
-  file >> comment;
-  file >> cost;
-
-  file >> comment;
-  file >> essential;
-   
-  this->width = size * framewidth;
-  this->height = size * frameheight;
-
-  //move shadow to feet
-  shadow->xoffset += width/2 - shadow->width/2;
-  shadow->yoffset += height - shadow->height/2;
-
-
-  this->bounds.x += width/2 - bounds.width/2;
-  this->bounds.y += height - bounds.height/2;
-
-
-  shadow->width += g_extraShadowSize;
-  shadow->height += g_extraShadowSize * XtoY;
-
-  shadow->xoffset -= 0.5 * g_extraShadowSize;
-  shadow->yoffset -= 0.5 * g_extraShadowSize * XtoY;
-
-
-
-  int w, h;
-  SDL_QueryTexture(texture, NULL, NULL, &w, &h);
-
-  xframes = 1;
-  yframes = 1;
-  frame = 0;
-  framewidth = w;
-  frameheight = h;
-  coord a;
-  a.x = 0;
-  a.y = 0;
-  framespots.push_back(a);
-
-  g_entities.push_back(this);
-}
-
 
 entity::~entity() {
   if (!wallcap) {
@@ -3753,7 +3598,7 @@ void entity::solidify() {
 }
 
 void entity::unsolidify() {
-    this->solid = 0;
+  this->solid = 0;
   g_solid_entities.erase(remove(g_solid_entities.begin(), g_solid_entities.end(), this), g_solid_entities.end());
 }
 
@@ -3781,10 +3626,10 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
 
   if(this == protag) { g_protagHasBeenDrawnThisFrame = 1; }
   //if its a wallcap, tile the image just like a maptile
-  
+
   rect obj;
-  
-    
+
+
   if(shrinking) {
     if(growFromFloor) {
       obj = rect(
@@ -3800,9 +3645,9 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
           ((y) - (((curheight) * (XtoY) + (originalHeight * (1-XtoY)))) 
 
            - ( 
-               (originalHeight * (XtoY))
-                -
-               (curheight * XtoY)
+             (originalHeight * (XtoY))
+             -
+             (curheight * XtoY)
              )*0.5
 
            - ((z) + floatheight) * XtoZ) - fcamera.y,
@@ -3827,9 +3672,9 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
           ((y) - (((curheight) * (XtoY) + (height * (1-XtoY)))) 
 
            - ( 
-               (height * (XtoY))
-                -
-               (curheight * XtoY)
+             (height * (XtoY))
+             -
+             (curheight * XtoY)
              )*0.5
 
            - ((z) + floatheight) * XtoZ) - fcamera.y,
@@ -3859,7 +3704,7 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
           (forwardsVelocity + forwardsPushVelocity > 0 && !this->wasPellet)
           ||
           this->forceAngularUpdate
-          ) {
+        ) {
         animation = convertAngleToFrame(steeringAngle);
         flip = SDL_FLIP_NONE;
         if(yframes < 8) {
@@ -3873,17 +3718,17 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
             animation = 1;
             flip = SDL_FLIP_HORIZONTAL;
           }
-  
+
           if(animation > 5 || animation < 0) {
             animation = 0;
           }
         }
-  
+
         if(yframes < 2) {
           animation = 0;
         }
-  
-  
+
+
       }
       if(lastDirection != animation) {
         directionUpdateCooldownMs = maxDirectionUpdateCooldownMs;
@@ -3903,8 +3748,6 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
       //this is used to share a texture between multiple sprites who really just use one frame of the texture, e.g. collectible familiars
       frame = animation * xframes + animWalkFrames;
     }
-    //genericmode has just one frame
-    if(isWorlditem) {frame = 0;}
 
 
 
@@ -3997,26 +3840,21 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
       if(texture != NULL) {
         SDL_RenderCopyF(renderer, texture, NULL, &dstrect);
       }
-//      if(flashingMS > 0) {
-//        SDL_SetTextureColorMod(texture, 255, 255, 255);
-//      }
+      //      if(flashingMS > 0) {
+      //        SDL_SetTextureColorMod(texture, 255, 255, 255);
+      //      }
     }
   }
 
 }
 
 void entity::move_up() {
-  //M("move_up()"); was having problems walking in devmode ;_;
   if(stunned) {return;}
   forwardsVelocity = (xagil * (100 - statusSlownPercent));
-  //y-=xagil;
-  //yaccel = -1* (xagil * (100 - statusSlownPercent));
   if(shooting) { return;}
   up = true;
   down = false;
   hadInput = 1;
-
-  //M("move_up() completed");
 }
 
 void entity::stop_verti() {
@@ -4160,2454 +3998,2338 @@ musicNode* entity::Get_Closest_Node(vector<musicNode*> array, int useVelocity) {
 //returns a pointer to a door that the player used
 //entity update
 door* entity::update(vector<door*> doors, float elapsed) {
-        if(!tangible) {return nullptr;}
+  if(g_entityBenchmarking) {
+    g_eu_timer = SDL_GetTicks();
+  }
+  if(!tangible) {return nullptr;}
 
-        if(target != nullptr) {
-          this->distanceToTarget = XYWorldDistance(this->getOriginX(), this->getOriginY(), target->getOriginX(), target->getOriginY());
-        }
-        
-        //unset these so they update
-        cachedOriginValsAreGood = 0;
-        
-        if(usingTimeToLive) {
-          timeToLiveMs -= elapsed;
-        }
+  if(target != nullptr) {
+    this->distanceToTarget = XYWorldDistance(this->getOriginX(), this->getOriginY(), target->getOriginX(), target->getOriginY());
+  }
 
-        invincibleMS -= elapsed;
+  //unset these so they update
+  cachedOriginValsAreGood = 0;
 
-        if(usingVisibleMs) {
-          visibleMs -= elapsed;
-          if(visibleMs <= 0) {
-            visible = 0;
-          }
-        }
+  if(usingTimeToLive) {
+    timeToLiveMs -= elapsed;
+  }
 
-        for(auto t : mobilesounds) {
-          t->x = getOriginX();
-          t->y = getOriginY();
-        }
+  invincibleMS -= elapsed;
 
-        if(isOrbital) {
-          if(!orbitalIgnoreZ) {
-            this->z = parent->z -10 - (parent->height - parent->curheight);
-          }
+  if(usingVisibleMs) {
+    visibleMs -= elapsed;
+    if(visibleMs <= 0) {
+      visible = 0;
+    }
+  }
 
+  for(auto t : mobilesounds) {
+    t->x = getOriginX();
+    t->y = getOriginY();
+  }
 
-          float angle = convertFrameToAngle(parent->animation, parent->flip == SDL_FLIP_HORIZONTAL);
-
-
-          //orbitoffset is the number of frames, counter-clockwise from facing straight down
-          float fangle = angle;
-          fangle += (float)orbitOffset * (M_PI/4);
-          fangle = fmod(fangle , (2* M_PI));
-
-          this->setOriginX(parent->getOriginX() - cos(fangle) * orbitRange);
-          this->setOriginY(parent->getOriginY() - sin(fangle) * orbitRange);
-
-          if(this->dynamic) {
-            this->sortingOffset = baseSortingOffset + sin(fangle) * 21 + 10 + (parent->height - parent->curheight);
-          }
-
-          if(yframes == 8) {
-            this->animation = convertAngleToFrame(fangle);
-            this->flip = SDL_FLIP_NONE;
-          } else {
-            this->flip = parent->flip;
-            this->animation = parent->animation;
-            if(yframes == 1) {
-              this->animation = 0;
-            }
-          }
-
-          //I think I added this check for the ent's floor to let the protag walk up
-          //slopes, but i'll disable it since i don't really use slopes (Nov 2023)
-          //There's another one 1000 lines later
-
-//          //update shadow
-//          float heightfloor = 0;
-//          layer = max(z /64, 0.0f);
-//          layer = min(layer, (int)g_boxs.size() - 1);
-//
-//          //should we fall?
-//          //bool should_fall = 1;
-//          float floor = 0;
-//          if(layer > 0) {
-//            //!!!
-//            rect thisMovedBounds = rect(bounds.x + x + xvel * ((double) elapsed / 256.0), bounds.y + y + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
-//            //rect thisMovedBounds = rect(bounds.x + x, bounds.y + y, bounds.width, bounds.height);
-//            for (auto n : g_boxs[layer - 1]) {
-//              if(RectOverlap(n->bounds, thisMovedBounds)) {
-//                floor = 64 * (layer);
-//                break;
-//              }
-//            }
-//            for (auto n : g_triangles[layer - 1]) {
-//              if(TriRectOverlap(n, thisMovedBounds.x, thisMovedBounds.y, thisMovedBounds.width, thisMovedBounds.height)) {
-//                floor = 64 * (layer);
-//                break;
-//              }
-//
-//            }
-//
-//
-//            float shadowFloor = floor;
-//            floor = max(floor, heightfloor);
-//
-//            bool breakflag = 0;
-//            for(int i = layer - 1; i >= 0; i--) {
-//              for (auto n : g_boxs[i]) {
-//                if(RectOverlap(n->bounds, thisMovedBounds)) {
-//                  shadowFloor = 64 * (i + 1);
-//                  breakflag = 1;
-//                  break;
-//                }
-//              }
-//              if(breakflag) {break;}
-//              for (auto n : g_triangles[i]) {
-//                if(TriRectOverlap(n, thisMovedBounds.x, thisMovedBounds.y, thisMovedBounds.width, thisMovedBounds.height)) {
-//                  shadowFloor = 64 * (i + 1);
-//                  breakflag = 1;
-//                  break;
-//                }
-//
-//              }
-//              if(breakflag) {break;}
-//            }
-//            if(breakflag == 0) {
-//              //just use heightmap
-//              shadowFloor = floor;
-//            }
-//            this->shadow->z = shadowFloor;
-//          } else {
-//            this->shadow->z = heightfloor;
-//            floor = heightfloor;
-//          }
-          shadow->x = x + shadow->xoffset;
-          shadow->y = y + shadow->yoffset;
+  if(isOrbital) {
+    if(!orbitalIgnoreZ) {
+      this->z = parent->z -10 - (parent->height - parent->curheight);
+    }
 
 
-
-          //return nullptr; 
-          //i commented this out
-          //to make biting work
-        }
+    float angle = convertFrameToAngle(parent->animation, parent->flip == SDL_FLIP_HORIZONTAL);
 
 
-        if(msPerFrame != 0) {
+    //orbitoffset is the number of frames, counter-clockwise from facing straight down
+    float fangle = angle;
+    fangle += (float)orbitOffset * (M_PI/4);
+    fangle = fmod(fangle , (2* M_PI));
 
-          msTilNextFrame += elapsed;
-          if(msTilNextFrame > msPerFrame && xframes > 1) {
-            msTilNextFrame = 0; //should be msTilNextFrame - msPerFrame
-           
-            if(reverseAnimation) {
-              frameInAnimation--;
-              if(frameInAnimation < 0) {
-                if(loopAnimation) {
-                  if(scriptedAnimation) {
-                    frameInAnimation = xframes - 1;
-                  } else {
-                    frameInAnimation = 0;
-                  }
-                } else {
-                  frameInAnimation = 0;
-                  msPerFrame = 0;
-                  //!!! slightly ambiguous. open to review later
-                  scriptedAnimation = 0;
-                }
-              }
+    this->setOriginX(parent->getOriginX() - cos(fangle) * orbitRange);
+    this->setOriginY(parent->getOriginY() - sin(fangle) * orbitRange);
+
+    if(this->dynamic) {
+      this->sortingOffset = baseSortingOffset + sin(fangle) * 21 + 10 + (parent->height - parent->curheight);
+    }
+
+    if(yframes == 8) {
+      this->animation = convertAngleToFrame(fangle);
+      this->flip = SDL_FLIP_NONE;
+    } else {
+      this->flip = parent->flip;
+      this->animation = parent->animation;
+      if(yframes == 1) {
+        this->animation = 0;
+      }
+    }
+
+    //I think I added this check for the ent's floor to let the protag walk up
+    //slopes, but i'll disable it since i don't really use slopes (Nov 2023)
+    //There's another one 1000 lines later
+
+    //          //update shadow
+    //          float heightfloor = 0;
+    //          layer = max(z /64, 0.0f);
+    //          layer = min(layer, (int)g_boxs.size() - 1);
+    //
+    //          //should we fall?
+    //          //bool should_fall = 1;
+    //          float floor = 0;
+    //          if(layer > 0) {
+    //            //!!!
+    //            rect thisMovedBounds = rect(bounds.x + x + xvel * ((double) elapsed / 256.0), bounds.y + y + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
+    //            //rect thisMovedBounds = rect(bounds.x + x, bounds.y + y, bounds.width, bounds.height);
+    //            for (auto n : g_boxs[layer - 1]) {
+    //              if(RectOverlap(n->bounds, thisMovedBounds)) {
+    //                floor = 64 * (layer);
+    //                break;
+    //              }
+    //            }
+    //            for (auto n : g_triangles[layer - 1]) {
+    //              if(TriRectOverlap(n, thisMovedBounds.x, thisMovedBounds.y, thisMovedBounds.width, thisMovedBounds.height)) {
+    //                floor = 64 * (layer);
+    //                break;
+    //              }
+    //
+    //            }
+    //
+    //
+    //            float shadowFloor = floor;
+    //            floor = max(floor, heightfloor);
+    //
+    //            bool breakflag = 0;
+    //            for(int i = layer - 1; i >= 0; i--) {
+    //              for (auto n : g_boxs[i]) {
+    //                if(RectOverlap(n->bounds, thisMovedBounds)) {
+    //                  shadowFloor = 64 * (i + 1);
+    //                  breakflag = 1;
+    //                  break;
+    //                }
+    //              }
+    //              if(breakflag) {break;}
+    //              for (auto n : g_triangles[i]) {
+    //                if(TriRectOverlap(n, thisMovedBounds.x, thisMovedBounds.y, thisMovedBounds.width, thisMovedBounds.height)) {
+    //                  shadowFloor = 64 * (i + 1);
+    //                  breakflag = 1;
+    //                  break;
+    //                }
+    //
+    //              }
+    //              if(breakflag) {break;}
+    //            }
+    //            if(breakflag == 0) {
+    //              //just use heightmap
+    //              shadowFloor = floor;
+    //            }
+    //            this->shadow->z = shadowFloor;
+    //          } else {
+    //            this->shadow->z = heightfloor;
+    //            floor = heightfloor;
+    //          }
+    shadow->x = x + shadow->xoffset;
+    shadow->y = y + shadow->yoffset;
+
+
+
+    //return nullptr; 
+    //i commented this out
+    //to make biting work
+  }
+
+  if(msPerFrame != 0) {
+
+    msTilNextFrame += elapsed;
+    if(msTilNextFrame > msPerFrame && xframes > 1) {
+      msTilNextFrame = 0; //should be msTilNextFrame - msPerFrame
+
+      if(reverseAnimation) {
+        frameInAnimation--;
+        if(frameInAnimation < 0) {
+          if(loopAnimation) {
+            if(scriptedAnimation) {
+              frameInAnimation = xframes - 1;
             } else {
-              frameInAnimation++;
-              if(frameInAnimation == xframes || (useAnimForWalking && frameInAnimation == animWalkFrames + 1 && !scriptedAnimation)) {
-                if(loopAnimation) {
-                  if(scriptedAnimation) {
-                    frameInAnimation = 0;
-                  } else {
-                    frameInAnimation = 1;
-                  }
-                } else {
-                  frameInAnimation = xframes - 1;
-                  msPerFrame = 0;
-                  scriptedAnimation = 0;
-                }
-              }
-            }
-          }
-        }
-        if(animate && !transition && animlimit != 0) {
-          curwidth = (curwidth * 0.8 + width * 0.2) * ((sin(animtime*animspeed))   + (1/animlimit)) * (animlimit);
-          curheight = (curheight * 0.8 + height* 0.2) * ((sin(animtime*animspeed + PI))+ (1/animlimit)) * (animlimit);
-          animtime += elapsed;
-          if(this == protag && ( pow( pow(xvel,2) + pow(yvel, 2), 0.5) > 30 ) && (1 - sin(animtime * animspeed) < 0.01 || 1 - sin(animtime * animspeed + PI) < 0.01)) {
-            if(footstep_reset && grounded) {
-              footstep_reset = 0;
-              if(1 - sin(animtime * animspeed) < 0.04) {
-                playSound(-1, g_staticSounds[1], 0);
-              } else {
-                playSound(-1, g_staticSounds[2], 0);
-              }
-
-
+              frameInAnimation = 0;
             }
           } else {
-            footstep_reset = 1;
-          }
-        } else {
-          animtime = 0;
-          curwidth = curwidth * 0.8 + width * 0.2;
-          curheight = curheight * 0.8 + height* 0.2;
-        }
-
-
-        //should we animate?
-        if(xaccel != 0 || yaccel != 0) {
-          extraAnimateFrames = 6;
-        }
-
-        if( (xaccel != 0 || yaccel != 0) || !grounded || extraAnimateFrames > 0) {
-          extraAnimateFrames --;
-          animate = 1;
-          if(useAnimForWalking) {
-            if( (!scriptedAnimation) && grounded) {
-              msPerFrame = walkAnimMsPerFrame;
-            } else {
-              msPerFrame = 0;
-            }
-          }
-        } else {
-          animate = 0;
-          if(useAnimForWalking && !scriptedAnimation && this->useAnimForWalking) {
-            msPerFrame = 0;
             frameInAnimation = 0;
+            msPerFrame = 0;
+            //!!! slightly ambiguous. open to review later
+            scriptedAnimation = 0;
           }
         }
-
-        //should we enabled semisolidness? (for entities spawned after map-load far from protag)
-        if(semisolidwaittoenable) {
-          if(!CylinderOverlap(this->getMovedBounds(), protag->getMovedBounds())) {
-            this->semisolid = storedSemisolidValue;
-            this->semisolidwaittoenable = 0;
-          }
-        }
-
-        if(this->usesContactScript) {
-          this->curContactScriptWaitMS -= elapsed;
-          if(curContactScriptWaitMS <= 0) {
-            contactReadyToProc = 1;
-            curContactScriptWaitMS = contactScriptWaitMS;
+      } else {
+        frameInAnimation++;
+        if(frameInAnimation == xframes || (useAnimForWalking && frameInAnimation == animWalkFrames + 1 && !scriptedAnimation)) {
+          if(loopAnimation) {
+            if(scriptedAnimation) {
+              frameInAnimation = 0;
+            } else {
+              frameInAnimation = 1;
+            }
           } else {
-            contactReadyToProc = 0;
+            frameInAnimation = xframes - 1;
+            msPerFrame = 0;
+            scriptedAnimation = 0;
           }
         }
+      }
+    }
+  }
+  if(g_entityBenchmarking) {
+    g_eu_timer -= SDL_GetTicks();
+    g_eu_a -= g_eu_timer;
+    g_eu_timer = SDL_GetTicks();
+  }
 
-        if(!dynamic && !CalcDynamicForOneFrame) { return nullptr; }
-        //if(CalcDynamicForOneFrame) { M("Calct for one frame");}
-        CalcDynamicForOneFrame = 0;
 
-        //wait until turned to walk
-        float thisTA = targetSteeringAngle;
-        float thisSA = steeringAngle;
-        float angularDiff = abs(thisTA - thisSA);
-        if( angularDiff > M_PI/2) {
-          //could it be a case of angle wrap causing problems?
-          if(thisTA == 0) {
-            thisTA = 2 * M_PI;
-          }
-          if(thisSA == 0) {
-            thisSA = 2 * M_PI;
-          }
-          angularDiff = abs(thisTA - thisSA);
-          if(angularDiff > M_PI/2) {
-            forwardsVelocity = 0;
-          }
-        }
-
-        forwardsPushVelocity *= 0.8;
-        if(forwardsPushVelocity < 0) {
-          forwardsPushVelocity = 0;
-        }
-
-        if(stunned) {forwardsVelocity = 0;}
-
-        //set xaccel and yaccel from forwardsVelocity
-        xaccel = cos(steeringAngle) * forwardsVelocity;
-        yaccel = -sin(steeringAngle) * forwardsVelocity;
-
-        //keep pellets moving
-        if(this->wasPellet && this->usingTimeToLive) {
-          this->steeringAngle = wrapAngle(atan2(protag->getOriginX() - this->getOriginX(), protag->getOriginY() - this->getOriginY()) - M_PI/2);
-          this->targetSteeringAngle = this->steeringAngle;
+  if(animate && !transition && animlimit != 0) {
+    curwidth = (curwidth * 0.8 + width * 0.2) * ((sin(animtime*animspeed))   + (1/animlimit)) * (animlimit);
+    curheight = (curheight * 0.8 + height* 0.2) * ((sin(animtime*animspeed + PI))+ (1/animlimit)) * (animlimit);
+    animtime += elapsed;
+    if(this == protag && ( pow( pow(xvel,2) + pow(yvel, 2), 0.5) > 30 ) && (1 - sin(animtime * animspeed) < 0.01 || 1 - sin(animtime * animspeed + PI) < 0.01)) {
+      if(footstep_reset && grounded) {
+        footstep_reset = 0;
+        if(1 - sin(animtime * animspeed) < 0.04) {
+          playSound(-1, g_staticSounds[1], 0);
         } else {
-          forwardsVelocity = 0;
+          playSound(-1, g_staticSounds[2], 0);
         }
- 
 
-        if(this == protag) {
-          if(up) {
-            if(left) {
-              //up + left
-              targetSteeringAngle = 3*M_PI/4;
-  
-            } else if(right) {
-              //up + right
-              targetSteeringAngle = M_PI/4;
-  
-            } else {
-              //up
-              targetSteeringAngle = M_PI/2;
-  
-            }
-  
-          } else if(down) {
-            if(left) {
-              //down + left
-              targetSteeringAngle = 5 * M_PI/4;
-  
-            } else if(right) {
-              //down + right
-              targetSteeringAngle = 7 * M_PI/4;
-  
-            } else {
-              //down
-              targetSteeringAngle = 3 * M_PI/2;
-  
-            }
-   
-          } else if(left) {
-            //left
-            targetSteeringAngle = M_PI;
-  
-          } else if(right) {
-            //right
-            targetSteeringAngle = 0;
+
+      }
+    } else {
+      footstep_reset = 1;
+    }
+  } else {
+    animtime = 0;
+    curwidth = curwidth * 0.8 + width * 0.2;
+    curheight = curheight * 0.8 + height* 0.2;
+  }
+
+
+  //should we animate?
+  if(xaccel != 0 || yaccel != 0) {
+    extraAnimateFrames = 6;
+  }
+
+  if( (xaccel != 0 || yaccel != 0) || !grounded || extraAnimateFrames > 0) {
+    extraAnimateFrames --;
+    animate = 1;
+    if(useAnimForWalking) {
+      if( (!scriptedAnimation) && grounded) {
+        msPerFrame = walkAnimMsPerFrame;
+      } else {
+        msPerFrame = 0;
+      }
+    }
+  } else {
+    animate = 0;
+    if(useAnimForWalking && !scriptedAnimation && this->useAnimForWalking) {
+      msPerFrame = 0;
+      frameInAnimation = 0;
+    }
+  }
+
+  //should we enabled semisolidness? (for entities spawned after map-load far from protag)
+  if(semisolidwaittoenable) {
+    if(!CylinderOverlap(this->getMovedBounds(), protag->getMovedBounds())) {
+      this->semisolid = storedSemisolidValue;
+      this->semisolidwaittoenable = 0;
+    }
+  }
+
+  if(this->usesContactScript) {
+    this->curContactScriptWaitMS -= elapsed;
+    if(curContactScriptWaitMS <= 0) {
+      contactReadyToProc = 1;
+      curContactScriptWaitMS = contactScriptWaitMS;
+    } else {
+      contactReadyToProc = 0;
+    }
+  }
+
+  if(!dynamic && !CalcDynamicForOneFrame) { return nullptr; }
+  //if(CalcDynamicForOneFrame) { M("Calct for one frame");}
+  CalcDynamicForOneFrame = 0;
+
+  //wait until turned to walk
+  float thisTA = targetSteeringAngle;
+  float thisSA = steeringAngle;
+  float angularDiff = abs(thisTA - thisSA);
+  if( angularDiff > M_PI/2) {
+    //could it be a case of angle wrap causing problems?
+    if(thisTA == 0) {
+      thisTA = 2 * M_PI;
+    }
+    if(thisSA == 0) {
+      thisSA = 2 * M_PI;
+    }
+    angularDiff = abs(thisTA - thisSA);
+    if(angularDiff > M_PI/2) {
+      forwardsVelocity = 0;
+    }
+  }
+
+  forwardsPushVelocity *= 0.8;
+  if(forwardsPushVelocity < 0) {
+    forwardsPushVelocity = 0;
+  }
+
+  if(stunned) {forwardsVelocity = 0;}
+
+  //set xaccel and yaccel from forwardsVelocity
+  xaccel = cos(steeringAngle) * forwardsVelocity;
+  yaccel = -sin(steeringAngle) * forwardsVelocity;
+
+  //keep pellets moving
+  if(this->wasPellet && this->usingTimeToLive) {
+    this->steeringAngle = wrapAngle(atan2(protag->getOriginX() - this->getOriginX(), protag->getOriginY() - this->getOriginY()) - M_PI/2);
+    this->targetSteeringAngle = this->steeringAngle;
+  } else {
+    forwardsVelocity = 0;
+  }
+
+
+  if(this == protag) {
+    if(up) {
+      if(left) {
+        //up + left
+        targetSteeringAngle = 3*M_PI/4;
+
+      } else if(right) {
+        //up + right
+        targetSteeringAngle = M_PI/4;
+
+      } else {
+        //up
+        targetSteeringAngle = M_PI/2;
+
+      }
+
+    } else if(down) {
+      if(left) {
+        //down + left
+        targetSteeringAngle = 5 * M_PI/4;
+
+      } else if(right) {
+        //down + right
+        targetSteeringAngle = 7 * M_PI/4;
+
+      } else {
+        //down
+        targetSteeringAngle = 3 * M_PI/2;
+
+      }
+
+    } else if(left) {
+      //left
+      targetSteeringAngle = M_PI;
+
+    } else if(right) {
+      //right
+      targetSteeringAngle = 0;
+    }
+  }
+  if(g_entityBenchmarking) {
+    g_eu_timer -= SDL_GetTicks();
+    g_eu_b -= g_eu_timer;
+    g_eu_timer = SDL_GetTicks();
+  }
+
+  if( (this != protag) || ((this == protag) && ((protag_can_move) && (up || down || left || right)))) {
+    float amountToTurn = turningSpeed * elapsed/1000 * 2*M_PI;
+    if(this == protag && g_spinning_duration > 0) {
+      amountToTurn = 2 * M_PI;
+    }
+    if( abs(targetSteeringAngle - steeringAngle) < amountToTurn) {
+      steeringAngle = targetSteeringAngle;
+    } else {
+      if(getTurningDirection(steeringAngle, targetSteeringAngle)) {
+        steeringAngle += amountToTurn;
+      } else {
+        steeringAngle -= amountToTurn;
+      }
+    }
+    steeringAngle = wrapAngle(steeringAngle);
+  }
+
+  if(mobile) {xmaxspeed = baseMaxSpeed + bonusSpeed;} else 
+  {xmaxspeed = baseMaxSpeed;}
+
+  //normalize accel vector
+  float vectorlen = pow( pow(xaccel, 2) + pow(yaccel, 2), 0.5) /(xmaxspeed * (1 - statusSlownPercent));
+  if(xaccel != 0) {
+    xaccel /=vectorlen;
+  }
+  if(yaccel != 0) {
+    yaccel /=vectorlen;
+  }
+
+  xaccel += cos(forwardsPushAngle) * forwardsPushVelocity;
+  yaccel += -sin(forwardsPushAngle) * forwardsPushVelocity;
+
+  if(yaccel != 0) {
+    yaccel /= p_ratio;
+  }
+
+  if(xaccel > 0) {
+    xvel += xaccel * ((double) elapsed / 256.0);
+  }
+
+  if(xaccel < 0) {
+    xvel += xaccel * ((double) elapsed / 256.0);
+  }
+
+  if(yaccel > 0) {
+    yvel += yaccel* ((double) elapsed / 256.0);
+  }
+
+  if(yaccel < 0) {
+    yvel += yaccel* ((double) elapsed / 256.0);
+  }
+
+  //if this is the protag, and they're spinning, use saved xvel/yvel
+  if(this == protag) {
+    if( g_spinning_duration > 0) {
+      xvel = g_spinning_xvel;
+      yvel = g_spinning_yvel;
+      protag->visible = 0;
+      g_spin_entity->visible = 1;
+
+    } else {
+      protag->visible = 1;
+      g_spin_entity->visible = 0;
+      if(g_afterspin_duration > 0) {
+        xvel = 0;
+        yvel = 0;
+        protag->visible = 1;
+        g_spin_entity->visible = 0;
+      }
+    }
+  }
+
+  //we need to detect not if the entity will collide into solid objects with their current
+  //velocity, but if they are within solid objects now
+  //in that case, set velocity to zero and look for a way to "jiggle" the entity
+  //to get them out
+  vector<pair<int,int>> jiggleOptions = { 
+    {0,0},
+    {0,1},
+    {0,-1},
+    {1,0},
+    {-1,0},
+    {1,1},
+    {-1,-1},
+    {1,-1},
+    {-1,1},
+    {0,2},
+    {0,-2},
+    {2,0},
+    {-2,0},
+    {2,2},
+    {-2,-2},
+    {2,-2},
+    {-2,2}
+  };
+  int jiggleOptionIndex = 0;
+  if(boxsenabled && g_collisionResolverOn) {
+    for(;;) {
+      //does jiggleOptions[jiggleOptionIndex] work for us?
+      int experimentalXOffset = jiggleOptions[jiggleOptionIndex].first;
+      int experimentalYOffset = jiggleOptions[jiggleOptionIndex].second;
+
+      bool inCollision = 0;
+
+      //might be able to delete these two lines
+      layer = max(z /64, 0.0f);
+      layer = min(layer, (int)g_boxs.size() - 1);
+
+      { //collision checking
+        rect movedbounds = rect(bounds.x + x + experimentalXOffset, bounds.y + y + experimentalYOffset, bounds.width, bounds.height);
+        movedbounds.z = z;
+        movedbounds.zeight = bounds.zeight;
+
+        //check for map collisions
+        for (int i = 0; i < (int)g_boxs[layer].size(); i++) {
+          //don't worry about boxes if we're not even close
+          //no point for a sleepbox if we're only doing one check
+          //rect sleepbox = rect(g_boxs[layer].at(i)->bounds.x - 150, g_boxs[layer].at(i)->bounds.y-150, g_boxs[layer].at(i)->bounds.width+300, g_boxs[layer].at(i)->bounds.height+300);
+          //if(!RectOverlap(sleepbox, movedbounds)) {continue;}
+          if(RectOverlap(movedbounds, g_boxs[layer].at(i)->bounds)) {
+            inCollision = 1;
+            break;
           }
+
         }
 
-        if( (this != protag) || ((this == protag) && ((protag_can_move) && (up || down || left || right)))) {
-          float amountToTurn = turningSpeed * elapsed/1000 * 2*M_PI;
-          if(this == protag && g_spinning_duration > 0) {
-            amountToTurn = 2 * M_PI;
-          }
-          if( abs(targetSteeringAngle - steeringAngle) < amountToTurn) {
-            steeringAngle = targetSteeringAngle;
-          } else {
-            if(getTurningDirection(steeringAngle, targetSteeringAngle)) {
-              steeringAngle += amountToTurn;
-            } else {
-              steeringAngle -= amountToTurn;
-            }
-          }
-          steeringAngle = wrapAngle(steeringAngle);
-        }
-
-        if(mobile) {xmaxspeed = baseMaxSpeed + bonusSpeed;} else 
-        {xmaxspeed = baseMaxSpeed;}
-
-        //normalize accel vector
-        float vectorlen = pow( pow(xaccel, 2) + pow(yaccel, 2), 0.5) /(xmaxspeed * (1 - statusSlownPercent));
-        if(xaccel != 0) {
-          xaccel /=vectorlen;
-        }
-        if(yaccel != 0) {
-          yaccel /=vectorlen;
-        }
-
-        xaccel += cos(forwardsPushAngle) * forwardsPushVelocity;
-        yaccel += -sin(forwardsPushAngle) * forwardsPushVelocity;
-
-        if(yaccel != 0) {
-          yaccel /= p_ratio;
-        }
-
-        if(xaccel > 0) {
-          xvel += xaccel * ((double) elapsed / 256.0);
-        }
-
-        if(xaccel < 0) {
-          xvel += xaccel * ((double) elapsed / 256.0);
-        }
-
-        if(yaccel > 0) {
-          yvel += yaccel* ((double) elapsed / 256.0);
-        }
-
-        if(yaccel < 0) {
-          yvel += yaccel* ((double) elapsed / 256.0);
-        }
-
-        //if this is the protag, and they're spinning, use saved xvel/yvel
-        if(this == protag) {
-          if( g_spinning_duration > 0) {
-            xvel = g_spinning_xvel;
-            yvel = g_spinning_yvel;
-            protag->visible = 0;
-            g_spin_entity->visible = 1;
-
-          } else {
-            protag->visible = 1;
-            g_spin_entity->visible = 0;
-            if(g_afterspin_duration > 0) {
-              xvel = 0;
-              yvel = 0;
-              protag->visible = 1;
-              g_spin_entity->visible = 0;
-            }
-          }
-        }
-
-        //we need to detect not if the entity will collide into solid objects with their current
-        //velocity, but if they are within solid objects now
-        //in that case, set velocity to zero and look for a way to "jiggle" the entity
-        //to get them out
-        vector<pair<int,int>> jiggleOptions = { 
-                                                {0,0},
-                                                {0,1},
-                                                {0,-1},
-                                                {1,0},
-                                                {-1,0},
-                                                {1,1},
-                                                {-1,-1},
-                                                {1,-1},
-                                                {-1,1},
-                                                {0,2},
-                                                {0,-2},
-                                                {2,0},
-                                                {-2,0},
-                                                {2,2},
-                                                {-2,-2},
-                                                {2,-2},
-                                                {-2,2}
-                                              };
-        int jiggleOptionIndex = 0;
-        if(boxsenabled && g_collisionResolverOn) {
-          for(;;) {
-            //does jiggleOptions[jiggleOptionIndex] work for us?
-            int experimentalXOffset = jiggleOptions[jiggleOptionIndex].first;
-            int experimentalYOffset = jiggleOptions[jiggleOptionIndex].second;
-  
-            bool inCollision = 0;
-  
-            //might be able to delete these two lines
-            layer = max(z /64, 0.0f);
-            layer = min(layer, (int)g_boxs.size() - 1);
-  
-            { //collision checking
-              rect movedbounds = rect(bounds.x + x + experimentalXOffset, bounds.y + y + experimentalYOffset, bounds.width, bounds.height);
-              movedbounds.z = z;
-              movedbounds.zeight = bounds.zeight;
-  
-              //check for map collisions
-              for (int i = 0; i < (int)g_boxs[layer].size(); i++) {
-                //don't worry about boxes if we're not even close
-                //no point for a sleepbox if we're only doing one check
-                //rect sleepbox = rect(g_boxs[layer].at(i)->bounds.x - 150, g_boxs[layer].at(i)->bounds.y-150, g_boxs[layer].at(i)->bounds.width+300, g_boxs[layer].at(i)->bounds.height+300);
-                //if(!RectOverlap(sleepbox, movedbounds)) {continue;}
-                if(RectOverlap(movedbounds, g_boxs[layer].at(i)->bounds)) {
-                  inCollision = 1;
-                  break;
-                }
-  
-              }
-
-              if(g_useSimpleImpliedGeometry) {
-                for(auto x : g_impliedSlopes) {
-                //rect sleepbox = rect(x->bounds.x - 150, x->bounds.y-150, x->bounds.width+300, x->bounds.height+300);
-                //if(!RectOverlap(sleepbox, movedbounds)) {continue;}
-                  if(RectOverlap(movedbounds, x->bounds)) {
-                    inCollision = 1;
-                    break;
-                  }
-                }
-
-              }
-  
-              if(!inCollision) { //shortcut if already in collision
-                //check with solid ents
-                //potentially not perfect, since this doesn't consider their velocities, but
-                //solid ents aren't really supposed to move
-                for (auto n : g_solid_entities) {
-                  if(this->ignoreSolids) {break;}
-                  if(n == this) {continue;}
-                  if(!n->tangible) {continue;}
-                  //if(n->zeight < g_stepHeight) {continue;} //if you ever wanna solve the bug
-                                                   //where the game keeps jiggling ents
-                                                   //out of spiketraps, you should then 
-                                                   //remove this line
-                  //update bounds with new pos
-                  rect thatmovedbounds = rect(n->bounds.x + n->x, n->bounds.y + n->y, n->bounds.width, n->bounds.height);
-                  thatmovedbounds.z = n->bounds.z;
-                  thatmovedbounds.zeight = n->bounds.zeight;
-
-                  //uh oh, did we collide with something?
-                  if(RectOverlap3d(movedbounds, thatmovedbounds)) {
-                    if(movedbounds.z >= thatmovedbounds.z + thatmovedbounds.zeight) {
-                    } else {
-                      inCollision = 1;
-                    }
-
-                    break;
-                  }
-                }
-              }
-  
-  
-              //check for implied slopes
-              //might be much better to just stop xcollide from being set to 1 if grounded
-  //            if(!inCollision) { //shortcut if already in collision
-  //              
-  //              for(auto i : g_impliedSlopes) {
-  //                rect simslope = rect(0,0,0,0);
-  //                
-  //                bool overlapY = RectOverlap(movedbounds, i->bounds);
-  //    
-  //                float heightFactor;
-  //                if(i->bounds.z >= this->z) {
-  //                  heightFactor = 1;
-  //                } else if (this->z - 63 > i->bounds.z) {
-  //                  heightFactor = 0;
-  //                } else {
-  //                  heightFactor = 1 - ((this->z - i->bounds.z) /63);
-  //                }
-  //    
-  //                if(overlapY) {
-  //                  rect simslope = rect(i->bounds.x, i->bounds.y + (16 * (1- heightFactor) ), i->bounds.width, i->bounds.height -  (64 * (1- heightFactor) ));
-  //                  if(heightFactor < 0.95 && heightFactor > 0 && RectOverlap(simslope, movedbounds)) {
-  //                    heightFactor = pow(heightFactor, 2);
-  //    
-  //                    if(heightFactor < 0.3) {
-  //                      inCollision = 1;
-  //                    }
-  //                  }
-  //                }
-  //    
-  //                if(heightFactor > 0) {
-  //                  
-  //                  if(overlapY) {
-  //                    bool overlapX = RectOverlap(movedbounds, simslope);
-  //      
-  //                    if(overlapX) {
-  //                      inCollision = 1;
-  //                    }
-  //      
-  //                  } else {
-  //                    movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)) , bounds.width, bounds.height);
-  //                    bool overlapX = RectOverlap(movedbounds, i->bounds);
-  //     
-  //                    if(overlapX) {
-  //                      inCollision = 1;
-  //                    }
-  //      
-  //                  }
-  //                }
-  //              }
-  //            }
-  
-  
-            }
-  
-            if(!inCollision) {
-              //cool, we checked everything and the entity isn't stuck inside a collision
-              //now break and apply the jiggleOption to the ent's position, and they're free!
+        if(g_useSimpleImpliedGeometry) {
+          for(auto x : g_impliedSlopes) {
+            //rect sleepbox = rect(x->bounds.x - 150, x->bounds.y-150, x->bounds.width+300, x->bounds.height+300);
+            //if(!RectOverlap(sleepbox, movedbounds)) {continue;}
+            if(RectOverlap(movedbounds, x->bounds)) {
+              inCollision = 1;
               break;
             }
-   
-  
-            //try the next jiggleOption
-            jiggleOptionIndex++;
-            if(jiggleOptionIndex > jiggleOptions.size() -1) {
-              if(g_showCRMessages) {
-                E("Couldn't jiggle an entity, it's stuck in collisionboxes with solid entities/map geo.");
-              }
-              break;
-  
-            }
           }
-  
-          if(jiggleOptionIndex != 0 && jiggleOptionIndex < jiggleOptions.size() - 1) { //this ent will be moved some dist to get it out of collisions
-            this->x += jiggleOptions[jiggleOptionIndex].first;
-            this->y += jiggleOptions[jiggleOptionIndex].second;
-  //          this->xvel = 0;
-  //          this->yvel = 0;
 
-//            if(g_showCRMessages) {
-//              M("Jiggled an ent out of collisions with solid entities/map geo");
-//              D(jiggleOptionIndex);
-//            }
-          }
         }
 
-        rect movedbounds;
-        bool ycollide = 0;
-        bool xcollide = 0;
-
-        int oxvel = xvel;
-        int oyvel = yvel;
-        
-
-        //observed problem - sometimes the zombie gets stuck trying to go thru a narrow doorway
-        //For instance, the zombie is trying to move left and up to pass thru a doorway
-        //But the horizontal component of his velocity is much greater than the vertical component
-        //the vertical component of velocity is negated due to friction
-        //but the horizontal component is negated due to normal force, and thus, the zombie is eternally stuck
-        //idea - if an entity's xcomp of velocity is reduced to zero, increase the y comp to their full agility value
-
-
-        //turn off boxs if using the map-editor
-        if(boxsenabled) {
-          //..check door
-          if(this == protag) {
-            for (int i = 0; i < (int)doors.size(); i++) {
-              //update bounds with new posj
-              rect movedbounds = rect(bounds.x + x + xvel * ((double) elapsed / 256.0), bounds.y + y  + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
-              //did we walk into a door?
-              if(RectOverlap(movedbounds, doors[i]->bounds) && (protag->z > doors[i]->z && protag->z < doors[i]->z + doors[i]->zeight)  ) {
-                //take the door.
-                if(devMode == 0) {
-                  return doors[i];
-                }
-              }
-            }
-          }
-          groundedByEntity = 0;
+        if(!inCollision) { //shortcut if already in collision
+                           //check with solid ents
+                           //potentially not perfect, since this doesn't consider their velocities, but
+                           //solid ents aren't really supposed to move
           for (auto n : g_solid_entities) {
             if(this->ignoreSolids) {break;}
             if(n == this) {continue;}
             if(!n->tangible) {continue;}
+            //if(n->zeight < g_stepHeight) {continue;} //if you ever wanna solve the bug
+            //where the game keeps jiggling ents
+            //out of spiketraps, you should then 
+            //remove this line
             //update bounds with new pos
-            rect thismovedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-            thismovedbounds.z = z;
-            thismovedbounds.zeight = bounds.zeight;
-
             rect thatmovedbounds = rect(n->bounds.x + n->x, n->bounds.y + n->y, n->bounds.width, n->bounds.height);
-            thatmovedbounds.z = n->z;
+            thatmovedbounds.z = n->bounds.z;
             thatmovedbounds.zeight = n->bounds.zeight;
 
-            
             //uh oh, did we collide with something?
-            if(RectOverlap3d(thismovedbounds, thatmovedbounds)) {
-              if((this == protag || this->isAI || this->identity == 5) && (thatmovedbounds.z + thatmovedbounds.zeight) - z < g_stepHeight) {
-                z += (thatmovedbounds.z + thatmovedbounds.zeight) - z;
+            if(RectOverlap3d(movedbounds, thatmovedbounds)) {
+              if(movedbounds.z >= thatmovedbounds.z + thatmovedbounds.zeight) {
               } else {
-                ycollide = true;
-                yvel = 0;
+                inCollision = 1;
               }
-            }
 
-            //update bounds with new pos
-            thismovedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
-            thismovedbounds.z = z;
-            thismovedbounds.zeight = bounds.zeight;
-
-            //uh oh, did we collide with something?
-            if(RectOverlap3d(thismovedbounds, thatmovedbounds)) {
-              if((this == protag || this->isAI || this->identity == 5) && (thatmovedbounds.z + thatmovedbounds.zeight) - z < g_stepHeight) {
-                z += (thatmovedbounds.z + thatmovedbounds.zeight) - z;
-                
-              } else {
-                xcollide = true;
-                xvel = 0;
-              }
+              break;
             }
           }
+        }
 
-          vector<box*> boxesToUse = {};
 
-          int usedCZ = 0;
+        //check for implied slopes
+        //might be much better to just stop xcollide from being set to 1 if grounded
+        //            if(!inCollision) { //shortcut if already in collision
+        //              
+        //              for(auto i : g_impliedSlopes) {
+        //                rect simslope = rect(0,0,0,0);
+        //                
+        //                bool overlapY = RectOverlap(movedbounds, i->bounds);
+        //    
+        //                float heightFactor;
+        //                if(i->bounds.z >= this->z) {
+        //                  heightFactor = 1;
+        //                } else if (this->z - 63 > i->bounds.z) {
+        //                  heightFactor = 0;
+        //                } else {
+        //                  heightFactor = 1 - ((this->z - i->bounds.z) /63);
+        //                }
+        //    
+        //                if(overlapY) {
+        //                  rect simslope = rect(i->bounds.x, i->bounds.y + (16 * (1- heightFactor) ), i->bounds.width, i->bounds.height -  (64 * (1- heightFactor) ));
+        //                  if(heightFactor < 0.95 && heightFactor > 0 && RectOverlap(simslope, movedbounds)) {
+        //                    heightFactor = pow(heightFactor, 2);
+        //    
+        //                    if(heightFactor < 0.3) {
+        //                      inCollision = 1;
+        //                    }
+        //                  }
+        //                }
+        //    
+        //                if(heightFactor > 0) {
+        //                  
+        //                  if(overlapY) {
+        //                    bool overlapX = RectOverlap(movedbounds, simslope);
+        //      
+        //                    if(overlapX) {
+        //                      inCollision = 1;
+        //                    }
+        //      
+        //                  } else {
+        //                    movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)) , bounds.width, bounds.height);
+        //                    bool overlapX = RectOverlap(movedbounds, i->bounds);
+        //     
+        //                    if(overlapX) {
+        //                      inCollision = 1;
+        //                    }
+        //      
+        //                  }
+        //                }
+        //              }
+        //            }
+
+
+      }
+
+      if(!inCollision) {
+        //cool, we checked everything and the entity isn't stuck inside a collision
+        //now break and apply the jiggleOption to the ent's position, and they're free!
+        break;
+      }
+
+
+      //try the next jiggleOption
+      jiggleOptionIndex++;
+      if(jiggleOptionIndex > jiggleOptions.size() -1) {
+        if(g_showCRMessages) {
+          E("Couldn't jiggle an entity, it's stuck in collisionboxes with solid entities/map geo.");
+        }
+        break;
+
+      }
+    }
+
+    if(jiggleOptionIndex != 0 && jiggleOptionIndex < jiggleOptions.size() - 1) { //this ent will be moved some dist to get it out of collisions
+      this->x += jiggleOptions[jiggleOptionIndex].first;
+      this->y += jiggleOptions[jiggleOptionIndex].second;
+      //          this->xvel = 0;
+      //          this->yvel = 0;
+
+      //            if(g_showCRMessages) {
+      //              M("Jiggled an ent out of collisions with solid entities/map geo");
+      //              D(jiggleOptionIndex);
+      //            }
+    }
+  }
+
+
+  rect movedbounds;
+  bool ycollide = 0;
+  bool xcollide = 0;
+
+  int oxvel = xvel;
+  int oyvel = yvel;
+
+
+  //observed problem - sometimes the zombie gets stuck trying to go thru a narrow doorway
+  //For instance, the zombie is trying to move left and up to pass thru a doorway
+  //But the horizontal component of his velocity is much greater than the vertical component
+  //the vertical component of velocity is negated due to friction
+  //but the horizontal component is negated due to normal force, and thus, the zombie is eternally stuck
+  //idea - if an entity's xcomp of velocity is reduced to zero, increase the y comp to their full agility value
+
+  if(g_entityBenchmarking) {
+    g_eu_timer -= SDL_GetTicks();
+    g_eu_c -= g_eu_timer;
+    g_eu_timer = SDL_GetTicks();
+  }
+
+  //turn off boxs if using the map-editor
+  if(boxsenabled) {
+    //..check door
+    if(this == protag) {
+      for (int i = 0; i < (int)doors.size(); i++) {
+        //update bounds with new posj
+        rect movedbounds = rect(bounds.x + x + xvel * ((double) elapsed / 256.0), bounds.y + y  + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
+        //did we walk into a door?
+        if(RectOverlap(movedbounds, doors[i]->bounds) && (protag->z > doors[i]->z && protag->z < doors[i]->z + doors[i]->zeight)  ) {
+          //take the door.
+          if(devMode == 0) {
+            return doors[i];
+          }
+        }
+      }
+    }
+    groundedByEntity = 0;
+    for (auto n : g_solid_entities) {
+      if(this->ignoreSolids) {break;}
+      if(n == this) {continue;}
+      if(!n->tangible) {continue;}
+      //update bounds with new pos
+      rect thismovedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+      thismovedbounds.z = z;
+      thismovedbounds.zeight = bounds.zeight;
+
+      rect thatmovedbounds = rect(n->bounds.x + n->x, n->bounds.y + n->y, n->bounds.width, n->bounds.height);
+      thatmovedbounds.z = n->z;
+      thatmovedbounds.zeight = n->bounds.zeight;
+
+
+      //uh oh, did we collide with something?
+      if(RectOverlap3d(thismovedbounds, thatmovedbounds)) {
+        if((this == protag || this->isAI || this->identity == 5) && (thatmovedbounds.z + thatmovedbounds.zeight) - z < g_stepHeight) {
+          z += (thatmovedbounds.z + thatmovedbounds.zeight) - z;
+        } else {
+          ycollide = true;
+          yvel = 0;
+        }
+      }
+
+      //update bounds with new pos
+      thismovedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
+      thismovedbounds.z = z;
+      thismovedbounds.zeight = bounds.zeight;
+
+      //uh oh, did we collide with something?
+      if(RectOverlap3d(thismovedbounds, thatmovedbounds)) {
+        if((this == protag || this->isAI || this->identity == 5) && (thatmovedbounds.z + thatmovedbounds.zeight) - z < g_stepHeight) {
+          z += (thatmovedbounds.z + thatmovedbounds.zeight) - z;
+
+        } else {
+          xcollide = true;
+          xvel = 0;
+        }
+      }
+    }
+
+    vector<box*> boxesToUse = {};
+
+    int usedCZ = 0;
+    rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+    //see if we overlap any collisionzones
+    for(auto x : g_collisionZones) {
+      if(RectOverlap(movedbounds, x->bounds)) {
+        usedCZ++;
+        boxesToUse.insert(boxesToUse.end(), x->guests[layer].begin(), x->guests[layer].end());
+      }
+    }
+
+
+    if(usedCZ == 0) {
+      for (int i = 0; i < (int)g_boxs[layer].size(); i++) {
+
+        //update bounds with new pos
+        rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+
+        //don't worry about boxes if we're not even close
+        rect sleepbox = rect(g_boxs[layer].at(i)->bounds.x - 150, g_boxs[layer].at(i)->bounds.y-150, g_boxs[layer].at(i)->bounds.width+300, g_boxs[layer].at(i)->bounds.height+300);
+        if(!RectOverlap(sleepbox, movedbounds)) {continue;}
+
+        //uh oh, did we collide with something?
+        if(RectOverlap(movedbounds, g_boxs[layer].at(i)->bounds)) {
+          ycollide = true;
+          yvel = 0;
+
+
+
+
+        }
+        //update bounds with new pos
+        movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
+        //uh oh, did we collide with something?
+        if(RectOverlap(movedbounds, g_boxs[layer].at(i)->bounds)) {
+          //box detected
+          xcollide = true;
+          xvel = 0;
+
+        }
+
+
+      }
+      for (int i = 0; i < (int)g_boxs[layer].size(); i++) {
+        movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+        //uh oh, did we collide with something?
+        if(RectOverlap(movedbounds, g_boxs[layer].at(i)->bounds)) {
+          //box detected
+          xcollide = true;
+          ycollide = true;
+          xvel = 0;
+          yvel = 0;
+          continue;
+        }
+      }
+
+      //now do that for implied slopes if I've chosen to treat them as regular collisions
+      if(g_useSimpleImpliedGeometry) {
+        for(auto n : g_impliedSlopes) {
+          //update bounds with new pos
           rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-          //see if we overlap any collisionzones
-          for(auto x : g_collisionZones) {
-            if(RectOverlap(movedbounds, x->bounds)) {
-              usedCZ++;
-              boxesToUse.insert(boxesToUse.end(), x->guests[layer].begin(), x->guests[layer].end());
-            }
+
+          //don't worry about boxes if we're not even close
+          rect sleepbox = rect(n->bounds.x - 150, n->bounds.y-150, n->bounds.width+300, n->bounds.height+300);
+          if(!RectOverlap(sleepbox, movedbounds)) {continue;}
+
+          //uh oh, did we collide with something?
+          if(RectOverlap(movedbounds, n->bounds)) {
+            ycollide = true;
+            yvel = 0;
+          }
+          //update bounds with new pos
+          movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
+          //uh oh, did we collide with something?
+          if(RectOverlap(movedbounds, n->bounds)) {
+            //box detected
+            xcollide = true;
+            xvel = 0;
+          }
+
+          movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+          //uh oh, did we collide with something?
+          if(RectOverlap(movedbounds, n->bounds)) {
+            //box detected
+            xcollide = true;
+            ycollide = true;
+            xvel = 0;
+            yvel = 0;
+            continue;
           }
 
 
-          if(usedCZ == 0) {
-            for (int i = 0; i < (int)g_boxs[layer].size(); i++) {
-
-              //update bounds with new pos
-              rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-
-              //don't worry about boxes if we're not even close
-              rect sleepbox = rect(g_boxs[layer].at(i)->bounds.x - 150, g_boxs[layer].at(i)->bounds.y-150, g_boxs[layer].at(i)->bounds.width+300, g_boxs[layer].at(i)->bounds.height+300);
-              if(!RectOverlap(sleepbox, movedbounds)) {continue;}
-
-              //uh oh, did we collide with something?
-              if(RectOverlap(movedbounds, g_boxs[layer].at(i)->bounds)) {
-                ycollide = true;
-                yvel = 0;
 
 
+        }
+      }
 
+    } else {
+      for (int i = 0; i < (int)boxesToUse.size(); i++) {
 
-              }
-              //update bounds with new pos
-              movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
-              //uh oh, did we collide with something?
-              if(RectOverlap(movedbounds, g_boxs[layer].at(i)->bounds)) {
-                //box detected
-                xcollide = true;
-                xvel = 0;
+        //update bounds with new pos
+        rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
 
-              }
+        //don't worry about boxes if we're not even close
+        rect sleepbox = rect(boxesToUse.at(i)->bounds.x - 150, boxesToUse.at(i)->bounds.y-150, boxesToUse.at(i)->bounds.width+300, boxesToUse.at(i)->bounds.height+300);
+        if(!RectOverlap(sleepbox, movedbounds)) {continue;}
 
-
-            }
-            for (int i = 0; i < (int)g_boxs[layer].size(); i++) {
-              movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-              //uh oh, did we collide with something?
-              if(RectOverlap(movedbounds, g_boxs[layer].at(i)->bounds)) {
-                //box detected
-                xcollide = true;
-                ycollide = true;
-                xvel = 0;
-                yvel = 0;
-                continue;
-              }
-            }
-
-            //now do that for implied slopes if I've chosen to treat them as regular collisions
-            if(g_useSimpleImpliedGeometry) {
-              for(auto n : g_impliedSlopes) {
-                //update bounds with new pos
-                rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-  
-                //don't worry about boxes if we're not even close
-                rect sleepbox = rect(n->bounds.x - 150, n->bounds.y-150, n->bounds.width+300, n->bounds.height+300);
-                if(!RectOverlap(sleepbox, movedbounds)) {continue;}
-  
-                //uh oh, did we collide with something?
-                if(RectOverlap(movedbounds, n->bounds)) {
-                  ycollide = true;
-                  yvel = 0;
-                }
-                //update bounds with new pos
-                movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
-                //uh oh, did we collide with something?
-                if(RectOverlap(movedbounds, n->bounds)) {
-                  //box detected
-                  xcollide = true;
-                  xvel = 0;
-                }
-
-                movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-                //uh oh, did we collide with something?
-                if(RectOverlap(movedbounds, n->bounds)) {
-                  //box detected
-                  xcollide = true;
-                  ycollide = true;
-                  xvel = 0;
-                  yvel = 0;
-                  continue;
-                }
-  
-  
-  
-  
-                }
-            }
-
-          } else {
-            for (int i = 0; i < (int)boxesToUse.size(); i++) {
-
-              //update bounds with new pos
-              rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-
-              //don't worry about boxes if we're not even close
-              rect sleepbox = rect(boxesToUse.at(i)->bounds.x - 150, boxesToUse.at(i)->bounds.y-150, boxesToUse.at(i)->bounds.width+300, boxesToUse.at(i)->bounds.height+300);
-              if(!RectOverlap(sleepbox, movedbounds)) {continue;}
-
-              //uh oh, did we collide with something?
-              if(RectOverlap(movedbounds, boxesToUse.at(i)->bounds)) {
-                ycollide = true;
-                yvel = 0;
+        //uh oh, did we collide with something?
+        if(RectOverlap(movedbounds, boxesToUse.at(i)->bounds)) {
+          ycollide = true;
+          yvel = 0;
 
 
 
 
-              }
-              //update bounds with new pos
-              movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
-              //uh oh, did we collide with something?
-              if(RectOverlap(movedbounds, boxesToUse.at(i)->bounds)) {
-                //box detected
-                xcollide = true;
-                xvel = 0;
+        }
+        //update bounds with new pos
+        movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
+        //uh oh, did we collide with something?
+        if(RectOverlap(movedbounds, boxesToUse.at(i)->bounds)) {
+          //box detected
+          xcollide = true;
+          xvel = 0;
 
-              }
-
-
-            }
-            for (int i = 0; i < (int)boxesToUse.size(); i++) {
-              movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-              //uh oh, did we collide with something?
-              if(RectOverlap(movedbounds, boxesToUse.at(i)->bounds)) {
-                //box detected
-                xcollide = true;
-                ycollide = true;
-                xvel = 0;
-                yvel = 0;
-                continue;
-              }
-            }
-          }
-
-          //if we didnt use a cz, use all boxes
-
-
-
-          //how much to push the player to not overlap with triangles.
-          float ypush = 0;
-          float xpush = 0;
-          float jerk = -abs( pow(pow(yvel,2) + pow(xvel, 2), 0.5))/2; //how much to push the player aside to slide along walls
-          //float jerk = -1;
-          //!!! try counting how many triangles the ent overlaps with per axis and disabling jerking
-          //if it is more than 1
-
-          //and try setting jerk to a comp of the ent velocity to make the movement faster and better-scaling
-
-
-          for(auto n : g_triangles[layer]){
-            rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-            if(TriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
-              //if we move the player one pixel up will we still overlap?
-              if(n->type == 3 || n->type == 2)  {
-                xpush = jerk;
-              }
-
-              if(n->type == 0 || n->type == 1) {
-                xpush = -jerk; ;
-              }
-
-
-              ycollide = true;
-              yvel = 0;
-
-            }
-
-            movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
-            if(TriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
-              //if we move the player one pixel up will we still overlap?
-              if(n->type == 1 || n->type == 2) {
-                ypush = jerk;
-              }
-
-              if(n->type == 0 || n->type == 3){
-                ypush = -jerk;
-              }
-
-              xcollide = true;
-              xvel = 0;
-
-            }
-
-            movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-            if(TriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
-              xcollide = true;
-              ycollide = true;
-              xvel = 0;
-              yvel = 0;
-              continue;
-
-
-            }
-
-          }
-
-          //test for triangular implied slopes
-          if(g_useSimpleImpliedGeometry == 0) {
-            for(auto n : g_impliedSlopeTris) {
-              rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-  
-              float heightFactor = 0;
-  
-              if(n->layer * 64 >= this->z) {
-                heightFactor = 1;
-              } else if (this->z - 63 > n->layer * 64) {
-                heightFactor = 0;
-              } else {
-                heightFactor = 1 - ((this->z - n->layer * 64) /63);
-              }
-  
-              //behaves as a triangle if heightFactor is nearly 1
-              if(heightFactor > 0.95) {
-    
-                if(ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
-                  //if we move the player one pixel up will we still overlap?
-                  if(n->type == 3 || n->type == 2)  {
-                    xpush = jerk;
-                  }
-    
-                  if(n->type == 0 || n->type == 1) {
-                    xpush = -jerk; ;
-                  }
-    
-    
-                  //ycollide = true;
-                  yvel = 0;
-    
-                }
-    
-                movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
-                if(ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
-                  //if we move the player one pixel up will we still overlap?
-                  if(n->type == 1 || n->type == 2) {
-                    ypush = jerk;
-                  }
-    
-                  if(n->type == 0 || n->type == 3){
-                    ypush = -jerk;
-                  }
-    
-                  //xcollide = true;
-                  xvel = 0;
-    
-                }
-    
-                movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-                if(ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
-  //                xcollide = true;
-  //                ycollide = true;
-                  xvel = 0;
-                  yvel = 0;
-                  //continue;
-    
-    
-                }
-              }
-  
-              //find modified bounds for player collision based on height
-              //I guess, simulate this by moving movedbounds up based on heighFactor
-              movedbounds.y -= (1-heightFactor) * 64;
-  
-              //push the player away 
-              if(heightFactor > 0 && ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
-  
-                if(n->type == 1) {
-                  this->y-=2;
-                  this->x+=2;
-                } else {
-                  this->y-=2;
-                  this->x-=2;
-                }
-  
-                zvel = max(zvel, -1.0f);
-              }
-            } 
-          } else {
-            //treat t implied slopes just like tris
-            for(auto n : g_impliedSlopeTris){
-              rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-              if(ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
-                //if we move the player one pixel up will we still overlap?
-                if(n->type == 3 || n->type == 2)  {
-                  xpush = jerk;
-                }
-  
-                if(n->type == 0 || n->type == 1) {
-                  xpush = -jerk; ;
-                }
-  
-  
-                ycollide = true;
-                yvel = 0;
-  
-              }
-  
-              movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
-              if(ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
-                //if we move the player one pixel up will we still overlap?
-                if(n->type == 1 || n->type == 2) {
-                  ypush = jerk;
-                }
-  
-                if(n->type == 0 || n->type == 3){
-                  ypush = -jerk;
-                }
-  
-                xcollide = true;
-                xvel = 0;
-  
-              }
-  
-              movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-              if(ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
-                xcollide = true;
-                ycollide = true;
-                xvel = 0;
-                yvel = 0;
-                continue;
-  
-  
-              }
-  
-            }
-
-          }
-
-
-          //test for implied slopes
-          if(g_useSimpleImpliedGeometry == 0) {
-            for(auto i : g_impliedSlopes) {
-              rect movedbounds;
-              rect simslope = rect(0,0,0,0);
-              movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
-              
-              bool overlapY = RectOverlap(movedbounds, i->bounds);
-  
-              float heightFactor;
-              if(i->bounds.z >= this->z) {
-                heightFactor = 1;
-              } else if (this->z - 63 > i->bounds.z) {
-                heightFactor = 0;
-              } else {
-                heightFactor = 1 - ((this->z - i->bounds.z) /63);
-              }
-  
-  
-              float yDiff = 0; //this is used to compare the ycoords of the ent and the slope, so if the ent has lower y than the slope, we can just treat it as a wall
-              yDiff = (this->y + bounds.y + this->bounds.height) - i->bounds.y;
-  
-  
-              if(overlapY) {
-                rect simslope = rect(i->bounds.x, i->bounds.y + (16 * (1- heightFactor) ), i->bounds.width, i->bounds.height -  (64 * (1- heightFactor) ));
-                if(heightFactor < 0.95 && heightFactor > 0 && RectOverlap(simslope, movedbounds)) {
-                  heightFactor = pow(heightFactor, 2);
-                  //yvel = -1 * ( (y + bounds.y + this->bounds.height) - (i->bounds.y + (64 * (1- heightFactor) )) );
-  
-                  float difference = ( (y + bounds.y + this->bounds.height) - (i->bounds.y + (8 * (1- heightFactor) )) );
-                  //y += -1 * difference;
-                  //yvel = -1 * difference;
-                  y-=2;
-                  yvel = 0;
-                  xaccel = 0;
-                  if(heightFactor < 0.3) {
-                    if(this->z > 1) {
-                      xcollide = 1;
-                    }
-                  }
-  
-  
-                  //zaccel -= -1;
-                  zvel = max(zvel, -1.0f);
-                  //ycollide = 1;
-  
-                  rect movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y  , bounds.width, bounds.height);
-                }
-              }
-  
-              if(heightFactor > 0) {
-                
-                if(overlapY) {
-                  ycollide = 1;
-                  movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)) , bounds.width, bounds.height);
-                  bool overlapX = RectOverlap(movedbounds, simslope);
-    
-                  if(overlapX) {
-                    if(this->z > 1 || yDiff < 10) {
-                      xcollide = 1;
-                    }
-                  }
-    
-                } else {
-                  movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)) , bounds.width, bounds.height);
-                  bool overlapX = RectOverlap(movedbounds, i->bounds);
-   
-                  if(overlapX) {
-                    if(this->z > 1 || yDiff > 10) {
-                      xcollide = 1;
-                    }
-                  }
-    
-                }
-              }
-            } 
-          }
-          yvel += ypush;
-          xvel += xpush;
         }
 
 
-//        if(name == "common/neheten") {
-//          D(xcollide);
-//          D(ycollide);
-//          D(( pow( pow(oxvel,2) + pow(oyvel, 2), 0.5) ));
-//        }
-        if(((xcollide || ycollide )) && ( pow( pow(oxvel,2) + pow(oyvel, 2), 0.5) > 2 )) {
-          if(fragileMovement) {
-            timeToLiveMs = -1;
-            usingTimeToLive = 1;
-          }
+      }
+      for (int i = 0; i < (int)boxesToUse.size(); i++) {
+        movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+        //uh oh, did we collide with something?
+        if(RectOverlap(movedbounds, boxesToUse.at(i)->bounds)) {
+          //box detected
+          xcollide = true;
+          ycollide = true;
+          xvel = 0;
+          yvel = 0;
+          continue;
+        }
+      }
+    }
 
-          //detect stuckness
-          stuckTime++;
+    //if we didnt use a cz, use all boxes
+
+
+
+    //how much to push the player to not overlap with triangles.
+    float ypush = 0;
+    float xpush = 0;
+    float jerk = -abs( pow(pow(yvel,2) + pow(xvel, 2), 0.5))/2; //how much to push the player aside to slide along walls
+                                                                //float jerk = -1;
+                                                                //!!! try counting how many triangles the ent overlaps with per axis and disabling jerking
+                                                                //if it is more than 1
+
+                                                                //and try setting jerk to a comp of the ent velocity to make the movement faster and better-scaling
+
+
+    for(auto n : g_triangles[layer]){
+      rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+      if(TriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
+        //if we move the player one pixel up will we still overlap?
+        if(n->type == 3 || n->type == 2)  {
+          xpush = jerk;
+        }
+
+        if(n->type == 0 || n->type == 1) {
+          xpush = -jerk; ;
+        }
+
+
+        ycollide = true;
+        yvel = 0;
+
+      }
+
+      movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
+      if(TriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
+        //if we move the player one pixel up will we still overlap?
+        if(n->type == 1 || n->type == 2) {
+          ypush = jerk;
+        }
+
+        if(n->type == 0 || n->type == 3){
+          ypush = -jerk;
+        }
+
+        xcollide = true;
+        xvel = 0;
+
+      }
+
+      movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+      if(TriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
+        xcollide = true;
+        ycollide = true;
+        xvel = 0;
+        yvel = 0;
+        continue;
+
+
+      }
+
+    }
+
+    //test for triangular implied slopes
+    if(g_useSimpleImpliedGeometry == 0) {
+      for(auto n : g_impliedSlopeTris) {
+        rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+
+        float heightFactor = 0;
+
+        if(n->layer * 64 >= this->z) {
+          heightFactor = 1;
+        } else if (this->z - 63 > n->layer * 64) {
+          heightFactor = 0;
         } else {
-          stuckTime = 0;
+          heightFactor = 1 - ((this->z - n->layer * 64) /63);
         }
 
-        specialObjectsBump(this, xcollide, ycollide);
+        //behaves as a triangle if heightFactor is nearly 1
+        if(heightFactor > 0.95) {
 
-        if(!ycollide && !transition) {
-          y+= yvel * ((double) elapsed / 256.0);
-        }
-
-        //when coordinates are bungled, it isnt happening here
-        if(!xcollide && !transition) {
-          x+= xvel * ((double) elapsed / 256.0);
-        }
-
-        if(slowSeconds > 0) {
-          slowSeconds -= elapsed/1000;
-          friction = baseFriction * slowPercent;
-        } else {
-          friction = baseFriction;
-        }
-
-
-        if(grounded) {
-          yvel *= pow(friction, ((double) elapsed / 256.0));
-          xvel *= pow(friction, ((double) elapsed / 256.0));
-          stableLayer = layer;
-        } else {
-          yvel *= pow(friction*this->currentAirBoost, ((double) elapsed / 256.0));
-          xvel *= pow(friction*this->currentAirBoost, ((double) elapsed / 256.0));
-          this->currentAirBoost += (g_deltaBhopBoost * ((double) elapsed / 256.0)) * min(pow( pow(x,2) + pow(y, 2), 0.2) / xmaxspeed, 1.0);
-          if(this->currentAirBoost > g_maxBhoppingBoost) {
-            this->currentAirBoost = g_maxBhoppingBoost;
-          }
-          // !!! make this not suck
-        }
-
-        float heightfloor = 0; //filled with floor z from heightmap
-        if(g_heightmaps.size() > 0 /*&& update_z_time < 1*/) {
-          bool using_heightmap = 0;
-          bool heightmap_is_tiled = 0;
-          tile* heighttile = nullptr;
-          int heightmap_index = 0;
-
-          rect tilerect;
-          rect movedbounds;
-          //movedbounds = rect(this->x + xvel * ((double) elapsed / 256.0), this->y + yvel * ((double) elapsed / 256.0) - this->bounds.height, this->bounds.width, this->bounds.height);
-          movedbounds = rect(this->getOriginX(), this->getOriginY(), 0, 0);
-          //get what tile entity is on
-          //this is poorly set up. It would be better if heightmaps were assigned to tiles, obviously, with a pointer
-          bool breakflag = 0;
-
-          for (int i = (int)g_tiles.size() - 1; i >= 0; i--) {
-            if(g_tiles[i]->fileaddress == "textures/marker.qoi") {continue; }
-            tilerect = rect(g_tiles[i]->x, g_tiles[i]->y, g_tiles[i]->width, g_tiles[i]->height);
-
-            if(RectOverlap(tilerect, movedbounds)) {
-              for (int j = 0; j < (int)g_heightmaps.size(); j++) {
-                //M("looking for a heightmap");
-                //e(g_tiles[i]->fileaddress);
-                if(g_heightmaps[j]->name == g_tiles[i]->fileaddress) {
-                  //M("found it");
-                  heightmap_index = j;
-                  using_heightmap = 1;
-                  breakflag = 1;
-                  heightmap_is_tiled = g_tiles[i]->wraptexture;
-                  heighttile = g_tiles[i];
-                  break;
-                }
-              }
-              //current texture has no mask, keep looking
-            }
-          }
-
-
-
-          update_z_time = max_update_z_time;
-          //update z position
-          SDL_Color rgb = {0, 0, 0};
-          heightmap* thismap = g_heightmaps[heightmap_index];
-          Uint8 maxred = 0;
-          if(using_heightmap) {
-            //try each corner;
-            //thismap->image->w;
-            //code for middle
-            //Uint32 data = thismap->heighttilegetpixel(thismap->image, (int)(this->x + xvel * ((double) elapsed / 256.0) + 0.5 * this->width) % thismap->image->w, (int)(this->y + yvel * ((double) elapsed / 256.0) - 0.5 * this->bounds.height) % thismap->image->h);
-            Uint32 data;
-            if(heightmap_is_tiled) {
-              data = thismap->getpixel(thismap->image, (int)(getOriginX()) % thismap->image->w, (int)(getOriginY()) % thismap->image->h);
-            } else {
-              //tile is not tiled, so we have to get clever with the heighttile pointer
-
-              data = thismap->getpixel(thismap->image, (int)( ((this->getOriginX() - heighttile->x) /heighttile->width) * thismap->image->w), (int)( ((this->getOriginY() - heighttile->y) /heighttile->height) * thismap->image->h));
-            }
-            SDL_GetRGB(data, thismap->image->format, &rgb.r, &rgb.g, &rgb.b);
-            if(RectOverlap(tilerect, movedbounds)) {
-              maxred = rgb.r;
-            }
-            // //code for each corner:
-            // Uint32 data = thismap->getpixel(thismap->image, (int)(this->x + xvel * ((double) elapsed / 256.0)) % thismap->image->w, (int)(this->y + yvel * ((double) elapsed / 256.0)) % thismap->image->h);
-            // SDL_GetRGB(data, thismap->image->format, &rgb.r, &rgb.g, &rgb.b);
-
-            // movedbounds = rect(this->x + xvel * ((double) elapsed / 256.0), this->y + yvel * ((double) elapsed / 256.0), 1, 1);
-            // if(RectOverlap(tilerect, movedbounds)) {
-            // 	maxred = max(maxred, rgb.r);
-            // }
-
-            // data = thismap->getpixel(thismap->image, (int)(this->x + xvel * ((double) elapsed / 256.0) + this->bounds.width) % thismap->image->w, (int)(this->y + yvel * ((double) elapsed / 256.0)) % thismap->image->h);
-            // SDL_GetRGB(data, thismap->image->format, &rgb.r, &rgb.g, &rgb.b);
-
-            // movedbounds = rect(this->x + xvel * ((double) elapsed / 256.0) + this->bounds.width, this->y + yvel * ((double) elapsed / 256.0), 1, 1);
-            // if(RectOverlap(tilerect, movedbounds)) {
-            // 	maxred = max(maxred, rgb.r);
-            // }
-
-            // data = thismap->getpixel(thismap->image, (int)(this->x + xvel * ((double) elapsed / 256.0)) % thismap->image->w, (int)(this->y + yvel * ((double) elapsed / 256.0) - this->bounds.height) % thismap->image->h);
-            // SDL_GetRGB(data, thismap->image->format, &rgb.r, &rgb.g, &rgb.b);
-
-            // movedbounds = rect(this->x + xvel * ((double) elapsed / 256.0), this->y + yvel * ((double) elapsed / 256.0) - this->bounds.height, 1, 1);
-            // if(RectOverlap(tilerect, movedbounds)) {
-            // 	maxred = max(maxred, rgb.r);
-            // }
-
-            // data = thismap->getpixel(thismap->image, (int)(this->x + xvel * ((double) elapsed / 256.0) + this->bounds.width) % thismap->image->w, (int)(this->y + yvel * ((double) elapsed / 256.0) - this->bounds.height) % thismap->image->h);
-            // SDL_GetRGB(data, thismap->image->format, &rgb.r, &rgb.g, &rgb.b);
-
-            // movedbounds = rect(this->x + xvel * ((double) elapsed / 256.0) + this->bounds.width, this->y + yvel * ((double) elapsed / 256.0) - this->bounds.height, 1, 1);
-            // if(RectOverlap(tilerect, movedbounds)) {
-            // 	maxred = max(maxred, rgb.r);
-            // }
-
-          }
-          //oldz = this->z;
-          if(using_heightmap) {
-            heightfloor = ((maxred * thismap->magnitude));
-          }
-
-        } else {
-          //update_z_time--;
-          //this->z = ((oldz) + this->z) / 2 ;
-
-        }
-        // ... return nullptr; and there was no slowdown
-
-        layer = max(z /64, 0.0f);
-        layer = min(layer, (int)g_boxs.size() - 1);
-        //should we fall?
-        //bool should_fall = 1;
-        float floor = 0;
-        if(layer > 0) {
-          //!!!
-          rect thisMovedBounds = rect(bounds.x + x + xvel * ((double) elapsed / 256.0), bounds.y + y + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
-          //rect thisMovedBounds = rect(bounds.x + x, bounds.y + y, bounds.width, bounds.height);
-          for (auto n : g_boxs[layer - 1]) {
-            if(RectOverlap(n->bounds, thisMovedBounds)) {
-              floor = 64 * (layer);
-              break;
-            }
-          }
-          for (auto n : g_triangles[layer - 1]) {
-            if(TriRectOverlap(n, thisMovedBounds.x, thisMovedBounds.y, thisMovedBounds.width, thisMovedBounds.height)) {
-              floor = 64 * (layer);
-              break;
+          if(ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
+            //if we move the player one pixel up will we still overlap?
+            if(n->type == 3 || n->type == 2)  {
+              xpush = jerk;
             }
 
-          }
-
-
-          float shadowFloor = floor;
-          floor = max(floor, heightfloor);
-
-          bool breakflag = 0;
-          for(int i = layer - 1; i >= 0; i--) {
-            for (auto n : g_boxs[i]) {
-              if(RectOverlap(n->bounds, thisMovedBounds)) {
-                shadowFloor = 64 * (i + 1);
-                breakflag = 1;
-                break;
-              }
-            }
-            if(breakflag) {break;}
-            for (auto n : g_triangles[i]) {
-              if(TriRectOverlap(n, thisMovedBounds.x, thisMovedBounds.y, thisMovedBounds.width, thisMovedBounds.height)) {
-                shadowFloor = 64 * (i + 1);
-                breakflag = 1;
-                break;
-              }
-
-            }
-            if(breakflag) {break;}
-          }
-          if(breakflag == 0) {
-            //just use heightmap
-            shadowFloor = floor;
-          }
-          this->shadow->z = shadowFloor;
-        } else {
-          this->shadow->z = heightfloor;
-          floor = heightfloor;
-        }
-
-        //try ramps?
-        //!!! can crash if the player gets too high
-
-        if(layer < g_layers) {
-          for(auto r : g_ramps[this->layer]) {
-            rect a = rect(r->x, r->y, 64, 55);
-            rect movedBounds = rect(bounds.x + x, bounds.y + y + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
-            if(RectOverlap(movedBounds, a)) {
-              if(r->type == 0) {
-                //contribute to protag z based on how far we are along
-                //the y axis
-                float push = (55 - abs((((float)movedBounds.y - (float)r->y ))))/55;
-
-                float possiblefloor = r->layer * 64 + 64 * push;
-                if( abs(this->z - possiblefloor ) < 15) {
-                  floor = possiblefloor;
-                  this->shadow->z = floor + 1;
-                }
-
-              } else {
-                if(r->type == 1) {
-                  float push = (64 - abs((( (float)(movedBounds.x + movedBounds.width) - (float)(r->x + 64) ))))/64;
-
-                  float possiblefloor = r->layer * 64 + 64 * push;
-                  if( abs(this->z - possiblefloor ) < 15) {
-                    floor = possiblefloor;
-                    this->shadow->z = floor + 1;
-                  }
-                } else {
-                  if(r->type == 2) {
-                    //contribute to protag z based on how far we are along
-                    //the y axis
-                    float push = (55 - abs((( (float)(movedBounds.y + movedBounds.height) - (float)(r->y + 55) ))))/55;
-
-                    float possiblefloor = r->layer * 64 + 64 * push;
-                    if( abs(this->z - possiblefloor ) < 15) {
-                      floor = possiblefloor;
-                      this->shadow->z = floor + 1;
-                    }
-
-                  } else {
-                    float push = (64 - abs((( (float)(movedBounds.x) - (float)(r->x) ))))/64;
-
-                    float possiblefloor = r->layer * 64 + 64 * push;
-                    if( abs(this->z - possiblefloor ) < 15) {
-                      floor = possiblefloor;
-                      this->shadow->z = floor + 1;
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        //look for solid entities (new as of Nov 2023 for the bed)
-        if(this == protag || this->isAI) { //seems to be causing slowdown
-          groundedByEntity = 0;
-          for(auto n : g_solid_entities) {
-            if(this->ignoreSolids) {break;}
-
-            if(XYWorldDistanceSquared(this->x, this->y, n->x, n->y) < 102400) //arbitrary distance chosen for optimization, it indicates a origin-to-origin distance of five blocks which is usually enough
-            {
-              rect thisb = rect(bounds.x + x + xvel * ((double) elapsed / 256.0), bounds.y + y + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
-              thisb.z = z;
-              thisb.zeight = bounds.zeight;
-  
-              rect that = rect(n->bounds.x + n->x -2, n->bounds.y + n->y-2, n->bounds.width+1, n->bounds.height+1);
-              that.z = n->z;
-              that.zeight = n->bounds.zeight;
-  
-  
-              if(RectOverlap(thisb,that) && (thisb.z >= that.z + that.zeight)) {
-                floor = that.z + that.zeight + 0.1;
-                this->shadow->z = floor + 1;
-  
-              }
-            }
-          }
-        }
- 
-
-        if(z > floor + 1) {
-          if(useGravity) {
-            zaccel -= g_gravity * ((double) elapsed / 256.0);
-          }
-          grounded = 0;
-        } else {
-          // !!! maybe revisit this to let "character" entities have fallsounds
-          if(grounded == 0 && this == protag && g_boardingCooldownMs < 0) {
-            //need to check if we landed in a boardable entity
-            
-            rect thisMovedBounds = rect(this->bounds.x + this->x, this->bounds.y + this->y, this->bounds.width, this->bounds.height);
-            for(auto n : g_boardableEntities) {
-              if(n->tangible && n->grounded) {
-                rect thatMovedBounds = {n->bounds.x + n->x, n->bounds.y + n->y, n->bounds.width, n->bounds.height};
-                if(RectOverlap(thisMovedBounds, thatMovedBounds) && (abs(this->z - n->z) < 32 )) {
-                  //M("Protag boarded entity named " + n->name);
-                  
-                  //decide to de-agro entities
-//                  if(n->isHidingSpot) {
-//                    for(auto x:g_ai) {
-//                      if(x->target == protag) {
-//                        //I want a "realistic" or clever way of de-agroing enemies
-//                        //I could make it so that there's a timer after fomm is last in listening range of an agrod enemy
-//                        if(!g_protagIsInHearingRange) {
-//                          //x->poiIndex = 0;
-//                          // i want to have a fun way of having the enemy de-agro
-//                          // I want them to approach the hiding spot and stare at it for a moment
-//                          // before a "?" appears above their head and they then wander off
-//
-//                          //this makes them instantly give up the moment the protag hides
-//                          x->agrod = 0;
-//                          x->smellAgroMs = 0;
-//                          x->target = nullptr;
-//
-//                          //x->myTravelstyle = patrol;
-//                          //x->traveling = 1;
-//                          //x->readyForNextTravelInstruction = 1;
-//                          M("begin losthim sequence");
-//                          
-//                          x->lostHimSequence = 1;
-//                          
-//                          //we want to pick the node closest to the edge of the hs,
-//                          //in the direction of the behemoth
-//                          //so get the angle from the hs to the behemoth
-//                          
-//                          float angleToBehemoth = atan2(x->getOriginX() - n->getOriginX(), x->getOriginY() - n->getOriginY()) - M_PI/2;
-//                          angleToBehemoth = wrapAngle(angleToBehemoth);
-//
-//                          float interestingX = n->getOriginX() + cos(angleToBehemoth) * n->bounds.width/2;
-//                          float interestingY = n->getOriginY() + sin(angleToBehemoth) * n->bounds.width/2;
-//
-//                          Destination = getNodeByPosition(x->lostHimX, x->lostHimY);
-//                          x->lostHimX = n->getOriginX();
-//                          x->lostHimY = n->getOriginY();
-//                        }
-//                      }
-//                    }
-//                  }
-
-                  if(n->transportEntPtr != nullptr) {
-                    g_boardedEntity = n->transportEntPtr;
-                    g_formerBoardedEntity = n;
-                    g_transferingByBoardable = 1;
-                    g_maxTransferingByBoardableTime = XYWorldDistance(n->getOriginX(), n->getOriginY(), g_boardedEntity->getOriginX(), g_boardedEntity->getOriginY()) / n->transportRate;
-                    g_transferingByBoardableTime = 0;
-                  } else {
-                    g_boardedEntity = n;
-                    g_transferingByBoardable = 0;
-                  }
-
-
-                  g_protagIsWithinBoardable = 1;
-                  g_msSinceBoarding = 0;
-                  protag->tangible = 0;
-                  smokeEffect->happen(n->getOriginX(), n->getOriginY(), protag->z, 0);
-                  break;
-                }
-              }
-
-            }
-
-            //play landing sound
-            //playSound(-1, g_land, 0);
-            playSound(-1, g_staticSounds[3], 0);
-
-            if(!storedJump) {
-              //penalize the player for not bhopping
-              if(protagConsecutiveBhops > 3) {
-                protag->slowPercent = g_jump_afterslow;
-                protag->slowSeconds = g_jump_afterslow_seconds;
-                protag->currentAirBoost = g_defaultBhoppingBoost;
-              }
-              protagConsecutiveBhops = 0;
-
-            } else {
-              protagConsecutiveBhops++;
-            }
-          }
-          grounded = 1;
-          zvel = max(zvel, 0.0f);
-          zaccel = max(zaccel, 0.0f);
-
-        }
-
-        if(groundedByEntity) { grounded = 1;}
-
-
-        zvel += zaccel * ((double) elapsed / 256.0);
-
-        if(this == protag && zvel < 75 && g_jumpGaranteedAccelMs < 0 ) {
-          if(!input[8]) {
-            if(zvel > 0) {zvel = 0;}
-          }
-        }
-
-        //for banish animation from scripts
-        if(this->banished && zvel <= 0) {
-          this->dynamic = 0;
-          //SDL_SetTextureAlphaMod(this->texture, 127);
-          this->opacity = 127;
-          //if we are solid, disable nodes beneath
-          if(this->canBeSolid) {
-
-            for(auto x : overlappedNodes) {
-
-              x->enabled = 1;
-              // for(auto y : x->friends) {
-              // 	y->enabled = 1;
-              // }
-            }
-
-          }
-          if(solid) {
-            solid = 0;
-            g_solid_entities.erase(remove(g_solid_entities.begin(), g_solid_entities.end(), this), g_solid_entities.end());
-          }
-          return nullptr;
-        }
-
-        //zvel *= pow(friction, ((double) elapsed / 256.0));
-        z += zvel * ((double) elapsed / 256.0);
-        z = max(z, floor + 1);
-
-
-        z = max(z, heightfloor);
-        layer = max(z /64, 0.0f);
-        layer = min(layer, (int)g_boxs.size() - 1);
-
-        shadow->x = x + shadow->xoffset;
-        shadow->y = y + shadow->yoffset;
-
-        //is out scriptcaller sleeping? Lets update it, and maybe wake it up
-        if(myScriptCaller != nullptr) {
-          if(myScriptCaller->sleepflag){
-            if(myScriptCaller->sleepingMS > 1) { myScriptCaller->sleepingMS -= elapsed;}
-            else {myScriptCaller->sleepflag = 0;myScriptCaller->continueDialogue();}
-          }
-        }
-
-        //and what about our contactscriptcaller?
-        if(contactScriptCaller != nullptr) {
-          if(contactScriptCaller->sleepflag){
-            if(contactScriptCaller->sleepingMS > 1) { contactScriptCaller->sleepingMS -= elapsed;}
-            else {contactScriptCaller->sleepflag = 0;contactScriptCaller->continueDialogue();}
-          }
-        }
-
-        //update combat
-        if(isWorlditem) {return nullptr;}
-
-        //hisweapon->comboResetMS+=elapsed;
-
-        if(shooting) {
-          //spawn shot.
-          shoot();
-        }
-
-        //check for everyone, even if they are invincible
-        if(1) {
-          //check for projectile box
-          vector<projectile*> projectilesToDelete;
-          for(auto x : g_projectiles) {
-            rect thatMovedBounds = rect(x->x + x->bounds.x, x->y + x->bounds.y, x->bounds.width, x->bounds.height);
-            thatMovedBounds.z = x->z;
-            thatMovedBounds.zeight = thatMovedBounds.width * XtoZ;
-            rect thisMovedBounds = rect(this->x + bounds.x, y + bounds.y, bounds.width, bounds.height);
-            thisMovedBounds.z = this->z;
-            thisMovedBounds.zeight = this->bounds.zeight;
-            if(x->owner->faction != this->faction && RectOverlap3d(thatMovedBounds, thisMovedBounds)) {
-
-              //destroy projectile
-              projectilesToDelete.push_back(x);
-
-              if(!invincible) {
-                //take damage
-                this->hp -= x->gun->damage;
-                this->flashingMS = g_flashtime;
-                if(this->faction != 0) {
-                  //playSound(1, g_enemydamage, 0);
-                } else {
-                  if(this == protag) {
-                    //playSound(2, g_playerdamage, 0);
-                  } else {
-                    //playSound(3, g_npcdamage, 0);
-                  }
-                }
-              }
-
-              //if(this->weaponName == "unarmed") {break;} //some entities should be able to target themselves (fleshpit)
-
-              //under certain conditions, agro the entity hit and set his target to the shooter
-              if(target == nullptr && useAgro) {
-              target = x->owner;
-              targetFaction = x->owner->faction;
-                agrod = 1;
-
-              //agro all of the boys on this's team who aren't already agrod, and set their target to a close entity from x's faction
-              //WITHIN A RADIUS, because it doesnt make sense to agro everyone on the map.
-
-              for (auto y : g_entities) {
-                if(y->tangible && y != this && y->faction == this->faction && (y->agrod == 0 || y->target == nullptr) && XYWorldDistance(y->x, y->y, this->x, this->y) < g_earshot && y->useAgro) {
-                  y->targetFaction = x->owner->faction;
-                  y->agrod = 1;
-                }
-              }
-
-              
-            }
-          }
-          for(auto x:projectilesToDelete) {
-            delete x;
-          }
-        }
-
-
-        //alert nearby friends who arent fighting IF we are agrod
-//        if(agrod && useAgro) {
-//          for (auto y : g_entities) {
-//            if(y->tangible && y != this && y->faction == this->faction && (y->agrod == 0 || y->target == nullptr) && XYWorldDistance(y->x, y->y, this->x, this->y) < g_earshot) {
-//              if(y->useAgro) {
-//                y->agrod = 1;
-//  
-//                if(this->target != nullptr) {
-//                  y->targetFaction = this->targetFaction;
-//                  if(y->target == nullptr) {
-//                    y->target = this->target;
-//                  }
-//                }
-//              }
-//            }
-//          }
-//        }
-
-        /*
-        if(isAI && useAgro) {
-          //check the auto-agro-range
-          potentialTarget = nullptr;
-          smellsPotentialTarget = 0;
-          seesPotentialTarget = 0;
-          if(target == nullptr) {
-
-            //could make this a bit nicer by splitting into finding a potential target and progressing towards detection for that target instead of having them together like this
-            for(auto x : g_entities) {
-              if(x->faction == this->targetFaction) {
-                //detect instantly, as if by hearing breath
-                if(XYWorldDistance(x->getOriginX(), x->getOriginY(), this->getOriginX(), this->getOriginY()) < 4 * 64) {
-                  if(LineTrace(x->getOriginX(), x->getOriginY(), this->getOriginX(), this->getOriginY(), false, 30, 0, 10, false)) 
-                  {
-                    if(!devMode 
-                        && 
-                        !g_ninja
-                        &&
-                        !g_protagIsWithinBoardable
-                        )  {
-                      M("I felt fomm's breath!");
-                      //close and have LOS - detection
-                      this->target = x;
-                      this->traveling = 0;
-                      this->agrod = 1;
-                    }
-                  }
-                
-                }
-
-                //can it smell fomm?
-                if(XYWorldDistance(x->getOriginX(), x->getOriginY(), this->getOriginX(), this->getOriginY()) < this->smellAgroRadius) {
-
-                  { //check for smell
-                    potentialTarget = x;
-                    smellsPotentialTarget = 1;
-                    if(potentialTarget == protag) {
-                      
-                      g_protagIsBeingDetectedBySmell = 1;
-                    }
-                  }
-                }
-
-                //can it see fomm?
-                if(XYWorldDistance(x->getOriginX(), x->getOriginY(), this->getOriginX(), this->getOriginY()) < this->visionRadius) {
-
-                  if(
-                      LineTrace(x->getOriginX(), x->getOriginY(), this->getOriginX(), this->getOriginY(), false, 30, 0, 10, false)
-                      &&
-                      x->tangible
-
-
-                      ) 
-                  {
-                    if(x == protag && g_protagIsWithinBoardable) { break;}
-                    if(opacity != 255) {break;}
-
-                    //is the monster facing the target? compare angle to target to this steeringangel
-
-                    float angleToPotTarget = atan2(x->getOriginX() - getOriginX(), x->getOriginY() - getOriginY()) - M_PI/2;
-                    angleToPotTarget = wrapAngle(angleToPotTarget);
-                    if(abs(angleDiff(angleToPotTarget, this->steeringAngle)) < 1.6) {
-                      potentialTarget = x;
-                      if(potentialTarget == protag) {
-                        g_protagIsBeingDetectedBySight = 1;
-                      }
-                      seesPotentialTarget = 1;
-                      break;
-                    }
-
-                    
-
-
-                  }
-                }
-              }
+            if(n->type == 0 || n->type == 1) {
+              xpush = -jerk; ;
             }
 
 
+            //ycollide = true;
+            yvel = 0;
+
+          }
+
+          movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
+          if(ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
+            //if we move the player one pixel up will we still overlap?
+            if(n->type == 1 || n->type == 2) {
+              ypush = jerk;
+            }
+
+            if(n->type == 0 || n->type == 3){
+              ypush = -jerk;
+            }
+
+            //xcollide = true;
+            xvel = 0;
+
+          }
+
+          movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+          if(ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
+            //                xcollide = true;
+            //                ycollide = true;
+            xvel = 0;
+            yvel = 0;
+            //continue;
+
+
+          }
+        }
+
+        //find modified bounds for player collision based on height
+        //I guess, simulate this by moving movedbounds up based on heighFactor
+        movedbounds.y -= (1-heightFactor) * 64;
+
+        //push the player away 
+        if(heightFactor > 0 && ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
+
+          if(n->type == 1) {
+            this->y-=2;
+            this->x+=2;
           } else {
-            //if we are agrod on the player, check if we are perceiving him
-            perceivingProtag = 0;
-            if(target == protag) {
-              //check smell
-              if(XYWorldDistance(protag->getOriginX(), protag->getOriginY(), this->getOriginX(), this->getOriginY()) < this->smellAgroRadius) {
-
-                { //check for smell
-                  perceivingProtag = 1;
-                }
-              }
-
-
-
-              //check sight
-              if(XYWorldDistance(protag->getOriginX(), protag->getOriginY(), this->getOriginX(), this->getOriginY()) < this->visionRadius) {
-                if(
-                    LineTrace(protag->getOriginX(), protag->getOriginY(), this->getOriginX(), this->getOriginY(), false, 30, 0, 10, false)
-                    &&
-                    protag->tangible
-                    ) 
-                {
-                  if(!g_protagIsWithinBoardable) {
-  
-                    //is the monster facing the target? compare angle to target to this steeringangel
-                    float angleToPotTarget = atan2(protag->getOriginX() - getOriginX(), protag->getOriginY() - getOriginY()) - M_PI/2;
-                    angleToPotTarget = wrapAngle(angleToPotTarget);
-                    if(abs(angleDiff(angleToPotTarget, this->steeringAngle)) < 1.6) {
-                      perceivingProtag = 1;
-                    }
-                  }
-                }
-              }
-
-            }
-            if(!perceivingProtag) {
-              c_deagroMs += elapsed;
-            } else {
-              c_deagroMs -= elapsed;
-            }
-            if(c_deagroMs > deagroMs) {
-              agrod = 0;
-              traveling = 1;
-              readyForNextTravelInstruction = 1;
-              target = nullptr;
-              M("I deagrod of fomm");
-            } else if(c_deagroMs < 0) {
-              c_deagroMs = 0;
-
-            }
+            this->y-=2;
+            this->x-=2;
           }
 
-          //this is so it takes time to agro on someone
-          if(smellsPotentialTarget && !devMode) {
-            smellAgroMs += elapsed;
-          } else {
-            smellAgroMs -= elapsed;
-          }
-
-          if(smellAgroMs >= maxSmellAgroMs && potentialTarget != nullptr && !devMode && !g_ninja) {
-            M("I smelled fomm!");
-            this->traveling = 0;
-            this->target = potentialTarget;
-            this->agrod = 1;
-          }
-
-
-          if(smellAgroMs < 0) {
-            smellAgroMs = 0;
-          }
-
-          if(seesPotentialTarget && !devMode) {
-            seeAgroMs += elapsed;
-          } else {
-            seeAgroMs -= elapsed;
-          }
-
-          if(seeAgroMs >= visionTime && potentialTarget != nullptr && !devMode && !g_ninja) {
-            M("I saw fomm!");
-            this->traveling = 0;
-            this->target = potentialTarget;
-            this->agrod = 1;
-          }
-
-          if(seeAgroMs < 0) {
-            seeAgroMs = 0;
-          }
-
-//          //is out scriptcaller sleeping? Lets update it, and maybe wake it up
-//          if(myScriptCaller != nullptr) {
-//            if(myScriptCaller->sleepflag){
-//              if(myScriptCaller->sleepingMS > 1) { myScriptCaller->sleepingMS -= elapsed;}
-//              else {myScriptCaller->sleepflag = 0;myScriptCaller->continueDialogue();}
-//            }
-//          }
-
-
-
-
-        } else if(isAI && !useAgro) {
-          //HORROR STALKER NERVOUS AGGRESSIVE
-          //This is the code for having fun enemies who vary in aggressiveness
-          //prototypically, aggressiveness makes them faster, do more damage, and spend less time wandering
-          if(target == nullptr) {
-            //get the target
-            for(auto x : g_entities) {
-              if(x->faction == targetFaction) {
-                target = x;
-                break;
-              }
-            }
-          }
-
-          if(target != nullptr) {
-            smellsPotentialTarget = 0;
-            seesPotentialTarget = 0;
-            //can it smell fomm?
-            if(distanceToTarget < this->smellAgroRadius) {
-              smellsPotentialTarget = 1;
-            }
-
-            //can it see fomm?
-            if(distanceToTarget < this->visionRadius) {
-              if(
-                  LineTrace(target->getOriginX(), target->getOriginY(), this->getOriginX(), this->getOriginY(), false, 30, 0, 10, false)
-                  &&
-                  target->tangible
-                  ) 
-              {
-                if(target != protag || !g_protagIsWithinBoardable) {
-                  //is the monster facing the target? compare angle to target to this steeringangel
-                  float angleToPotTarget = atan2(target->getOriginX() - getOriginX(), target->getOriginY() - getOriginY()) - M_PI/2;
-                  angleToPotTarget = wrapAngle(angleToPotTarget);
-                  if(abs(angleDiff(angleToPotTarget, this->steeringAngle)) < 1.6) {
-                    seesPotentialTarget = 1;
-                  }
-                }
-              }
-            }
-
-            //can it hear fomm?
-
-            //if we are using the state system, let's update that
-            if(useStateSystem) {
-              
-              if(distanceToTarget < states[activeState].blocks || states[activeState].blocks == 0) {
-                states[activeState].interval -= elapsed;
-              }
-
-              if(states[activeState].interval < 0) {
-                int numChoices = states[activeState].nextStates.size();
-                float random = (double)rand() / RAND_MAX;
-                float sumOfOdds = 0;
-                int destinationState = 0;
-                for(int i = 0; i < states[activeState].nextStates.size(); i++) {
-                  float chance = states[activeState].nextStateProbabilities[i];
-                  sumOfOdds += chance;
-                  if(sumOfOdds >= random) { 
-                    destinationState = states[activeState].nextStates[i];
-                    break;
-                  }
-                }
-                //cout << "State change from " << activeState << " to " << destinationState << endl;
-                states[activeState].interval = states[activeState].nextInterval;
-                activeState = destinationState;
-              }
-            }
-          }
-          
-          //aggressiveness is frozen if the player is hiding
-          if(!g_protagIsWithinBoardable) {
-            if(seesPotentialTarget && opacity == 255) {
-
-              if(target == protag) {
-                g_protagIsBeingDetectedBySight = 1;
-              }
-              aggressiveness += elapsed * aggressivenessGain;
-            }
-            if(hearsPotentialTarget) {
-              aggressiveness += elapsed * aggressivenessNoiseGain;
-            }
-            if(smellsPotentialTarget) {
-              aggressiveness += elapsed * aggressivenessGain;
-            }
-  
-            if(!seesPotentialTarget && !hearsPotentialTarget && !smellsPotentialTarget) {
-              aggressiveness -= elapsed * aggressivenessLoss;
-            }
-          }
-
-          if(aggressiveness < minAggressiveness) {
-            aggressiveness = minAggressiveness;
-          } else if(aggressiveness > maxAggressiveness) {
-            aggressiveness = maxAggressiveness;
-          }
+          zvel = max(zvel, -1.0f);
         }
-
-        if(isAI) {
-          //likely has abilities to use
-          //are any abilities ready?
-          for(auto &x : myAbilities) {
-            if(x.ready == 1) {continue;}
-            
-            //accumulate-abilities will always decrease CD
-            if(x.resetStableAccumulate == 2) {
-              x.cooldownMS -= elapsed;
-            }
-            if(target == nullptr) {if(x.resetStableAccumulate == 0) {x.cooldownMS = x.upperCooldownBound;}}
-
-            float inRange = 0;
-            float dist = std::numeric_limits<float>::max();
-
-            if(target != nullptr) {
-              dist = distanceToTarget;
-            }
-
-            if((dist <= x.upperRangeBound  && dist >= x.lowerRangeBound) || x.upperRangeBound == x.lowerRangeBound && x.lowerRangeBound == 0) {
-              inRange = 1;
-              if(x.resetStableAccumulate != 2) {
-                x.cooldownMS -= elapsed;
-              }
-            } else {
-              //reset-abilities are reset when out of range
-              if(x.resetStableAccumulate == 0) {
-                x.cooldownMS = (x.lowerCooldownBound + x.upperCooldownBound)/2;
-              }
-            }
-
-            if(x.cooldownMS < 0) {
-              //are we in range to the player?
-              if(inRange) {
-                x.ready = 1;
-              }
-            }
-          }
-
-        }
-        */
-
-        // ... return nullptr; and there was no slowdown
-
-        //apply statuseffect
-        this->stunned = hisStatusComponent.stunned.updateStatuses(elapsed);
-        if(this->stunned) {stop_hori(); stop_verti();}
-        this->marked = hisStatusComponent.marked.updateStatuses(elapsed);
-        this->disabled = hisStatusComponent.disabled.updateStatuses(elapsed);
-        this->enraged = hisStatusComponent.enraged.updateStatuses(elapsed);
-        this->buffed = hisStatusComponent.buffed.updateStatuses(elapsed);
-        
-        
-        int damageFromPoison = round(hisStatusComponent.poisoned.updateStatuses(elapsed));
-        this->poisoned = damageFromPoison;
-        if(this->poisoned) {poisonFlickerFrames = 6;}
-        this->hp -= damageFromPoison;
-
-        int healthFromHealen = round(hisStatusComponent.healen.updateStatuses(elapsed));
-        this->healen = healthFromHealen;
-        this->hp += healthFromHealen;
-        if(this->hp > this->maxhp) {this->hp = this->maxhp;}
-        this->statusSlownPercent =  hisStatusComponent.slown.updateStatuses(elapsed);
-        if(statusSlownPercent > 1) {statusSlownPercent = 1;}
-
-        hisStatusComponent.invincible.updateStatuses(elapsed);
-
-        this->hisStatusComponent.stunned.cleanUpStatuses();
-        this->hisStatusComponent.marked.cleanUpStatuses();
-        this->hisStatusComponent.disabled.cleanUpStatuses();
-        this->hisStatusComponent.enraged.cleanUpStatuses();
-        this->hisStatusComponent.buffed.cleanUpStatuses();
-        this->hisStatusComponent.poisoned.cleanUpStatuses();
-        this->hisStatusComponent.healen.cleanUpStatuses();
-        this->hisStatusComponent.slown.cleanUpStatuses();
-        this->hisStatusComponent.invincible.cleanUpStatuses();
-
-
-        //check if he has died
-        if(hp <= 0) {
-          if(this != protag) {
-            tangible = 0;
-            return nullptr;
-          }
-        }
-
-
-
-
-
-        //push him away from close entities
-        //if we're even slightly stuck, don't bother
-        if(this->dynamic && this->pushable && elapsed > 0) {
-
-          for(auto x : g_entities) {
-            if(this->isAI && x->isAI) {continue;} //behemoths don't collide
-            if(this == x) {continue;}
-
-            //entities with a semisolid value of 2 are only solid to the player
-            bool solidfits = 0;
-  
-            //this is not a silly check
-            if(this == protag) {
-              solidfits = x->semisolid;
-            } else {
-              solidfits = (x->semisolid == 1);
-            }
-
-            //entities with a semisolid value of 3 are semisolid with a square collision
-            bool semisolidsquare = x->semisolid == 3;
-            if(semisolidsquare) {
-              bool m = RectOverlap(this->getMovedBounds(), x->getMovedBounds());
-              if(m && x->tangible && solidfits) {
-                float r = pow( max(Distance(getOriginX(), getOriginY(), x->getOriginX(), x->getOriginY()), (float)10.0 ), 2);
-                float mag =  30000/r;
-                if(identity == 29) {
-                  mag = 0.3/r;
-                }
-                float xdif = (this->getOriginX() - x->getOriginX());
-                float ydif = (this->getOriginY() - x->getOriginY());
-                float len = pow( pow(xdif, 2) + pow(ydif, 2), 0.5);
-                float normx = xdif * 0.1;
-                float normy = ydif * 0.1;
-  
-                if(!isnan(mag * normx) && !isnan(mag * normy)) {
-                  xvel += normx * mag;
-                  yvel += normy * mag;
-                }
-
-
-              }
-
-            } else {
-
-              bool m = CylinderOverlap(this->getMovedBounds(), x->getMovedBounds());
-  
-  
-              if(solidfits && x->tangible && m) {
-                //push this one slightly away from x
-                float r = pow( max(Distance(getOriginX(), getOriginY(), x->getOriginX(), x->getOriginY()), (float)10.0 ), 2);
-                float mag =  30000/r;
-                float xdif = (this->getOriginX() - x->getOriginX());
-                float ydif = (this->getOriginY() - x->getOriginY());
-                float len = pow( pow(xdif, 2) + pow(ydif, 2), 0.5);
-                float normx = xdif/len;
-                float normy = ydif/len;
-  
-                if(!isnan(mag * normx) && !isnan(mag * normy)) {
-                  xvel += normx * mag;
-                  yvel += normy * mag;
-                }
-  
-              } else if(m && x->usesContactScript && x->contactReadyToProc && x->tangible && this->faction != x->faction && !x->contactScriptCaller->executingScript) {
-                x->contactScriptCaller->dialogue_index = -1;
-                x->target = this;
-                x->sayings = x->contactScript;
-                x->contactScriptCaller->continueDialogue();
-              }
-            }
-          }
-        }
-
-        flashingMS -= elapsed;
-        darkenMs -= elapsed;
-//        if(this->inParty) {
-//          return nullptr;
-//        }
-        if(this == protag) {
-          return nullptr;
-        }
-
-//        if(!canFight) {
-//          return nullptr;
-//        }
-
-        // ... return nullptr; and there was no slowdown
-        //shooting ai
-        if(canFight && agrod && 0) {
-          //do we have a target?
-          if(target != nullptr) {
-            //check if target is still valid
-            if(target->hp <= 0 || (!target->tangible && !(target == protag && g_protagIsWithinBoardable))) {
-              //can we get a new target from the same faction that we are agrod against?
-              bool setNewTarget = 0;
-              for(auto x : g_entities) {
-                if(x->tangible && x->faction == target->faction && LineTrace(this->getOriginX(), this->getOriginY(), x->getOriginX(), x->getOriginY(), false, 30, this->layer, 10, 0)) {
-                  target = x;
-                  setNewTarget = 1;
-                  break;
-                }
-              }
-              if(!setNewTarget){
-                for(auto x : g_entities) {
-                  if(x->tangible && x->faction == target->faction) {
-                    target = x;
-                    setNewTarget = 1;
-                    break;
-                  }
-                }
-              }
-              if(!setNewTarget) {
-                target = nullptr;
-                //agrod = 0;
-                //I'd like to check if there are entities we can't see but we can path too but its so much work :(
-
-                Destination = nullptr;
-              }
-            } else {
-              //re-evaluate target if someone else has delt high damage to us recently
-
-              //this constant is what factor of the range must be had to the player
-              //in these types of games, humans seem to shoot even when they are out
-              // of range, so lets go with that
-              shooting = 0;
-              //float distanceToTarget = XYWorldDistance(target->getOriginX(), target->getOriginY(), getOriginX(), getOriginY());
-//              if(distanceToTarget < this->hisweapon->attacks[hisweapon->combo]->range) {
-//                shooting = 1;
-//              }
-
-              float xvector;
-              float yvector;
-              //bool recalcAngle = 0; //should we change his angle in the first place?
-              //combatrange is higher than shooting range because sometimes that range is broken while a fight is still happening, so he shouldnt turn away
-
-              //now that we have a direction, shoot
-              if(shooting) {
-                shoot();
-              }
-
-            }
-          } else {
-            //another placeholder - target is protag
-            if(faction != 0) {
-              extern entity* protag;
-              target = protag;
-            }
-            if(targetFaction != -1) {
-              //set target to first visible enemy from target faction
-              for(auto x : g_entities) {
-                if(x->faction == this->targetFaction ) {
-                  //found an entity that we have vision to
-                  this->target = x;
-                }
-              }
-            }
-          }
-        } else if(dynamic) {
-
-          //code for becoming agrod when seeing a hostile entity will go here
-          //face the direction we are moving
-          //bool recalcAngle = 0; //should we change his angle in the first place?
-          //combatrange is higher than shooting range because sometimes that range is broken while a fight is still happening, so he shouldnt turn away
-
-          //here's the code for roaming/patrolling
-          //we aren't agrod.
-          if(traveling) {
-            if(readyForNextTravelInstruction && g_setsOfInterest.at(poiIndex).size() != 0) {
-              readyForNextTravelInstruction = 0;
-
-              float r = ((double) rand() / RAND_MAX);
-              if(curPatrolPerRoam < minPatrolPerRoam) {
-                myTravelstyle = patrol;
-                curPatrolPerRoam++;
-                //M("Can't roam now");
-              } else {
-                if(r >= roamRate) {
-                  myTravelstyle = patrol;
-                } else {
-                  myTravelstyle = roam;
-                  curPatrolPerRoam = 0;
-                }
-              }
-              if(myTravelstyle == roam && g_setsOfInterest.size() > poiIndex) {
-                //generate random number corresponding to an index of our poi vector
-                int random = rand() % ((int)g_setsOfInterest.at(poiIndex).size() - 1);
-                pointOfInterest* targetDest = g_setsOfInterest.at(poiIndex).at(random);
-                if(random == lastTargetDestIndex) {
-                  random++;
-                  targetDest = g_setsOfInterest.at(poiIndex).at(random);
-                }
-                if(random == lastTargetDestIndex) {
-                  //M("They're equal, this shouldn't happen");
-                } 
-//                else if(random < lastTargetDestIndex) {
-//                  patrolDirection = 1; //patrol decreasingly
-//                  M("New direction is Clock.");
-//                } else {
-//                  patrolDirection = 0; //patrol increasingly
-//                  M("New direction is Ounter.");
-//                }
-                //set new direction to clock if it's faster to go clockwise
-                int numPoiNodes = ((int)g_setsOfInterest.at(poiIndex).size());
-
-                //get the distance by counting upwards (ounter)
-                int ounterDistance = 0;
-                int thisSpot = lastTargetDestIndex;
-                while(thisSpot != random) {
-                  thisSpot++;
-                  ounterDistance++;
-                  if(thisSpot > numPoiNodes) {thisSpot = 0;}
-                }
-
-                int clockDistance = numPoiNodes - ounterDistance;
-
-                if(ounterDistance < clockDistance) {
-                  patrolDirection = 0;
-                  //M("New Direction is Ounter");
-                } else {
-                  patrolDirection = 1;
-                  //M("New Direction is Clock");
-
-                }
-
-
-                lastTargetDestIndex = random;
-                currentPoiForPatrolling = random;
-                Destination = getNodeByPosition(targetDest->x, targetDest->y);
-              } else if(myTravelstyle == patrol) {
-                if(patrolDirection == 0) {
-                  currentPoiForPatrolling++;
-                  //M("Going Ounter...");
-                } else {
-                  currentPoiForPatrolling--;
-                  //M("Going Clock...");
-                }
-                if(currentPoiForPatrolling > (int)g_setsOfInterest.at(poiIndex).size()-1) {currentPoiForPatrolling = 0;}
-                if(currentPoiForPatrolling < 0) {currentPoiForPatrolling = g_setsOfInterest.at(poiIndex).size()-1;}
-
-                pointOfInterest* targetDest = g_setsOfInterest.at(poiIndex).at(currentPoiForPatrolling);
-                lastTargetDestIndex = currentPoiForPatrolling;
-                Destination = getNodeByPosition(targetDest->x, targetDest->y);
-              }
-            } else {
-              //should we be ready for our next travel-instruction?
-              if(Destination == nullptr) {
-                Destination = getNodeByPosition(getOriginX(), getOriginY());
-              }
-              if(Destination != nullptr && XYWorldDistance(this->getOriginX(), this->getOriginY(), Destination->x, Destination->y) < 32) {
-                readyForNextTravelInstruction = 1;
-              }
-            }
-
-            BasicNavigate(Destination);
-          }
-        }
-        
-        // ... return nullptr; and there was no slowdown
-        // pretty sure the slowdown is due to code after this point
-        //double checked, left it going for about an hour
-
-        float dist = XYWorldDistanceSquared(this->getOriginX(), this->getOriginY(), protag->getOriginX(), protag->getOriginY());
-        if(dist < g_entitySleepDistance || this->isAI) {
-          specialObjectsUpdate(this, elapsed);
-        }
-
-        if(this->missile) {
-          // missile movment
-          if(target !=  nullptr && target->tangible) {
-            int rangeToUse = 0;
-            
-            if(g_protagIsWithinBoardable) {
-              rangeToUse = 64 * 3;
-            } else {
-              rangeToUse = this->hisweapon->attacks[hisweapon->combo]->range;
-            }
-
-            if( XYWorldDistance(this->getOriginX(), this->getOriginY(), target->getOriginX(), target->getOriginY()) > rangeToUse) {
-
-              angleToTarget = atan2(target->getOriginX() - getOriginX(), target->getOriginY() - getOriginY()) - M_PI/2;
-              angleToTarget = wrapAngle(angleToTarget);
-              targetSteeringAngle = angleToTarget;
-              forwardsVelocity = xagil;
-  
-            } else {
-              //stop if in range
-              forwardsVelocity = 0;
-              forceAngularUpdate = 1;
-            }
-
-          } else if (target == nullptr) {
-            forwardsVelocity = xagil;
-          }
-
-          
-        } else if (target != nullptr && agrod) {
-          // monster movement 
-          
-          float distToTarget = 10000;
-          angleToTarget = atan2(target->getOriginX() - getOriginX(), target->getOriginY() - getOriginY()) - M_PI/2;
-          angleToTarget = wrapAngle(angleToTarget);
-          distToTarget = XYWorldDistance(this->getOriginX(), this->getOriginY(), target->getOriginX(), target->getOriginY());
-          g_dijkstraEntity = this;
-
-          //chase if custommovement type is 0 or we are within movementTypeSwitchRadius
-          //to target
-          blindrun = 0;
-          if(customMovement == 0 || distToTarget < movementTypeSwitchRadius)
-          { //blindrun movement
-            
-            if(( (LineTrace(this->getOriginX(), this->getOriginY(), target->getOriginX(), target->getOriginY(), false, 64 + 32, this->layer, 10, true) )  || (distToTarget < 180) ) ) {
-            //just walk towards the target, need to use range to stop walking if we are at target (for friendly npcs)
-            targetSteeringAngle = angleToTarget;
-            blindrun = 1;
-            
-            int rangeToUse = 0;
-            
-            if(g_protagIsWithinBoardable) {
-              rangeToUse = 64 * 3;
-            } else {
-              rangeToUse = 128;
-              if(inParty) {rangeToUse = 100;}
-            }
-  
-            if( distToTarget > rangeToUse) {
-              forwardsVelocity = xagil;
-            } else {
-              //stop if in range
-              forwardsVelocity = 0;
-              forceAngularUpdate = 1;
-            }
-
-            //not calling BasicNavigate, so we need to set nearby nodes to indicate that they're being used
-            //we have LOS so this trick really isn't a hack
-            
-            int xval = getOriginX();
-            int yval = getOriginY();
-//            int xval = getOriginX() + 15 * xvel;
-//            int yval = getOriginY() + 15 * yvel;
-            navNode* closestNode = getNodeByPos(g_navNodes, xval, yval);
-            if(closestNode != nullptr) {
-              for(auto u : closestNode->friends) {
-                u->costFromUsage = 1000000;
-              }
-            }
-
-  
-            //recalculate current when we lose los
-            current = nullptr;
-            dest = nullptr;
-            Destination = nullptr;
-            timeSinceLastDijkstra = -1;
-            //M("Dijkstra refresh");
-            justLostLosToTarget = 1;
-            path.clear();
-
-          } else {
-            if(Destination != nullptr) {
-              //M("BN D");
-              BasicNavigate(Destination);
-            }
-            justLostLosToTarget = 0;
-          }
-        } else if( customMovement == 1) 
-        { //precede
-          
-          //BasicNavigate();
-        } else if(customMovement == 2)
-        { //corner
-          if(Destination != nullptr) {
-            BasicNavigate(Destination);
-          }
-        }
-
-
-        //walking ai
-        if(agrod) {
-          if(timeSinceLastDijkstra - elapsed < 0 && blindrun ==0 ) {
-            //M("Dijkstra update");
-            //need to update our Destination member variable, dijkstra will
-            //be called this frame
-            if(target != nullptr && (target->tangible || target == protag && g_protagIsWithinBoardable)) {
-              //requirements for a valid place to navigate to
-              //must be
-              //1 - in range
-              //2 - have LOS to player (we can even check if the attack pierces walls later)
-              //3 - not be a wall
-              //hopefully thats enuff, because i dont really want to make an algorithm
-              //to check if a spot is easy to walk to, but its possible.
-
-              //how will we write the algorithm?
-              //check the cardinal points of the player having 2/3 of the range
-              //thats eight places to check.
-              //start with the closest first, otherwise every dijkstra call the AI
-              //would basically walk thru the player between these cardinal points
-              //if the closest cardinal place fails the second or third requirements
-              //try testing another
-              //if none work, (e.g. player is standing in the middle of a small room)
-              //repeat with half of 2/3 of the range. it might just be better to have them navigate
-              //to the player
-
-              //DEPRECATED - use frame to get prefered cardinal point
-              //NOW - use angle to target to get prefered cardinal point
-              int index = convertAngleToFrame(angleToTarget);
-
-              //vector<int> ret;
-              Destination = getNodeByPosition(target->getOriginX(), target->getOriginY());
-//              if(this->hisweapon->attacks[hisweapon->combo]->melee)  {
-//                //ret = getCardinalPoint(target->getOriginX(), target->getOriginY(), 0, index);
-//               
-//                //Destination = getNodeByPosition(ret[0], ret[1]);
-//                Destination = getNodeByPosition(target->getOriginX(), target->getOriginY());
-////                M("getNodeByPosition() A");
-////                D(Destination->x);
-////                D(Destination->y);
-//
-//              } else {
-//                ret = getCardinalPoint(target->getOriginX(), target->getOriginY(), this->hisweapon->attacks[hisweapon->combo]->range, index);
-//      
-//                if( LineTrace(ret[0], ret[1], target->getOriginX(), target->getOriginY(), false, 30, 0, 10, 0) && abs(target->z- verticalRayCast(ret[0], ret[1])) < 32 ) {
-//      
-//                  Destination = getNodeByPosition(ret[0], ret[1]);
-////                  M("getNodeByPosition() B");
-////                  D(Destination->x);
-////                  D(Destination->y);
-//                } else {
-//                  //Can't get our full range, so use the values in LineTraceX and LineTraceY
-//                  extern int lineTraceX, lineTraceY;
-//                  Destination = getNodeByPosition(lineTraceX, lineTraceY);
-////                  M("getNodeByPosition() C");
-////                  D(Destination->x);
-////                  D(Destination->y);
-//                }
-//              }
-              
-            }
-          }
-
-          //detect stuckness- if we're stuck, try heading to a random nearby node for a moment
-
-          if(stuckTime > maxStuckTime) {
-            //this is somehow wrong
-            //entities will be rubbing against a wall and stuckTime won't be incremented
-            //and this chunk of code won't be exeecuted
-            //M("A PATHFINDER IS STUCK");
-            stuckTime = 0;
-            current = Get_Closest_Node(g_navNodes);
-            if(current != nullptr) {
-              int c = rand() % current->friends.size();
-              Destination = target->Get_Closest_Node(g_navNodes);
-              dest = current->friends[c];
-            }
-            readyForNextTravelInstruction = 1;
-          }
-        }
-
-
-
       } 
+    } else {
+      //treat t implied slopes just like tris
+      for(auto n : g_impliedSlopeTris){
+        rect movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+        if(ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
+          //if we move the player one pixel up will we still overlap?
+          if(n->type == 3 || n->type == 2)  {
+            xpush = jerk;
+          }
+
+          if(n->type == 0 || n->type == 1) {
+            xpush = -jerk; ;
+          }
+
+
+          ycollide = true;
+          yvel = 0;
+
         }
 
-      
+        movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y, bounds.width, bounds.height);
+        if(ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
+          //if we move the player one pixel up will we still overlap?
+          if(n->type == 1 || n->type == 2) {
+            ypush = jerk;
+          }
 
+          if(n->type == 0 || n->type == 3){
+            ypush = -jerk;
+          }
+
+          xcollide = true;
+          xvel = 0;
+
+        }
+
+        movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+        if(ITriRectOverlap(n, movedbounds.x, movedbounds.y, movedbounds.width, movedbounds.height)) {
+          xcollide = true;
+          ycollide = true;
+          xvel = 0;
+          yvel = 0;
+          continue;
+
+
+        }
+
+      }
+
+    }
+
+
+    //test for implied slopes
+    if(g_useSimpleImpliedGeometry == 0) {
+      for(auto i : g_impliedSlopes) {
+        rect movedbounds;
+        rect simslope = rect(0,0,0,0);
+        movedbounds = rect(bounds.x + x, bounds.y + y  + (yvel * ((double) elapsed / 256.0)), bounds.width, bounds.height);
+
+        bool overlapY = RectOverlap(movedbounds, i->bounds);
+
+        float heightFactor;
+        if(i->bounds.z >= this->z) {
+          heightFactor = 1;
+        } else if (this->z - 63 > i->bounds.z) {
+          heightFactor = 0;
+        } else {
+          heightFactor = 1 - ((this->z - i->bounds.z) /63);
+        }
+
+
+        float yDiff = 0; //this is used to compare the ycoords of the ent and the slope, so if the ent has lower y than the slope, we can just treat it as a wall
+        yDiff = (this->y + bounds.y + this->bounds.height) - i->bounds.y;
+
+
+        if(overlapY) {
+          rect simslope = rect(i->bounds.x, i->bounds.y + (16 * (1- heightFactor) ), i->bounds.width, i->bounds.height -  (64 * (1- heightFactor) ));
+          if(heightFactor < 0.95 && heightFactor > 0 && RectOverlap(simslope, movedbounds)) {
+            heightFactor = pow(heightFactor, 2);
+            //yvel = -1 * ( (y + bounds.y + this->bounds.height) - (i->bounds.y + (64 * (1- heightFactor) )) );
+
+            float difference = ( (y + bounds.y + this->bounds.height) - (i->bounds.y + (8 * (1- heightFactor) )) );
+            //y += -1 * difference;
+            //yvel = -1 * difference;
+            y-=2;
+            yvel = 0;
+            xaccel = 0;
+            if(heightFactor < 0.3) {
+              if(this->z > 1) {
+                xcollide = 1;
+              }
+            }
+
+
+            //zaccel -= -1;
+            zvel = max(zvel, -1.0f);
+            //ycollide = 1;
+
+            rect movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y  , bounds.width, bounds.height);
+          }
+        }
+
+        if(heightFactor > 0) {
+
+          if(overlapY) {
+            ycollide = 1;
+            movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)) , bounds.width, bounds.height);
+            bool overlapX = RectOverlap(movedbounds, simslope);
+
+            if(overlapX) {
+              if(this->z > 1 || yDiff < 10) {
+                xcollide = 1;
+              }
+            }
+
+          } else {
+            movedbounds = rect(bounds.x + x + (xvel * ((double) elapsed / 256.0)), bounds.y + y + (yvel * ((double) elapsed / 256.0)) , bounds.width, bounds.height);
+            bool overlapX = RectOverlap(movedbounds, i->bounds);
+
+            if(overlapX) {
+              if(this->z > 1 || yDiff > 10) {
+                xcollide = 1;
+              }
+            }
+
+          }
+        }
+      } 
+    }
+    yvel += ypush;
+    xvel += xpush;
+  }
+
+  if(g_entityBenchmarking) {
+    g_eu_timer -= SDL_GetTicks();
+    g_eu_d -= g_eu_timer;
+    g_eu_timer = SDL_GetTicks();
+  }
+
+
+  //        if(name == "common/neheten") {
+  //          D(xcollide);
+  //          D(ycollide);
+  //          D(( pow( pow(oxvel,2) + pow(oyvel, 2), 0.5) ));
+  //        }
+  if(((xcollide || ycollide )) && ( pow( pow(oxvel,2) + pow(oyvel, 2), 0.5) > 2 )) {
+    if(fragileMovement) {
+      timeToLiveMs = -1;
+      usingTimeToLive = 1;
+    }
+
+    //detect stuckness
+    stuckTime++;
+  } else {
+    stuckTime = 0;
+  }
+
+  specialObjectsBump(this, xcollide, ycollide);
+
+  if(!ycollide && !transition) {
+    y+= yvel * ((double) elapsed / 256.0);
+  }
+
+  //when coordinates are bungled, it isnt happening here
+  if(!xcollide && !transition) {
+    x+= xvel * ((double) elapsed / 256.0);
+  }
+
+  if(slowSeconds > 0) {
+    slowSeconds -= elapsed/1000;
+    friction = baseFriction * slowPercent;
+  } else {
+    friction = baseFriction;
+  }
+
+
+  if(grounded) {
+    yvel *= pow(friction, ((double) elapsed / 256.0));
+    xvel *= pow(friction, ((double) elapsed / 256.0));
+    stableLayer = layer;
+  } else {
+    yvel *= pow(friction*this->currentAirBoost, ((double) elapsed / 256.0));
+    xvel *= pow(friction*this->currentAirBoost, ((double) elapsed / 256.0));
+    this->currentAirBoost += (g_deltaBhopBoost * ((double) elapsed / 256.0)) * min(pow( pow(x,2) + pow(y, 2), 0.2) / xmaxspeed, 1.0);
+    if(this->currentAirBoost > g_maxBhoppingBoost) {
+      this->currentAirBoost = g_maxBhoppingBoost;
+    }
+    // !!! make this not suck
+  }
+
+  float heightfloor = 0; //filled with floor z from heightmap
+  if(g_heightmaps.size() > 0 /*&& update_z_time < 1*/) {
+    bool using_heightmap = 0;
+    bool heightmap_is_tiled = 0;
+    tile* heighttile = nullptr;
+    int heightmap_index = 0;
+
+    rect tilerect;
+    rect movedbounds;
+    //movedbounds = rect(this->x + xvel * ((double) elapsed / 256.0), this->y + yvel * ((double) elapsed / 256.0) - this->bounds.height, this->bounds.width, this->bounds.height);
+    movedbounds = rect(this->getOriginX(), this->getOriginY(), 0, 0);
+    //get what tile entity is on
+    //this is poorly set up. It would be better if heightmaps were assigned to tiles, obviously, with a pointer
+    bool breakflag = 0;
+
+    for (int i = (int)g_tiles.size() - 1; i >= 0; i--) {
+      if(g_tiles[i]->fileaddress == "textures/marker.qoi") {continue; }
+      tilerect = rect(g_tiles[i]->x, g_tiles[i]->y, g_tiles[i]->width, g_tiles[i]->height);
+
+      if(RectOverlap(tilerect, movedbounds)) {
+        for (int j = 0; j < (int)g_heightmaps.size(); j++) {
+          //M("looking for a heightmap");
+          //e(g_tiles[i]->fileaddress);
+          if(g_heightmaps[j]->name == g_tiles[i]->fileaddress) {
+            //M("found it");
+            heightmap_index = j;
+            using_heightmap = 1;
+            breakflag = 1;
+            heightmap_is_tiled = g_tiles[i]->wraptexture;
+            heighttile = g_tiles[i];
+            break;
+          }
+        }
+        //current texture has no mask, keep looking
+      }
+    }
+
+
+
+    update_z_time = max_update_z_time;
+    //update z position
+    SDL_Color rgb = {0, 0, 0};
+    heightmap* thismap = g_heightmaps[heightmap_index];
+    Uint8 maxred = 0;
+    if(using_heightmap) {
+      //try each corner;
+      //thismap->image->w;
+      //code for middle
+      //Uint32 data = thismap->heighttilegetpixel(thismap->image, (int)(this->x + xvel * ((double) elapsed / 256.0) + 0.5 * this->width) % thismap->image->w, (int)(this->y + yvel * ((double) elapsed / 256.0) - 0.5 * this->bounds.height) % thismap->image->h);
+      Uint32 data;
+      if(heightmap_is_tiled) {
+        data = thismap->getpixel(thismap->image, (int)(getOriginX()) % thismap->image->w, (int)(getOriginY()) % thismap->image->h);
+      } else {
+        //tile is not tiled, so we have to get clever with the heighttile pointer
+
+        data = thismap->getpixel(thismap->image, (int)( ((this->getOriginX() - heighttile->x) /heighttile->width) * thismap->image->w), (int)( ((this->getOriginY() - heighttile->y) /heighttile->height) * thismap->image->h));
+      }
+      SDL_GetRGB(data, thismap->image->format, &rgb.r, &rgb.g, &rgb.b);
+      if(RectOverlap(tilerect, movedbounds)) {
+        maxred = rgb.r;
+      }
+      // //code for each corner:
+      // Uint32 data = thismap->getpixel(thismap->image, (int)(this->x + xvel * ((double) elapsed / 256.0)) % thismap->image->w, (int)(this->y + yvel * ((double) elapsed / 256.0)) % thismap->image->h);
+      // SDL_GetRGB(data, thismap->image->format, &rgb.r, &rgb.g, &rgb.b);
+
+      // movedbounds = rect(this->x + xvel * ((double) elapsed / 256.0), this->y + yvel * ((double) elapsed / 256.0), 1, 1);
+      // if(RectOverlap(tilerect, movedbounds)) {
+      // 	maxred = max(maxred, rgb.r);
+      // }
+
+      // data = thismap->getpixel(thismap->image, (int)(this->x + xvel * ((double) elapsed / 256.0) + this->bounds.width) % thismap->image->w, (int)(this->y + yvel * ((double) elapsed / 256.0)) % thismap->image->h);
+      // SDL_GetRGB(data, thismap->image->format, &rgb.r, &rgb.g, &rgb.b);
+
+      // movedbounds = rect(this->x + xvel * ((double) elapsed / 256.0) + this->bounds.width, this->y + yvel * ((double) elapsed / 256.0), 1, 1);
+      // if(RectOverlap(tilerect, movedbounds)) {
+      // 	maxred = max(maxred, rgb.r);
+      // }
+
+      // data = thismap->getpixel(thismap->image, (int)(this->x + xvel * ((double) elapsed / 256.0)) % thismap->image->w, (int)(this->y + yvel * ((double) elapsed / 256.0) - this->bounds.height) % thismap->image->h);
+      // SDL_GetRGB(data, thismap->image->format, &rgb.r, &rgb.g, &rgb.b);
+
+      // movedbounds = rect(this->x + xvel * ((double) elapsed / 256.0), this->y + yvel * ((double) elapsed / 256.0) - this->bounds.height, 1, 1);
+      // if(RectOverlap(tilerect, movedbounds)) {
+      // 	maxred = max(maxred, rgb.r);
+      // }
+
+      // data = thismap->getpixel(thismap->image, (int)(this->x + xvel * ((double) elapsed / 256.0) + this->bounds.width) % thismap->image->w, (int)(this->y + yvel * ((double) elapsed / 256.0) - this->bounds.height) % thismap->image->h);
+      // SDL_GetRGB(data, thismap->image->format, &rgb.r, &rgb.g, &rgb.b);
+
+      // movedbounds = rect(this->x + xvel * ((double) elapsed / 256.0) + this->bounds.width, this->y + yvel * ((double) elapsed / 256.0) - this->bounds.height, 1, 1);
+      // if(RectOverlap(tilerect, movedbounds)) {
+      // 	maxred = max(maxred, rgb.r);
+      // }
+
+    }
+    //oldz = this->z;
+    if(using_heightmap) {
+      heightfloor = ((maxred * thismap->magnitude));
+    }
+
+  } else {
+    //update_z_time--;
+    //this->z = ((oldz) + this->z) / 2 ;
+
+  }
+  // ... return nullptr; and there was no slowdown
+  if(g_entityBenchmarking) {
+    g_eu_timer -= SDL_GetTicks();
+    g_eu_e -= g_eu_timer;
+    g_eu_timer = SDL_GetTicks();
+  }
+
+  layer = max(z /64, 0.0f);
+  layer = min(layer, (int)g_boxs.size() - 1);
+  //should we fall?
+  //bool should_fall = 1;
+  float floor = 0;
+  if(layer > 0) {
+    //!!!
+    rect thisMovedBounds = rect(bounds.x + x + xvel * ((double) elapsed / 256.0), bounds.y + y + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
+    //rect thisMovedBounds = rect(bounds.x + x, bounds.y + y, bounds.width, bounds.height);
+    for (auto n : g_boxs[layer - 1]) {
+      if(RectOverlap(n->bounds, thisMovedBounds)) {
+        floor = 64 * (layer);
+        break;
+      }
+    }
+    for (auto n : g_triangles[layer - 1]) {
+      if(TriRectOverlap(n, thisMovedBounds.x, thisMovedBounds.y, thisMovedBounds.width, thisMovedBounds.height)) {
+        floor = 64 * (layer);
+        break;
+      }
+
+    }
+
+
+    float shadowFloor = floor;
+    floor = max(floor, heightfloor);
+
+    bool breakflag = 0;
+    for(int i = layer - 1; i >= 0; i--) {
+      for (auto n : g_boxs[i]) {
+        if(RectOverlap(n->bounds, thisMovedBounds)) {
+          shadowFloor = 64 * (i + 1);
+          breakflag = 1;
+          break;
+        }
+      }
+      if(breakflag) {break;}
+      for (auto n : g_triangles[i]) {
+        if(TriRectOverlap(n, thisMovedBounds.x, thisMovedBounds.y, thisMovedBounds.width, thisMovedBounds.height)) {
+          shadowFloor = 64 * (i + 1);
+          breakflag = 1;
+          break;
+        }
+
+      }
+      if(breakflag) {break;}
+    }
+    if(breakflag == 0) {
+      //just use heightmap
+      shadowFloor = floor;
+    }
+    this->shadow->z = shadowFloor;
+  } else {
+    this->shadow->z = heightfloor;
+    floor = heightfloor;
+  }
+
+  //try ramps?
+  //!!! can crash if the player gets too high
+
+//  if(layer < g_layers) {
+//    for(auto r : g_ramps[this->layer]) {
+//      rect a = rect(r->x, r->y, 64, 55);
+//      rect movedBounds = rect(bounds.x + x, bounds.y + y + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
+//      if(RectOverlap(movedBounds, a)) {
+//        if(r->type == 0) {
+//          //contribute to protag z based on how far we are along
+//          //the y axis
+//          float push = (55 - abs((((float)movedBounds.y - (float)r->y ))))/55;
+//
+//          float possiblefloor = r->layer * 64 + 64 * push;
+//          if( abs(this->z - possiblefloor ) < 15) {
+//            floor = possiblefloor;
+//            this->shadow->z = floor + 1;
+//          }
+//
+//        } else {
+//          if(r->type == 1) {
+//            float push = (64 - abs((( (float)(movedBounds.x + movedBounds.width) - (float)(r->x + 64) ))))/64;
+//
+//            float possiblefloor = r->layer * 64 + 64 * push;
+//            if( abs(this->z - possiblefloor ) < 15) {
+//              floor = possiblefloor;
+//              this->shadow->z = floor + 1;
+//            }
+//          } else {
+//            if(r->type == 2) {
+//              //contribute to protag z based on how far we are along
+//              //the y axis
+//              float push = (55 - abs((( (float)(movedBounds.y + movedBounds.height) - (float)(r->y + 55) ))))/55;
+//
+//              float possiblefloor = r->layer * 64 + 64 * push;
+//              if( abs(this->z - possiblefloor ) < 15) {
+//                floor = possiblefloor;
+//                this->shadow->z = floor + 1;
+//              }
+//
+//            } else {
+//              float push = (64 - abs((( (float)(movedBounds.x) - (float)(r->x) ))))/64;
+//
+//              float possiblefloor = r->layer * 64 + 64 * push;
+//              if( abs(this->z - possiblefloor ) < 15) {
+//                floor = possiblefloor;
+//                this->shadow->z = floor + 1;
+//              }
+//            }
+//          }
+//        }
+//      }
+//    }
+//  }
+
+  //look for solid entities (new as of Nov 2023 for the bed)
+  if(this == protag || this->isAI) { //seems to be causing slowdown
+    groundedByEntity = 0;
+    for(auto n : g_solid_entities) {
+      if(this->ignoreSolids) {break;}
+
+      if(XYWorldDistanceSquared(this->x, this->y, n->x, n->y) < 102400) //arbitrary distance chosen for optimization, it indicates a origin-to-origin distance of five blocks which is usually enough
+      {
+        rect thisb = rect(bounds.x + x + xvel * ((double) elapsed / 256.0), bounds.y + y + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
+        thisb.z = z;
+        thisb.zeight = bounds.zeight;
+
+        rect that = rect(n->bounds.x + n->x -2, n->bounds.y + n->y-2, n->bounds.width+1, n->bounds.height+1);
+        that.z = n->z;
+        that.zeight = n->bounds.zeight;
+
+
+        if(RectOverlap(thisb,that) && (thisb.z >= that.z + that.zeight)) {
+          floor = that.z + that.zeight + 0.1;
+          this->shadow->z = floor + 1;
+
+        }
+      }
+    }
+  }
+
+
+  if(z > floor + 1) {
+    if(useGravity) {
+      zaccel -= g_gravity * ((double) elapsed / 256.0);
+    }
+    grounded = 0;
+  } else {
+    // !!! maybe revisit this to let "character" entities have fallsounds
+    if(grounded == 0 && this == protag && g_boardingCooldownMs < 0) {
+      //need to check if we landed in a boardable entity
+
+      rect thisMovedBounds = rect(this->bounds.x + this->x, this->bounds.y + this->y, this->bounds.width, this->bounds.height);
+      for(auto n : g_boardableEntities) {
+        if(n->tangible && n->grounded) {
+          rect thatMovedBounds = {n->bounds.x + n->x, n->bounds.y + n->y, n->bounds.width, n->bounds.height};
+          if(RectOverlap(thisMovedBounds, thatMovedBounds) && (abs(this->z - n->z) < 32 )) {
+            //M("Protag boarded entity named " + n->name);
+
+            //decide to de-agro entities
+            //                  if(n->isHidingSpot) {
+            //                    for(auto x:g_ai) {
+            //                      if(x->target == protag) {
+            //                        //I want a "realistic" or clever way of de-agroing enemies
+            //                        //I could make it so that there's a timer after fomm is last in listening range of an agrod enemy
+            //                        if(!g_protagIsInHearingRange) {
+            //                          //x->poiIndex = 0;
+            //                          // i want to have a fun way of having the enemy de-agro
+            //                          // I want them to approach the hiding spot and stare at it for a moment
+            //                          // before a "?" appears above their head and they then wander off
+            //
+            //                          //this makes them instantly give up the moment the protag hides
+            //                          x->agrod = 0;
+            //                          x->smellAgroMs = 0;
+            //                          x->target = nullptr;
+            //
+            //                          //x->myTravelstyle = patrol;
+            //                          //x->traveling = 1;
+            //                          //x->readyForNextTravelInstruction = 1;
+            //                          M("begin losthim sequence");
+            //                          
+            //                          x->lostHimSequence = 1;
+            //                          
+            //                          //we want to pick the node closest to the edge of the hs,
+            //                          //in the direction of the behemoth
+            //                          //so get the angle from the hs to the behemoth
+            //                          
+            //                          float angleToBehemoth = atan2(x->getOriginX() - n->getOriginX(), x->getOriginY() - n->getOriginY()) - M_PI/2;
+            //                          angleToBehemoth = wrapAngle(angleToBehemoth);
+            //
+            //                          float interestingX = n->getOriginX() + cos(angleToBehemoth) * n->bounds.width/2;
+            //                          float interestingY = n->getOriginY() + sin(angleToBehemoth) * n->bounds.width/2;
+            //
+            //                          Destination = getNodeByPosition(x->lostHimX, x->lostHimY);
+            //                          x->lostHimX = n->getOriginX();
+            //                          x->lostHimY = n->getOriginY();
+            //                        }
+            //                      }
+            //                    }
+            //                  }
+
+            if(n->transportEntPtr != nullptr) {
+              g_boardedEntity = n->transportEntPtr;
+              g_formerBoardedEntity = n;
+              g_transferingByBoardable = 1;
+              g_maxTransferingByBoardableTime = XYWorldDistance(n->getOriginX(), n->getOriginY(), g_boardedEntity->getOriginX(), g_boardedEntity->getOriginY()) / n->transportRate;
+              g_transferingByBoardableTime = 0;
+            } else {
+              g_boardedEntity = n;
+              g_transferingByBoardable = 0;
+            }
+
+
+            g_protagIsWithinBoardable = 1;
+            g_msSinceBoarding = 0;
+            protag->tangible = 0;
+            smokeEffect->happen(n->getOriginX(), n->getOriginY(), protag->z, 0);
+            break;
+          }
+        }
+
+      }
+
+      //play landing sound
+      //playSound(-1, g_land, 0);
+      playSound(-1, g_staticSounds[3], 0);
+
+      if(!storedJump) {
+        //penalize the player for not bhopping
+        if(protagConsecutiveBhops > 3) {
+          protag->slowPercent = g_jump_afterslow;
+          protag->slowSeconds = g_jump_afterslow_seconds;
+          protag->currentAirBoost = g_defaultBhoppingBoost;
+        }
+        protagConsecutiveBhops = 0;
+
+      } else {
+        protagConsecutiveBhops++;
+      }
+    }
+    grounded = 1;
+    zvel = max(zvel, 0.0f);
+    zaccel = max(zaccel, 0.0f);
+
+  }
+
+  if(groundedByEntity) { grounded = 1;}
+
+
+  zvel += zaccel * ((double) elapsed / 256.0);
+
+  if(this == protag && zvel < 75 && g_jumpGaranteedAccelMs < 0 ) {
+    if(!input[8]) {
+      if(zvel > 0) {zvel = 0;}
+    }
+  }
+
+  //for banish animation from scripts
+  if(this->banished && zvel <= 0) {
+    this->dynamic = 0;
+    //SDL_SetTextureAlphaMod(this->texture, 127);
+    this->opacity = 127;
+    //if we are solid, disable nodes beneath
+    if(this->canBeSolid) {
+
+      for(auto x : overlappedNodes) {
+
+        x->enabled = 1;
+        // for(auto y : x->friends) {
+        // 	y->enabled = 1;
+        // }
+      }
+
+    }
+    if(solid) {
+      solid = 0;
+      g_solid_entities.erase(remove(g_solid_entities.begin(), g_solid_entities.end(), this), g_solid_entities.end());
+    }
+    return nullptr;
+  }
+
+  //zvel *= pow(friction, ((double) elapsed / 256.0));
+  z += zvel * ((double) elapsed / 256.0);
+  z = max(z, floor + 1);
+
+
+  z = max(z, heightfloor);
+  layer = max(z /64, 0.0f);
+  layer = min(layer, (int)g_boxs.size() - 1);
+
+  shadow->x = x + shadow->xoffset;
+  shadow->y = y + shadow->yoffset;
+
+  //is out scriptcaller sleeping? Lets update it, and maybe wake it up
+  if(myScriptCaller != nullptr) {
+    if(myScriptCaller->sleepflag){
+      if(myScriptCaller->sleepingMS > 1) { myScriptCaller->sleepingMS -= elapsed;}
+      else {myScriptCaller->sleepflag = 0;myScriptCaller->continueDialogue();}
+    }
+  }
+
+  //and what about our contactscriptcaller?
+  if(contactScriptCaller != nullptr) {
+    if(contactScriptCaller->sleepflag){
+      if(contactScriptCaller->sleepingMS > 1) { contactScriptCaller->sleepingMS -= elapsed;}
+      else {contactScriptCaller->sleepflag = 0;contactScriptCaller->continueDialogue();}
+    }
+  }
+
+
+  if(shooting) {
+    //spawn shot.
+    shoot();
+  }
+
+  //check for everyone, even if they are invincible
+  
+  if(g_entityBenchmarking) {
+    g_eu_timer -= SDL_GetTicks();
+    g_eu_f -= g_eu_timer;
+    g_eu_timer = SDL_GetTicks();
+  }
+  if(1) {
+    //check for projectile box
+    vector<projectile*> projectilesToDelete;
+    for(auto x : g_projectiles) {
+      rect thatMovedBounds = rect(x->x + x->bounds.x, x->y + x->bounds.y, x->bounds.width, x->bounds.height);
+      thatMovedBounds.z = x->z;
+      thatMovedBounds.zeight = thatMovedBounds.width * XtoZ;
+      rect thisMovedBounds = rect(this->x + bounds.x, y + bounds.y, bounds.width, bounds.height);
+      thisMovedBounds.z = this->z;
+      thisMovedBounds.zeight = this->bounds.zeight;
+      if(x->owner->faction != this->faction && RectOverlap3d(thatMovedBounds, thisMovedBounds)) {
+
+        //destroy projectile
+        projectilesToDelete.push_back(x);
+
+        if(!invincible) {
+          //take damage
+          this->hp -= x->gun->damage;
+          this->flashingMS = g_flashtime;
+          if(this->faction != 0) {
+            //playSound(1, g_enemydamage, 0);
+          } else {
+            if(this == protag) {
+              //playSound(2, g_playerdamage, 0);
+            } else {
+              //playSound(3, g_npcdamage, 0);
+            }
+          }
+        }
+
+        //if(this->weaponName == "unarmed") {break;} //some entities should be able to target themselves (fleshpit)
+
+        //under certain conditions, agro the entity hit and set his target to the shooter
+        if(target == nullptr && useAgro) {
+          target = x->owner;
+          targetFaction = x->owner->faction;
+          agrod = 1;
+
+          //agro all of the boys on this's team who aren't already agrod, and set their target to a close entity from x's faction
+          //WITHIN A RADIUS, because it doesnt make sense to agro everyone on the map.
+
+          for (auto y : g_entities) {
+            if(y->tangible && y != this && y->faction == this->faction && (y->agrod == 0 || y->target == nullptr) && XYWorldDistance(y->x, y->y, this->x, this->y) < g_earshot && y->useAgro) {
+              y->targetFaction = x->owner->faction;
+              y->agrod = 1;
+            }
+          }
+
+
+        }
+      }
+      for(auto x:projectilesToDelete) {
+        delete x;
+      }
+    }
+
+
+    //alert nearby friends who arent fighting IF we are agrod
+    //        if(agrod && useAgro) {
+    //          for (auto y : g_entities) {
+    //            if(y->tangible && y != this && y->faction == this->faction && (y->agrod == 0 || y->target == nullptr) && XYWorldDistance(y->x, y->y, this->x, this->y) < g_earshot) {
+    //              if(y->useAgro) {
+    //                y->agrod = 1;
+    //  
+    //                if(this->target != nullptr) {
+    //                  y->targetFaction = this->targetFaction;
+    //                  if(y->target == nullptr) {
+    //                    y->target = this->target;
+    //                  }
+    //                }
+    //              }
+    //            }
+    //          }
+    //        }
+
+    /*
+       if(isAI && useAgro) {
+    //check the auto-agro-range
+    potentialTarget = nullptr;
+    smellsPotentialTarget = 0;
+    seesPotentialTarget = 0;
+    if(target == nullptr) {
+
+    //could make this a bit nicer by splitting into finding a potential target and progressing towards detection for that target instead of having them together like this
+    for(auto x : g_entities) {
+    if(x->faction == this->targetFaction) {
+    //detect instantly, as if by hearing breath
+    if(XYWorldDistance(x->getOriginX(), x->getOriginY(), this->getOriginX(), this->getOriginY()) < 4 * 64) {
+    if(LineTrace(x->getOriginX(), x->getOriginY(), this->getOriginX(), this->getOriginY(), false, 30, 0, 10, false)) 
+    {
+    if(!devMode 
+    && 
+    !g_ninja
+    &&
+    !g_protagIsWithinBoardable
+    )  {
+    M("I felt fomm's breath!");
+    //close and have LOS - detection
+    this->target = x;
+    this->traveling = 0;
+    this->agrod = 1;
+    }
+    }
+
+    }
+
+    //can it smell fomm?
+    if(XYWorldDistance(x->getOriginX(), x->getOriginY(), this->getOriginX(), this->getOriginY()) < this->smellAgroRadius) {
+
+    { //check for smell
+    potentialTarget = x;
+    smellsPotentialTarget = 1;
+    if(potentialTarget == protag) {
+
+    g_protagIsBeingDetectedBySmell = 1;
+    }
+    }
+    }
+
+    //can it see fomm?
+    if(XYWorldDistance(x->getOriginX(), x->getOriginY(), this->getOriginX(), this->getOriginY()) < this->visionRadius) {
+
+    if(
+    LineTrace(x->getOriginX(), x->getOriginY(), this->getOriginX(), this->getOriginY(), false, 30, 0, 10, false)
+    &&
+    x->tangible
+
+
+    ) 
+    {
+    if(x == protag && g_protagIsWithinBoardable) { break;}
+    if(opacity != 255) {break;}
+
+    //is the monster facing the target? compare angle to target to this steeringangel
+
+    float angleToPotTarget = atan2(x->getOriginX() - getOriginX(), x->getOriginY() - getOriginY()) - M_PI/2;
+    angleToPotTarget = wrapAngle(angleToPotTarget);
+    if(abs(angleDiff(angleToPotTarget, this->steeringAngle)) < 1.6) {
+    potentialTarget = x;
+    if(potentialTarget == protag) {
+    g_protagIsBeingDetectedBySight = 1;
+    }
+    seesPotentialTarget = 1;
+    break;
+    }
+
+
+
+
+  }
+  }
+  }
+  }
+
+
+  } else {
+    //if we are agrod on the player, check if we are perceiving him
+    perceivingProtag = 0;
+    if(target == protag) {
+      //check smell
+      if(XYWorldDistance(protag->getOriginX(), protag->getOriginY(), this->getOriginX(), this->getOriginY()) < this->smellAgroRadius) {
+
+        { //check for smell
+          perceivingProtag = 1;
+        }
+      }
+
+
+
+      //check sight
+      if(XYWorldDistance(protag->getOriginX(), protag->getOriginY(), this->getOriginX(), this->getOriginY()) < this->visionRadius) {
+        if(
+            LineTrace(protag->getOriginX(), protag->getOriginY(), this->getOriginX(), this->getOriginY(), false, 30, 0, 10, false)
+            &&
+            protag->tangible
+          ) 
+        {
+          if(!g_protagIsWithinBoardable) {
+
+            //is the monster facing the target? compare angle to target to this steeringangel
+            float angleToPotTarget = atan2(protag->getOriginX() - getOriginX(), protag->getOriginY() - getOriginY()) - M_PI/2;
+            angleToPotTarget = wrapAngle(angleToPotTarget);
+            if(abs(angleDiff(angleToPotTarget, this->steeringAngle)) < 1.6) {
+              perceivingProtag = 1;
+            }
+          }
+        }
+      }
+
+    }
+    if(!perceivingProtag) {
+      c_deagroMs += elapsed;
+    } else {
+      c_deagroMs -= elapsed;
+    }
+    if(c_deagroMs > deagroMs) {
+      agrod = 0;
+      traveling = 1;
+      readyForNextTravelInstruction = 1;
+      target = nullptr;
+      M("I deagrod of fomm");
+    } else if(c_deagroMs < 0) {
+      c_deagroMs = 0;
+
+    }
+  }
+
+  //this is so it takes time to agro on someone
+  if(smellsPotentialTarget && !devMode) {
+    smellAgroMs += elapsed;
+  } else {
+    smellAgroMs -= elapsed;
+  }
+
+  if(smellAgroMs >= maxSmellAgroMs && potentialTarget != nullptr && !devMode && !g_ninja) {
+    M("I smelled fomm!");
+    this->traveling = 0;
+    this->target = potentialTarget;
+    this->agrod = 1;
+  }
+
+
+  if(smellAgroMs < 0) {
+    smellAgroMs = 0;
+  }
+
+  if(seesPotentialTarget && !devMode) {
+    seeAgroMs += elapsed;
+  } else {
+    seeAgroMs -= elapsed;
+  }
+
+  if(seeAgroMs >= visionTime && potentialTarget != nullptr && !devMode && !g_ninja) {
+    M("I saw fomm!");
+    this->traveling = 0;
+    this->target = potentialTarget;
+    this->agrod = 1;
+  }
+
+  if(seeAgroMs < 0) {
+    seeAgroMs = 0;
+  }
+
+  //          //is out scriptcaller sleeping? Lets update it, and maybe wake it up
+  //          if(myScriptCaller != nullptr) {
+  //            if(myScriptCaller->sleepflag){
+  //              if(myScriptCaller->sleepingMS > 1) { myScriptCaller->sleepingMS -= elapsed;}
+  //              else {myScriptCaller->sleepflag = 0;myScriptCaller->continueDialogue();}
+  //            }
+  //          }
+
+
+
+
+  } else if(isAI && !useAgro) {
+    //HORROR STALKER NERVOUS AGGRESSIVE
+    //This is the code for having fun enemies who vary in aggressiveness
+    //prototypically, aggressiveness makes them faster, do more damage, and spend less time wandering
+    if(target == nullptr) {
+      //get the target
+      for(auto x : g_entities) {
+        if(x->faction == targetFaction) {
+          target = x;
+          break;
+        }
+      }
+    }
+
+    if(target != nullptr) {
+      smellsPotentialTarget = 0;
+      seesPotentialTarget = 0;
+      //can it smell fomm?
+      if(distanceToTarget < this->smellAgroRadius) {
+        smellsPotentialTarget = 1;
+      }
+
+      //can it see fomm?
+      if(distanceToTarget < this->visionRadius) {
+        if(
+            LineTrace(target->getOriginX(), target->getOriginY(), this->getOriginX(), this->getOriginY(), false, 30, 0, 10, false)
+            &&
+            target->tangible
+          ) 
+        {
+          if(target != protag || !g_protagIsWithinBoardable) {
+            //is the monster facing the target? compare angle to target to this steeringangel
+            float angleToPotTarget = atan2(target->getOriginX() - getOriginX(), target->getOriginY() - getOriginY()) - M_PI/2;
+            angleToPotTarget = wrapAngle(angleToPotTarget);
+            if(abs(angleDiff(angleToPotTarget, this->steeringAngle)) < 1.6) {
+              seesPotentialTarget = 1;
+            }
+          }
+        }
+      }
+
+      //can it hear fomm?
+
+      //if we are using the state system, let's update that
+      if(useStateSystem) {
+
+        if(distanceToTarget < states[activeState].blocks || states[activeState].blocks == 0) {
+          states[activeState].interval -= elapsed;
+        }
+
+        if(states[activeState].interval < 0) {
+          int numChoices = states[activeState].nextStates.size();
+          float random = (double)rand() / RAND_MAX;
+          float sumOfOdds = 0;
+          int destinationState = 0;
+          for(int i = 0; i < states[activeState].nextStates.size(); i++) {
+            float chance = states[activeState].nextStateProbabilities[i];
+            sumOfOdds += chance;
+            if(sumOfOdds >= random) { 
+              destinationState = states[activeState].nextStates[i];
+              break;
+            }
+          }
+          //cout << "State change from " << activeState << " to " << destinationState << endl;
+          states[activeState].interval = states[activeState].nextInterval;
+          activeState = destinationState;
+        }
+      }
+    }
+
+    //aggressiveness is frozen if the player is hiding
+    if(!g_protagIsWithinBoardable) {
+      if(seesPotentialTarget && opacity == 255) {
+
+        if(target == protag) {
+          g_protagIsBeingDetectedBySight = 1;
+        }
+        aggressiveness += elapsed * aggressivenessGain;
+      }
+      if(hearsPotentialTarget) {
+        aggressiveness += elapsed * aggressivenessNoiseGain;
+      }
+      if(smellsPotentialTarget) {
+        aggressiveness += elapsed * aggressivenessGain;
+      }
+
+      if(!seesPotentialTarget && !hearsPotentialTarget && !smellsPotentialTarget) {
+        aggressiveness -= elapsed * aggressivenessLoss;
+      }
+    }
+
+    if(aggressiveness < minAggressiveness) {
+      aggressiveness = minAggressiveness;
+    } else if(aggressiveness > maxAggressiveness) {
+      aggressiveness = maxAggressiveness;
+    }
+  }
+
+  if(isAI) {
+    //likely has abilities to use
+    //are any abilities ready?
+    for(auto &x : myAbilities) {
+      if(x.ready == 1) {continue;}
+
+      //accumulate-abilities will always decrease CD
+      if(x.resetStableAccumulate == 2) {
+        x.cooldownMS -= elapsed;
+      }
+      if(target == nullptr) {if(x.resetStableAccumulate == 0) {x.cooldownMS = x.upperCooldownBound;}}
+
+      float inRange = 0;
+      float dist = std::numeric_limits<float>::max();
+
+      if(target != nullptr) {
+        dist = distanceToTarget;
+      }
+
+      if((dist <= x.upperRangeBound  && dist >= x.lowerRangeBound) || x.upperRangeBound == x.lowerRangeBound && x.lowerRangeBound == 0) {
+        inRange = 1;
+        if(x.resetStableAccumulate != 2) {
+          x.cooldownMS -= elapsed;
+        }
+      } else {
+        //reset-abilities are reset when out of range
+        if(x.resetStableAccumulate == 0) {
+          x.cooldownMS = (x.lowerCooldownBound + x.upperCooldownBound)/2;
+        }
+      }
+
+      if(x.cooldownMS < 0) {
+        //are we in range to the player?
+        if(inRange) {
+          x.ready = 1;
+        }
+      }
+    }
+
+  }
+  */
+
+    // ... return nullptr; and there was no slowdown
+
+    //apply statuseffect
+    this->stunned = hisStatusComponent.stunned.updateStatuses(elapsed);
+  if(this->stunned) {stop_hori(); stop_verti();}
+  this->marked = hisStatusComponent.marked.updateStatuses(elapsed);
+  this->disabled = hisStatusComponent.disabled.updateStatuses(elapsed);
+  this->enraged = hisStatusComponent.enraged.updateStatuses(elapsed);
+  this->buffed = hisStatusComponent.buffed.updateStatuses(elapsed);
+
+
+  int damageFromPoison = round(hisStatusComponent.poisoned.updateStatuses(elapsed));
+  this->poisoned = damageFromPoison;
+  if(this->poisoned) {poisonFlickerFrames = 6;}
+  this->hp -= damageFromPoison;
+
+  int healthFromHealen = round(hisStatusComponent.healen.updateStatuses(elapsed));
+  this->healen = healthFromHealen;
+  this->hp += healthFromHealen;
+  if(this->hp > this->maxhp) {this->hp = this->maxhp;}
+  this->statusSlownPercent =  hisStatusComponent.slown.updateStatuses(elapsed);
+  if(statusSlownPercent > 1) {statusSlownPercent = 1;}
+
+  hisStatusComponent.invincible.updateStatuses(elapsed);
+
+  this->hisStatusComponent.stunned.cleanUpStatuses();
+  this->hisStatusComponent.marked.cleanUpStatuses();
+  this->hisStatusComponent.disabled.cleanUpStatuses();
+  this->hisStatusComponent.enraged.cleanUpStatuses();
+  this->hisStatusComponent.buffed.cleanUpStatuses();
+  this->hisStatusComponent.poisoned.cleanUpStatuses();
+  this->hisStatusComponent.healen.cleanUpStatuses();
+  this->hisStatusComponent.slown.cleanUpStatuses();
+  this->hisStatusComponent.invincible.cleanUpStatuses();
+
+
+  //check if he has died
+  if(hp <= 0) {
+    if(this != protag) {
+      tangible = 0;
       return nullptr;
     }
+  }
+
+
+
+
+
+  //push him away from close entities
+  //if we're even slightly stuck, don't bother
+  if(this->dynamic && this->pushable && elapsed > 0) {
+
+    for(auto x : g_entities) {
+      if(this->isAI && x->isAI) {continue;} //behemoths don't collide
+      if(this == x) {continue;}
+
+      //entities with a semisolid value of 2 are only solid to the player
+      bool solidfits = 0;
+
+      //this is not a silly check
+      if(this == protag) {
+        solidfits = x->semisolid;
+      } else {
+        solidfits = (x->semisolid == 1);
+      }
+
+      //entities with a semisolid value of 3 are semisolid with a square collision
+      bool semisolidsquare = x->semisolid == 3;
+      if(semisolidsquare) {
+        bool m = RectOverlap(this->getMovedBounds(), x->getMovedBounds());
+        if(m && x->tangible && solidfits) {
+          float r = pow( max(Distance(getOriginX(), getOriginY(), x->getOriginX(), x->getOriginY()), (float)10.0 ), 2);
+          float mag =  30000/r;
+          if(identity == 29) {
+            mag = 0.3/r;
+          }
+          float xdif = (this->getOriginX() - x->getOriginX());
+          float ydif = (this->getOriginY() - x->getOriginY());
+          float len = pow( pow(xdif, 2) + pow(ydif, 2), 0.5);
+          float normx = xdif * 0.1;
+          float normy = ydif * 0.1;
+
+          if(!isnan(mag * normx) && !isnan(mag * normy)) {
+            xvel += normx * mag;
+            yvel += normy * mag;
+          }
+
+
+        }
+
+      } else {
+
+        bool m = CylinderOverlap(this->getMovedBounds(), x->getMovedBounds());
+
+
+        if(solidfits && x->tangible && m) {
+          //push this one slightly away from x
+          float r = pow( max(Distance(getOriginX(), getOriginY(), x->getOriginX(), x->getOriginY()), (float)10.0 ), 2);
+          float mag =  30000/r;
+          float xdif = (this->getOriginX() - x->getOriginX());
+          float ydif = (this->getOriginY() - x->getOriginY());
+          float len = pow( pow(xdif, 2) + pow(ydif, 2), 0.5);
+          float normx = xdif/len;
+          float normy = ydif/len;
+
+          if(!isnan(mag * normx) && !isnan(mag * normy)) {
+            xvel += normx * mag;
+            yvel += normy * mag;
+          }
+
+        } else if(m && x->usesContactScript && x->contactReadyToProc && x->tangible && this->faction != x->faction && !x->contactScriptCaller->executingScript) {
+          x->contactScriptCaller->dialogue_index = -1;
+          x->target = this;
+          x->sayings = x->contactScript;
+          x->contactScriptCaller->continueDialogue();
+        }
+      }
+    }
+  }
+
+  flashingMS -= elapsed;
+  darkenMs -= elapsed;
+  //        if(this->inParty) {
+  //          return nullptr;
+  //        }
+  if(this == protag) {
+    return nullptr;
+  }
+
+  //        if(!canFight) {
+  //          return nullptr;
+  //        }
+
+  // ... return nullptr; and there was no slowdown
+  //shooting ai
+  if(g_entityBenchmarking) {
+    g_eu_timer -= SDL_GetTicks();
+    g_eu_g -= g_eu_timer;
+    g_eu_timer = SDL_GetTicks();
+  }
+
+  /*
+     if(dynamic) {
+
+  //code for becoming agrod when seeing a hostile entity will go here
+  //face the direction we are moving
+  //bool recalcAngle = 0; //should we change his angle in the first place?
+  //combatrange is higher than shooting range because sometimes that range is broken while a fight is still happening, so he shouldnt turn away
+
+  //here's the code for roaming/patrolling
+  //we aren't agrod.
+  if(traveling) {
+  if(readyForNextTravelInstruction && g_setsOfInterest.at(poiIndex).size() != 0) {
+  readyForNextTravelInstruction = 0;
+
+  float r = ((double) rand() / RAND_MAX);
+  if(curPatrolPerRoam < minPatrolPerRoam) {
+  myTravelstyle = patrol;
+  curPatrolPerRoam++;
+  //M("Can't roam now");
+  } else {
+  if(r >= roamRate) {
+  myTravelstyle = patrol;
+  } else {
+  myTravelstyle = roam;
+  curPatrolPerRoam = 0;
+  }
+  }
+  if(myTravelstyle == roam && g_setsOfInterest.size() > poiIndex) {
+  //generate random number corresponding to an index of our poi vector
+  int random = rand() % ((int)g_setsOfInterest.at(poiIndex).size() - 1);
+  pointOfInterest* targetDest = g_setsOfInterest.at(poiIndex).at(random);
+  if(random == lastTargetDestIndex) {
+  random++;
+  targetDest = g_setsOfInterest.at(poiIndex).at(random);
+  }
+  if(random == lastTargetDestIndex) {
+  //M("They're equal, this shouldn't happen");
+  } 
+  //                else if(random < lastTargetDestIndex) {
+  //                  patrolDirection = 1; //patrol decreasingly
+  //                  M("New direction is Clock.");
+  //                } else {
+  //                  patrolDirection = 0; //patrol increasingly
+  //                  M("New direction is Ounter.");
+  //                }
+  //set new direction to clock if it's faster to go clockwise
+  int numPoiNodes = ((int)g_setsOfInterest.at(poiIndex).size());
+
+  //get the distance by counting upwards (ounter)
+  int ounterDistance = 0;
+  int thisSpot = lastTargetDestIndex;
+  while(thisSpot != random) {
+  thisSpot++;
+  ounterDistance++;
+  if(thisSpot > numPoiNodes) {thisSpot = 0;}
+  }
+
+  int clockDistance = numPoiNodes - ounterDistance;
+
+  if(ounterDistance < clockDistance) {
+  patrolDirection = 0;
+  //M("New Direction is Ounter");
+  } else {
+  patrolDirection = 1;
+  //M("New Direction is Clock");
+
+  }
+
+
+  lastTargetDestIndex = random;
+  currentPoiForPatrolling = random;
+  Destination = getNodeByPosition(targetDest->x, targetDest->y);
+  } else if(myTravelstyle == patrol) {
+    if(patrolDirection == 0) {
+      currentPoiForPatrolling++;
+      //M("Going Ounter...");
+    } else {
+      currentPoiForPatrolling--;
+      //M("Going Clock...");
+    }
+    if(currentPoiForPatrolling > (int)g_setsOfInterest.at(poiIndex).size()-1) {currentPoiForPatrolling = 0;}
+    if(currentPoiForPatrolling < 0) {currentPoiForPatrolling = g_setsOfInterest.at(poiIndex).size()-1;}
+
+    pointOfInterest* targetDest = g_setsOfInterest.at(poiIndex).at(currentPoiForPatrolling);
+    lastTargetDestIndex = currentPoiForPatrolling;
+    Destination = getNodeByPosition(targetDest->x, targetDest->y);
+  }
+  } else {
+    //should we be ready for our next travel-instruction?
+    if(Destination == nullptr) {
+      Destination = getNodeByPosition(getOriginX(), getOriginY());
+    }
+    if(Destination != nullptr && XYWorldDistance(this->getOriginX(), this->getOriginY(), Destination->x, Destination->y) < 32) {
+      readyForNextTravelInstruction = 1;
+    }
+  }
+
+  BasicNavigate(Destination);
+  }
+  }
+  */
+
+  float dist = XYWorldDistanceSquared(this->getOriginX(), this->getOriginY(), protag->getOriginX(), protag->getOriginY());
+  if(dist < g_entitySleepDistance || this->isAI) {
+    specialObjectsUpdate(this, elapsed);
+  }
+
+  if(this->missile) {
+    // missile movment
+    if(target !=  nullptr && target->tangible) {
+      int rangeToUse = 0;
+
+      if(g_protagIsWithinBoardable) {
+        rangeToUse = 64 * 3;
+      } else {
+        rangeToUse = this->hisweapon->attacks[hisweapon->combo]->range;
+      }
+
+      if( XYWorldDistance(this->getOriginX(), this->getOriginY(), target->getOriginX(), target->getOriginY()) > rangeToUse) {
+
+        angleToTarget = atan2(target->getOriginX() - getOriginX(), target->getOriginY() - getOriginY()) - M_PI/2;
+        angleToTarget = wrapAngle(angleToTarget);
+        targetSteeringAngle = angleToTarget;
+        forwardsVelocity = xagil;
+
+      } else {
+        //stop if in range
+        forwardsVelocity = 0;
+        forceAngularUpdate = 1;
+      }
+
+    } else if (target == nullptr) {
+      forwardsVelocity = xagil;
+    }
+
+
+  } else if (target != nullptr && agrod) {
+    // monster movement 
+
+    float distToTarget = 10000;
+    angleToTarget = atan2(target->getOriginX() - getOriginX(), target->getOriginY() - getOriginY()) - M_PI/2;
+    angleToTarget = wrapAngle(angleToTarget);
+    distToTarget = XYWorldDistance(this->getOriginX(), this->getOriginY(), target->getOriginX(), target->getOriginY());
+    g_dijkstraEntity = this;
+    blindrun = 0;
+
+    if(1)
+    {
+
+      if(( (LineTrace(this->getOriginX(), this->getOriginY(), target->getOriginX(), target->getOriginY(), false, 64 + 32, this->layer, 10, true) )  || (distToTarget < 180) ) ) {
+        //just walk towards the target, need to use range to stop walking if we are at target (for friendly npcs)
+        targetSteeringAngle = angleToTarget;
+        blindrun = 1;
+
+        int rangeToUse = 0;
+
+        if(g_protagIsWithinBoardable) {
+          rangeToUse = 64 * 3;
+        } else {
+          rangeToUse = 128;
+          if(inParty) {rangeToUse = 100;}
+        }
+
+        if( distToTarget > rangeToUse) {
+          forwardsVelocity = xagil;
+        } else {
+          //stop if in range
+          forwardsVelocity = 0;
+          forceAngularUpdate = 1;
+        }
+
+        int xval = getOriginX();
+        int yval = getOriginY();
+        //            int xval = getOriginX() + 15 * xvel;
+        //            int yval = getOriginY() + 15 * yvel;
+        navNode* closestNode = getNodeByPos(g_navNodes, xval, yval);
+
+        //recalculate current when we lose los
+        current = nullptr;
+        dest = nullptr;
+        Destination = nullptr;
+        timeSinceLastDijkstra = -1;
+        path.clear();
+
+      } else {
+        if(Destination != nullptr) {
+          BasicNavigate(Destination);
+        }
+      }
+    } 
+
+    //walking ai
+    if(agrod) {
+      if(timeSinceLastDijkstra - elapsed < 0 && blindrun ==0 ) {
+        if(target != nullptr && (target->tangible || target == protag && g_protagIsWithinBoardable)) {
+          Destination = getNodeByPosition(target->getOriginX(), target->getOriginY());
+        }
+      }
+
+      if(stuckTime > maxStuckTime) {
+        stuckTime = 0;
+        current = Get_Closest_Node(g_navNodes);
+        if(current != nullptr) {
+          int c = rand() % current->friends.size();
+          Destination = target->Get_Closest_Node(g_navNodes);
+          dest = current->friends[c];
+        }
+        readyForNextTravelInstruction = 1;
+      }
+    }
+  } 
+  }
+
+
+  if(g_entityBenchmarking) {
+    g_eu_timer -= SDL_GetTicks();
+    g_eu_h -= g_eu_timer;
+    g_eu_timer = SDL_GetTicks();
+  }
+
+  return nullptr;
+}
 
 //all-purpose pathfinding function
 void entity::BasicNavigate(navNode* ultimateTargetNode) {
@@ -6615,24 +6337,11 @@ void entity::BasicNavigate(navNode* ultimateTargetNode) {
   bool popOffPath = 0;
   if(current == nullptr) { //modified during rotational overhaul
     popOffPath = 1;
-    
-    //around the time when I started getting organs to follow the player
-    //i noticed that sometimes entities would lose LOS and take the long
-    //way around to get to the player
-    //i suspect this line of code is the problem, so im changing the second
-    //parameter from 1 to 0
-    
-    //sometime after that I started using the second node in the path, but that still hasn't quite solved it
-    //i'll try re-enabling the useVelocity param and trying to fix it
 
     current = Get_Closest_Node(g_navNodes, 1);
     dest = current;
     path.clear();
   }
-
-  // current->Render(255,0,0);
-  // dest->Render(0,255,0);
-  // Destination->Render(0,0,255);
 
   if(dest != nullptr) {
     float angleToTarget = atan2(dest->x - getOriginX(), dest->y - getOriginY()) - M_PI/2;
@@ -6643,7 +6352,6 @@ void entity::BasicNavigate(navNode* ultimateTargetNode) {
     forwardsVelocity = xagil;
   }
 
-  
   int prog = 0;
   if(dest != nullptr) {
     if(abs(dest->y - getOriginY() ) < 64) {
@@ -6711,14 +6419,14 @@ void entity::BasicNavigate(navNode* ultimateTargetNode) {
         //could issue an error msg
         break;
       }
-          
-        if(customMovement == 0) {
-          if(u->costFromUsage >= 50) {
-            u->costFromUsage -= 50;
-          } else {
-            u->costFromUsage = 0;
-          }
+
+      if(customMovement == 0) {
+        if(u->costFromUsage >= 50) {
+          u->costFromUsage -= 50;
+        } else {
+          u->costFromUsage = 0;
         }
+      }
 
       //u is closest node in bag
       bag.erase(remove(bag.begin(), bag.end(), u), bag.end());
@@ -6726,7 +6434,7 @@ void entity::BasicNavigate(navNode* ultimateTargetNode) {
         if(u->enabled) {
 
           float alt = u->costFromSource + u->costs[i];
-          
+
           //if our customMovement is set to corner, 
           //penalize nodes which were used by another behemoth
           if(customMovement == 2) {
@@ -6752,7 +6460,7 @@ void entity::BasicNavigate(navNode* ultimateTargetNode) {
 
     while(targetNode != nullptr) {
       secondoverflow--;
-      if(secondoverflow < 0) { /*M("prevented a PF crash.");*/ break;} //preventing this crash results in pathfinding problems
+      if(secondoverflow < 0) { break;} 
 
       path.push_back(targetNode);
 
@@ -6760,31 +6468,12 @@ void entity::BasicNavigate(navNode* ultimateTargetNode) {
       if(targetNode == current) {
         break;
       }
-      targetNode = targetNode->prev; //this can kinda randomly segfault, the crash has been here for years
-                                     //the usual fix is just to add more navnodes but I'd love to 
-                                     //find a blanket-solution
-                                     //I think it's fixed now.
-                                     //I changed navNode* ret =  lowerbound->second; to navNode* ret = nullptr; in getNodeByPosition()
+      targetNode = targetNode->prev; 
     }
 
     if(popOffPath && path.size() > 1) {
       path.erase(path.begin());
       path.erase(path.begin());
-    }
-
-    if(justLostLosToTarget) {
-//        This code might be handy later for trying to understand why
-//        entities doesn't travel as you might expect.
-//        Today's efforts (probably) mark the conclusion of a struggle
-//        I've had with getting entities to path properly.
-//        The problem was that they would take a bad path the moment they lose
-//        LOS to their target.
-//        Many improvements have been made, and in this case the problem was
-//        with the navmesh, the closest node was one nex to a wall, which was 
-//        too close to travel to another node close to the wall (there was no line between them)
-//        and because of how I have nodes attach, the nodes didnt connect to some of the closest
-//        nodes, but kinda past them and through them, making it look like he was taking a 
-//        very long path. I'll ajust how navnodes are linked
     }
 
     for(auto x : path) {
@@ -6799,22 +6488,6 @@ void entity::BasicNavigate(navNode* ultimateTargetNode) {
       }
     }
 
-    //path is considered "valid"
-    //we should penalize all nodes in the path, and all nodes connected
-    //so that other ents don't use them
-    if(customMovement == 0) {
-      int enough = 0;
-      for(auto x : path) {
-        enough++;
-        if(enough < 1) {continue;}
-        if(enough > 5) {break;}
-
-        x->costFromUsage = 1000000;
-        for(auto y : x->friends) {
-          y->costFromUsage = 1000000;
-        }
-      }
-    }
     if(path.size() != 0) {
       dest = path.at(path.size() - 1); 
     } else {
@@ -6829,7 +6502,7 @@ void entity::BasicNavigate(navNode* ultimateTargetNode) {
   } else {
     timeSinceLastDijkstra -= elapsed;
   }
-  
+
 }
 
 //search entity by name
@@ -6943,7 +6616,7 @@ levelNode::levelNode(string p3, string p4, string p5, SDL_Renderer * renderer, i
   }
 
   blinkCooldownMS = rng(minBlinkCooldownMS, maxBlinkCooldownMS);
-  
+
   g_levelNodes.push_back(this);
 
 }
@@ -6970,11 +6643,11 @@ levelSequence::levelSequence(string filename, SDL_Renderer * renderer){
 //add levels from a file
 void levelSequence::addLevels(string filename) {
   filename = "resources/levelsequence/" + filename;
-  
+
   istringstream file(loadTextAsString(filename));
 
   string temp;
-  
+
   string level_name;
   string map_name;
   string way_name;
@@ -7006,7 +6679,7 @@ void levelSequence::addLevels(string filename) {
 
     getline(file, temp);
     int firstActiveFloor = stoi(temp);
-    
+
     getline(file, temp);
     int avgRestSequence = stoi(temp);
 
@@ -7041,6 +6714,11 @@ int loadSave() {
   g_saveStrings.clear();
   ifstream file;
   string line;
+
+  int size = g_keyItems.size();
+  for(int i = 0; i < size; i++) {
+    delete g_keyItems[0];
+  }
 
   string address = "user/saves/" + g_saveName + ".save";
   const char* plik = address.c_str();
@@ -7176,7 +6854,7 @@ int loadSave() {
       mainProtag = a;
       setMainProtag = 1;
     }
-    
+
   }
 
   if(setMainProtag) {
@@ -7192,7 +6870,7 @@ int loadSave() {
 
   //load spin entity
   if(g_spin_enabled && g_spin_entity == nullptr) {
-    
+
     string spinEntFilename = protag->name + "-spin";
     entity* a = new entity(renderer, spinEntFilename);
     g_spin_entity = a;
@@ -7257,8 +6935,8 @@ int writeSave() {
     it++;
   }
   file << "&" << endl; //token to stop writing savefields
-                       
-                       
+
+
   auto it2 = g_saveStrings.begin();
 
   while (it2 != g_saveStrings.end() ) {
@@ -7266,8 +6944,8 @@ int writeSave() {
     it2++;
   }
   file << "&" << endl; //token to stop writing savestrings
-                       
-                       
+
+
   file << g_mapdir + "/" + g_map << " " << g_waypoint << endl;
   file << "&" << endl;
 
@@ -7321,7 +6999,7 @@ int writeSave() {
       << spiritFour << endl;
   }
   file << "&" << endl;
-  
+
   for(int i = 0; i < g_levelSequence->levelNodes.size(); i++) {
     if(g_levelSequence->levelNodes[i]->locked == 0) {
       string lowerName = g_levelSequence->levelNodes[i]->name;
@@ -7336,7 +7014,7 @@ int writeSave() {
     file << x << endl;
   }
   file << "&" << endl; //token to stop writing combat items
-                        
+
   file.close();
   return 0;
 }
@@ -7485,19 +7163,19 @@ int LineTrace(int x1, int y1, int x2, int y2, bool display, int size, int layer,
     rect a = rect(xpos - xsize/2, ypos - size/2, xsize, size);
     SDL_Rect b = {(int)(((xpos- xsize/2) - g_camera.x) * g_camera.zoom), (int)(((ypos- size/2) - g_camera.y) * g_camera.zoom), (int)(xsize), (int)(size)};
 
-//    if(display) {
-//      SDL_RenderDrawRect(renderer, &b);
-//    }
+    //    if(display) {
+    //      SDL_RenderDrawRect(renderer, &b);
+    //    }
 
     if(fogOfWar) {
-//      //detect large entities
-//      for(auto x : g_l_entities) {
-//        if(RectOverlap(a, x->getMovedBounds())) {
-//          lineTraceX = a.x + a.width/2;
-//          lineTraceY = a.y + a.height/2;
-//          return true;
-//        }
-//      }
+      //      //detect large entities
+      //      for(auto x : g_l_entities) {
+      //        if(RectOverlap(a, x->getMovedBounds())) {
+      //          lineTraceX = a.x + a.width/2;
+      //          lineTraceY = a.y + a.height/2;
+      //          return true;
+      //        }
+      //      }
     } else {
 
       for (long long unsigned int j = 0; j < g_is_collisions.size(); j++) {
@@ -7542,7 +7220,25 @@ textbox::textbox(SDL_Renderer* renderer, const char* fcontent, float size, float
   //M("textbox()" );
   fontsize = size;
   content = fcontent;
-  font = loadFont(g_font, size);
+  if(size == 0) {
+    font = g_ttf_fontTiny;
+  } else if(size == 1) {
+    font = g_ttf_fontSmall;
+  } else if(size == 2) {
+    font = g_ttf_fontMedium;
+  } else if(size == 3) {
+    font = g_ttf_fontLarge;
+  }
+  //int shareFont = 0;
+//  for(auto x : g_textboxes) { 
+//    if(x->fontsize == this->fontsize) {
+//      font = x->font;
+//      shareFont = 1;
+//    }
+//  }
+//  if(!shareFont) {
+//    font = loadFont(g_font, size);
+//  }
 
   textsurface = TTF_RenderText_Blended_Wrapped(font, content.c_str(), textcolor, fwidth * WIN_WIDTH);
   texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
@@ -7565,9 +7261,36 @@ textbox::textbox(SDL_Renderer* renderer, const char* fcontent, float size, float
 textbox::~textbox() {
   //M("~textbox()" );
   g_textboxes.erase(remove(g_textboxes.begin(), g_textboxes.end(), this), g_textboxes.end());
-  TTF_CloseFont(font);
+  //TTF_CloseFont(font);
   SDL_DestroyTexture(texttexture);
   SDL_FreeSurface(textsurface);
+}
+
+float getShadowOffset(float fontsize) {
+  float booshAmount = 2;
+  switch((int)fontsize) {
+    case 0:
+      {
+        booshAmount = 1.6;
+        break;
+      }
+    case 1:
+      {
+        booshAmount = 2;
+        break;
+      }
+    case 2:
+      {
+        booshAmount = 2;
+        break;
+      }
+    case 3:
+      {
+        booshAmount = 2;
+        break;
+      }
+  }
+  return booshAmount;
 }
 
 void textbox::render(SDL_Renderer* renderer, int winwidth, int winheight) {
@@ -7588,7 +7311,7 @@ void textbox::render(SDL_Renderer* renderer, int winwidth, int winheight) {
         dstrect.x /= g_zoom_mod;
         if(dropshadow) {
           SDL_FRect shadowRect = dstrect;
-          float booshAmount = g_textDropShadowDist * fontsize;
+          float booshAmount = getShadowOffset(fontsize);
           shadowRect.x += booshAmount;
           shadowRect.y += booshAmount;
           SDL_SetTextureColorMod(texttexture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
@@ -7606,7 +7329,7 @@ void textbox::render(SDL_Renderer* renderer, int winwidth, int winheight) {
           dstrect.h /= g_zoom_mod;
           if(dropshadow) {
             SDL_FRect shadowRect = dstrect;
-            float booshAmount = g_textDropShadowDist * fontsize;
+            float booshAmount = getShadowOffset(fontsize);
             shadowRect.x += booshAmount;
             shadowRect.y += booshAmount;
             SDL_SetTextureColorMod(texttexture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
@@ -7624,7 +7347,7 @@ void textbox::render(SDL_Renderer* renderer, int winwidth, int winheight) {
           dstrect.h /= g_zoom_mod;
           if(dropshadow) {
             SDL_FRect shadowRect = dstrect;
-            float booshAmount = g_textDropShadowDist * fontsize;
+            float booshAmount = getShadowOffset(fontsize);
             shadowRect.x += booshAmount;
             shadowRect.y += booshAmount;
             SDL_SetTextureColorMod(texttexture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
@@ -7645,7 +7368,7 @@ void textbox::render(SDL_Renderer* renderer, int winwidth, int winheight) {
         dstrect.h /= g_zoom_mod;
         if(dropshadow) {
           SDL_FRect shadowRect = dstrect;
-          float booshAmount = g_textDropShadowDist * fontsize;
+          float booshAmount = getShadowOffset(fontsize);
           shadowRect.x += booshAmount;
           shadowRect.y += booshAmount;
           SDL_SetTextureColorMod(texttexture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
@@ -7662,7 +7385,7 @@ void textbox::render(SDL_Renderer* renderer, int winwidth, int winheight) {
           dstrect.h /= g_zoom_mod;
           if(dropshadow) {
             SDL_FRect shadowRect = dstrect;
-            float booshAmount = g_textDropShadowDist * fontsize;
+            float booshAmount = getShadowOffset(fontsize);
             shadowRect.x += booshAmount;
             shadowRect.y += booshAmount;
             SDL_SetTextureColorMod(texttexture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
@@ -7679,7 +7402,7 @@ void textbox::render(SDL_Renderer* renderer, int winwidth, int winheight) {
           dstrect.h /= g_zoom_mod;
           if(dropshadow) {
             SDL_FRect shadowRect = dstrect;
-            float booshAmount = g_textDropShadowDist * fontsize;
+            float booshAmount = getShadowOffset(fontsize);
             shadowRect.x += booshAmount;
             shadowRect.y += booshAmount;
             SDL_SetTextureColorMod(texttexture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
@@ -7715,14 +7438,24 @@ void textbox::updateText(string content, float size, float fwidth, SDL_Color fco
 ui::ui(SDL_Renderer * renderer, const char* ffilename, float fx, float fy, float fwidth, float fheight, int fpriority) {
   //M("ui()" );
   filename = ffilename;
+  bool sharingTexture = 0;
 
-  texture = loadTexture(renderer, ffilename);
+  for(auto x : g_ui) {
+    if(x->filename == filename) {
+      texture = x->texture;
+      sharingTexture = 1;
+    }
+  }
+
+  if(!sharingTexture) {
+    texture = loadTexture(renderer, ffilename);
+  }
 
   width = fwidth;
   height = fheight;
   x = fx;
   y = fy;
-  
+
   g_ui.push_back(this);
 
   priority = fpriority;
@@ -7831,16 +7564,16 @@ void ui::render(SDL_Renderer * renderer, camera fcamera, float elapsed) {
     } else {
       if(worldspace) {
         SDL_FRect dstrect = {x, y, width, height};
-        
-          dstrect.x *= g_camera.zoom;
-          dstrect.y *= g_camera.zoom;
-          dstrect.w *= g_camera.zoom;
-          dstrect.h *= g_camera.zoom;
+
+        dstrect.x *= g_camera.zoom;
+        dstrect.y *= g_camera.zoom;
+        dstrect.w *= g_camera.zoom;
+        dstrect.h *= g_camera.zoom;
 
         dstrect = transformRect( dstrect );
         if(dropshadow) {
           SDL_FRect shadowRect = dstrect;
-          float booshAmount = g_textDropShadowDist * 52.7;
+          float booshAmount = 2;
           shadowRect.x += booshAmount;
           shadowRect.y += booshAmount;
           SDL_SetTextureColorMod(texture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
@@ -7857,7 +7590,7 @@ void ui::render(SDL_Renderer * renderer, camera fcamera, float elapsed) {
           dstrect.h /= g_zoom_mod;
           if(dropshadow) {
             SDL_FRect shadowRect = dstrect;
-            float booshAmount = g_textDropShadowDist * 52.7;
+            float booshAmount = 2; 
             shadowRect.x += booshAmount;
             shadowRect.y += booshAmount;
             SDL_SetTextureColorMod(texture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
@@ -7888,7 +7621,7 @@ void ui::render(SDL_Renderer * renderer, camera fcamera, float elapsed) {
           SDL_FRect dstrect = {x * WIN_WIDTH + (shrinkPixels / scalex) + (shrinkPercent * WIN_WIDTH), y * WIN_HEIGHT + (shrinkPixels / scalex) + (shrinkPercent * WIN_WIDTH), width * WIN_WIDTH - (shrinkPixels / scalex) * 2 - (shrinkPercent * WIN_WIDTH) * 2, height * WIN_HEIGHT - (shrinkPixels / scalex) * 2 - (shrinkPercent * WIN_WIDTH) * 2};
           if(dropshadow) {
             SDL_FRect shadowRect = dstrect;
-            float booshAmount = g_textDropShadowDist * 52.7;
+            float booshAmount = 10;
             shadowRect.x += booshAmount;
             shadowRect.y += booshAmount;
             SDL_SetTextureColorMod(texture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
@@ -8175,43 +7908,43 @@ escapeUI::escapeUI() {
   fingerMarker->renderOverText = 1;
 
   vector<string> optionStrings;
-  
-  optionStrings.push_back("Back");
-  optionStrings.push_back("Levelselect");
-  optionStrings.push_back("Settings");
-  optionStrings.push_back("End");
+
+  optionStrings.push_back(getLanguageData("PauseOptionBack"));
+  optionStrings.push_back(getLanguageData("PauseOptionTeleport"));
+  optionStrings.push_back(getLanguageData("PauseOptionSettings"));
+  optionStrings.push_back(getLanguageData("PauseOptionEnd"));
 
 
   numLines = optionStrings.size();
   float spacing = (yEnd - yStart) / (numLines);
 
-//    backButton = new ui(renderer, "resources/static/ui/menu_back.qoi", bbXStart, bbYStart, bbWidth, 1, 2);
-//    backButton->heightFromWidthFactor = 1;
-//    backButton->shrinkPercent = 0.03;
-//    backButton->persistent = 1;
-//    backButton->show = 0;
-//    backButton->priority = 1;
-//    backButton->dropshadow = 1;
-//
-//    bbNinePatch = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", bbXStart, bbYStart, bbWidth, 1, 0);
-//    bbNinePatch->patchwidth = 213;
-//    bbNinePatch->patchscale = 0.4;
-//    bbNinePatch->is9patch = true;
-//    bbNinePatch->persistent = true;
-//    bbNinePatch->show = 1;
-//    bbNinePatch->priority = 0;
-//    bbNinePatch->heightFromWidthFactor = 1;
+  //    backButton = new ui(renderer, "resources/static/ui/menu_back.qoi", bbXStart, bbYStart, bbWidth, 1, 2);
+  //    backButton->heightFromWidthFactor = 1;
+  //    backButton->shrinkPercent = 0.03;
+  //    backButton->persistent = 1;
+  //    backButton->show = 0;
+  //    backButton->priority = 1;
+  //    backButton->dropshadow = 1;
+  //
+  //    bbNinePatch = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", bbXStart, bbYStart, bbWidth, 1, 0);
+  //    bbNinePatch->patchwidth = 213;
+  //    bbNinePatch->patchscale = 0.4;
+  //    bbNinePatch->is9patch = true;
+  //    bbNinePatch->persistent = true;
+  //    bbNinePatch->show = 1;
+  //    bbNinePatch->priority = 0;
+  //    bbNinePatch->heightFromWidthFactor = 1;
 
 
   int i = 0;
   for(float yPos = yStart + spacing/2; yPos < yEnd; yPos+= spacing ) 
   {
-    textbox* newTextbox = new textbox(renderer, optionStrings[i].c_str(), 40 * g_fontsize, 0.5, yPos, 0);
+    textbox* newTextbox = new textbox(renderer, optionStrings[i].c_str(), 1, 0.5, yPos, 0);
     newTextbox->dropshadow = 1;
     newTextbox->show = 0;
     newTextbox->align = 2;
     optionTextboxes.push_back(newTextbox);
-    
+
     i++;
   }
 
@@ -8288,7 +8021,7 @@ void clear_map(camera& cameraToReset) {
   g_encountersFile = "";
   g_encounterChance = 0;
 
-  
+
   if(g_waterAllocated) {
     g_waterTexture = 0;
     g_waterAllocated = 0;
@@ -8325,7 +8058,7 @@ void clear_map(camera& cameraToReset) {
 
     SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
     SDL_SetRenderTarget(renderer, frame);
-    
+
     {
       // tiles
       for (long long unsigned int i = 0; i < g_tiles.size(); i++)
@@ -8335,7 +8068,7 @@ void clear_map(camera& cameraToReset) {
           g_tiles[i]->render(renderer, g_camera);
         }
       }
-  
+
       for (long long unsigned int i = 0; i < g_tiles.size(); i++)
       {
         if (g_tiles[i]->z == 1)
@@ -8349,7 +8082,7 @@ void clear_map(camera& cameraToReset) {
       {
         g_actors[i]->render(renderer, g_camera);
       }
-  
+
       for (long long unsigned int i = 0; i < g_tiles.size(); i++)
       {
         if (g_tiles[i]->z == 2)
@@ -8363,54 +8096,54 @@ void clear_map(camera& cameraToReset) {
       //render black bars
       {
         SDL_Rect blackrect;
-        
+
         blackrect = {
           g_camera.desiredX - g_camera.width,
           g_camera.desiredY - g_camera.height,
           g_camera.width,
           g_camera.height*3
         };
-  
-  
+
+
         blackrect = transformRect(blackrect);
-  
+
         SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
-  
+
         blackrect = {
           g_camera.desiredX + g_camera.width,
           g_camera.desiredY - g_camera.height,
           g_camera.width,
           g_camera.height*3
         };
-  
-  
+
+
         blackrect = transformRect(blackrect);
-  
+
         SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
-  
+
         blackrect = {
           g_camera.desiredX,
           g_camera.desiredY - g_camera.height,
           g_camera.width,
           g_camera.height
         };
-  
+
         blackrect = transformRect(blackrect);
-  
+
         SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
-  
+
         blackrect = {
           g_camera.desiredX,
           g_camera.desiredY + g_camera.height,
           g_camera.width,
           g_camera.height
         };
-  
+
         blackrect = transformRect(blackrect);
-  
+
         SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
-  
-  
+
+
       }
     }
 
@@ -8439,7 +8172,7 @@ void clear_map(camera& cameraToReset) {
       //Uint32 halftone = SDL_MapRGBA( mappingFormat, 50, 50, 50, 128);
 
       offset += g_transitionSpeed + 0.02 * offset;
- 
+
       int blackPixels = 0;
       for(int x = 0;  x < imageWidth; x++) {
         for(int y = 0; y < imageHeight; y++) {
@@ -8613,29 +8346,29 @@ void clear_map(camera& cameraToReset) {
   }
 
   g_pelletGoalScripts.clear();
- 
+
 
   //was there a reason to do this?
   //none of the entities which persist through map clears
   //should ever have worldsounds
-//  vector<worldsound*> savedSounds;
-//
-//  size = (int)g_worldsounds.size();
-//  for(int i = 0; i < size; i++) {
-//    if(g_worldsounds[0]->owner == nullptr) {
-//      delete g_worldsounds[0];
-//    } else {
-//      savedSounds.push_back(g_worldsounds[0]);
-//      g_worldsounds.erase(remove(g_worldsounds.begin(), g_worldsounds.end(), g_worldsounds[0]), g_worldsounds.end());
-//    }
-//  }
-//
-//  //put savedSounds back to g_worldsounds
-//  for(auto s : savedSounds) {
-//
-//
-//  }
-  
+  //  vector<worldsound*> savedSounds;
+  //
+  //  size = (int)g_worldsounds.size();
+  //  for(int i = 0; i < size; i++) {
+  //    if(g_worldsounds[0]->owner == nullptr) {
+  //      delete g_worldsounds[0];
+  //    } else {
+  //      savedSounds.push_back(g_worldsounds[0]);
+  //      g_worldsounds.erase(remove(g_worldsounds.begin(), g_worldsounds.end(), g_worldsounds[0]), g_worldsounds.end());
+  //    }
+  //  }
+  //
+  //  //put savedSounds back to g_worldsounds
+  //  for(auto s : savedSounds) {
+  //
+  //
+  //  }
+
   //just do a typical clear
   size = (int)g_worldsounds.size();
   for(int i = 0; i < size; i++) {
@@ -8692,61 +8425,61 @@ void clear_map(camera& cameraToReset) {
       delete g_effectIndexes[0];
     }
   }
-  
+
   for(auto x : savedEffectIndexes) {
     g_effectIndexes.push_back(x);
   }
 
 
   g_particles.clear();
-                       
+
   //used to delete attacks and then weapons
   //but that's going to cause a segfault since weapons
   //delete their own attacks
-//  size = g_attacks.size();
-//  bool contflag = 0;
-//  for(int i = 0; i < size; i++) {
-//    for(auto x : protag->hisweapon->attacks) {
-//      if(x == g_attacks[0]) {
-//        swap(g_attacks[0], g_attacks[g_attacks.size()-1]);
-//        contflag = 1;
-//        break;
-//
-//
-//      }
-//
-//    }
-//    if(!contflag) {
-//      delete g_attacks[0];
-//    }
-//  }
+  //  size = g_attacks.size();
+  //  bool contflag = 0;
+  //  for(int i = 0; i < size; i++) {
+  //    for(auto x : protag->hisweapon->attacks) {
+  //      if(x == g_attacks[0]) {
+  //        swap(g_attacks[0], g_attacks[g_attacks.size()-1]);
+  //        contflag = 1;
+  //        break;
+  //
+  //
+  //      }
+  //
+  //    }
+  //    if(!contflag) {
+  //      delete g_attacks[0];
+  //    }
+  //  }
 
   //party is unarmed so this is unneccessary
-//  vector<weapon*> persistentweapons;
-//  size = (int)g_weapons.size();
-//  for(int i = 0; i < size; i++) {
-//    bool persist = false;
-//    //check if party members own the weapons
-//    for(auto x: party) {
-//      if(x->hisweapon->name == g_weapons[0]->name) {
-//        persist  = true;
-//      }
-//    }
-//    if(g_weapons[0]->persistent) {
-//      persist = true;
-//
-//    }
-//    if(persist) {
-//      persistentweapons.push_back(g_weapons[0]);
-//      g_weapons.erase(remove(g_weapons.begin(), g_weapons.end(), g_weapons[0]), g_weapons.end());
-//    } else {
-//      delete g_weapons[0];
-//    }
-//  }
-//
-//  for(auto x : persistentweapons) {
-//    g_weapons.push_back(x);
-//  }
+  //  vector<weapon*> persistentweapons;
+  //  size = (int)g_weapons.size();
+  //  for(int i = 0; i < size; i++) {
+  //    bool persist = false;
+  //    //check if party members own the weapons
+  //    for(auto x: party) {
+  //      if(x->hisweapon->name == g_weapons[0]->name) {
+  //        persist  = true;
+  //      }
+  //    }
+  //    if(g_weapons[0]->persistent) {
+  //      persist = true;
+  //
+  //    }
+  //    if(persist) {
+  //      persistentweapons.push_back(g_weapons[0]);
+  //      g_weapons.erase(remove(g_weapons.begin(), g_weapons.end(), g_weapons[0]), g_weapons.end());
+  //    } else {
+  //      delete g_weapons[0];
+  //    }
+  //  }
+  //
+  //  for(auto x : persistentweapons) {
+  //    g_weapons.push_back(x);
+  //  }
 
 
   vector<ui*> persistentui;
@@ -8817,20 +8550,6 @@ void clear_map(camera& cameraToReset) {
   newClosest = 0;
 }
 
-//make an entity from the file worlditem.ent
-worldItem::worldItem(string fname, bool fisKeyItem) : entity(renderer, 5, fname) {
-  isWorlditem = 1;
-  name = "ITEM-" + fname;
-  bounceindex = rand() % 8;
-  g_worldItems.push_back(this);
-
-}
-
-worldItem::~worldItem() {
-  g_worldItems.erase(remove(g_worldItems.begin(), g_worldItems.end(), this), g_worldItems.end());
-}
-
-
 settingsUI::settingsUI() {
 
   ninePatch = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", xStart, yStart, xEnd-xStart + 0.05, yEnd-yStart + 0.05, 0);
@@ -8856,21 +8575,21 @@ settingsUI::settingsUI() {
   fingerMarker->renderOverText = 1;
 
   vector<string> optionStrings;
-  
-  optionStrings.push_back("Up");
-  optionStrings.push_back("Down");
-  optionStrings.push_back("Left");
-  optionStrings.push_back("Right");
-  optionStrings.push_back("Spring");
-  optionStrings.push_back("Interact");
-  optionStrings.push_back("Check Status");
-  optionStrings.push_back("Spin");
 
-  optionStrings.push_back("Maximize");
-  optionStrings.push_back("Music Volume");
-  optionStrings.push_back("Sounds Volume");
-  optionStrings.push_back("Graphical Quality");
-  optionStrings.push_back("Brightness");
+  optionStrings.push_back(getLanguageData("UpSettingText"));
+  optionStrings.push_back(getLanguageData("DownSettingText"));
+  optionStrings.push_back(getLanguageData("LeftSettingText"));
+  optionStrings.push_back(getLanguageData("RightSettingText"));
+  optionStrings.push_back(getLanguageData("SpringSettingText"));
+  optionStrings.push_back(getLanguageData("InteractSettingText"));
+  optionStrings.push_back(getLanguageData("CheckStatusSettingText"));
+  optionStrings.push_back(getLanguageData("SpinSettingText"));
+
+  optionStrings.push_back(getLanguageData("MaximizeSettingText"));
+  optionStrings.push_back(getLanguageData("MusicSettingText"));
+  optionStrings.push_back(getLanguageData("SoundSettingText"));
+  optionStrings.push_back(getLanguageData("GraphicsSettingText"));
+  optionStrings.push_back(getLanguageData("BrightnessSettingText"));
 
   numLines = optionStrings.size();
   float spacing = (yEnd - yStart) / (numLines);
@@ -8896,11 +8615,11 @@ settingsUI::settingsUI() {
   int i = 0;
   for(float yPos = yStart + spacing/2; yPos < yEnd; yPos+= spacing ) 
   {
-    textbox* newTextbox = new textbox(renderer, optionStrings[i].c_str(), 30 * g_fontsize, xStart + (spacing/2 * (WIN_WIDTH/WIN_HEIGHT)), yPos, xEnd);
+    textbox* newTextbox = new textbox(renderer, optionStrings[i].c_str(), 1, xStart + (spacing/2 * (WIN_WIDTH/WIN_HEIGHT)), yPos, xEnd);
     newTextbox->dropshadow = 1;
     newTextbox->show = 0;
     optionTextboxes.push_back(newTextbox);
-    
+
     string content = "";
     if(i == 0) {content = SDL_GetScancodeName(bindings[0]);}
     if(i == 1) {content = SDL_GetScancodeName(bindings[1]);}
@@ -8918,7 +8637,7 @@ settingsUI::settingsUI() {
     if(i == 11) {content = g_graphicsStrings[g_graphicsquality]; }
     if(i == 12) {content = to_string((int)round(g_brightness)) + "%"; }
 
-    newTextbox = new textbox(renderer, content.c_str(), 30 * g_fontsize, xEnd + 0.02, yPos, 0.3);
+    newTextbox = new textbox(renderer, content.c_str(), 1, xEnd + 0.02, yPos, 0.3);
     newTextbox->show = 0;
     newTextbox->align = 1;
     newTextbox->dropshadow = 1;
@@ -9022,8 +8741,6 @@ void adventureUI::showInventoryUI()
     inventoryA->show = 1;
     inventoryB->show = 1;
     escText->show = 1;
-    levelTimeText->show = 1;
-    levelHitsText->show = 1;
     inputText->show = 1;
   }
 }
@@ -9034,14 +8751,57 @@ void adventureUI::hideInventoryUI()
     inventoryA->show = 0;
     inventoryB->show = 0;
     escText->show = 0;
-    levelTimeText->show = 0;
-    levelHitsText->show = 0;
     escText->updateText("",-1,1);
-    levelTimeText->updateText("",-1,1);
-    levelHitsText->updateText("",-1,1);
     inputText->show = 0;
     inputText->updateText("", -1, 0.9);
   }
+}
+
+void adventureUI::showAm() {
+  amPanel->show = 1;
+
+  for(int i =0; i< amTextboxes.size(); i++) {
+    amTextboxes[i]->show = 1;
+    string hook = "AdventureMenuOption" + to_string(i);
+    amTextboxes[i]->updateText(getLanguageData(hook), -1, 1);
+    amTextboxes[i]->boxX = amTexPos[i].first;
+    amTextboxes[i]->boxY = amTexPos[i].second;
+  }
+  amPicker->show = 1;
+}
+
+void adventureUI::hideAm() {
+  amPanel->show = 0;
+  for(auto &x : amTextboxes) {
+    x->show = 0;
+  }
+  amPicker->show = 0;
+}
+
+void adventureUI::showKi() {
+  kiPanel->show = 1;
+  for(auto &x : kiTextboxes) {
+    x->show = 1;
+  }
+  for(auto &x : kiIcons) {
+    x->show = 1;
+  }
+  kiPicker->show = 1;
+  kiPrecede->show = 1;
+  kiAdvance->show = 1;
+}
+
+void adventureUI::hideKi() {
+  kiPanel->show = 0;
+  for(auto &x : kiTextboxes) {
+    x->show = 0;
+  }
+  for(auto &x : kiIcons) {
+    x->show = 0;
+  }
+  kiPicker->show = 0;
+  kiPrecede->show = 0;
+  kiAdvance->show = 0;
 }
 
 adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, but due to the declaration plight is 0 by default
@@ -9054,18 +8814,18 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     talkingBox->is9patch = true;
     talkingBox->persistent = true;
 
-    dialogProceedIndicator = new ui(renderer, "resources/static/ui/dialog_proceed.qoi", 0.92, 0.88, 0.05, 1, 0);
+    dialogProceedIndicator = new ui(renderer, "resources/engine/dialog_proceed.qoi", 0.92, 0.88, 0.05, 1, 0);
     dialogProceedIndicator->heightFromWidthFactor = 1;
     dialogProceedIndicator->persistent = true;
     dialogProceedIndicator->priority = 8;
     dialogProceedIndicator->dropshadow = 1;
-    
+
 
     // talkingBoxTexture = new ui(renderer, "resources/static/ui/ui-background.qoi", 0.1, 0.45, 0.9, 0.25, 0);
     // talkingBoxTexture->persistent = true;
     /// SDL_SetTextureBlendMode(talkingBoxTexture->texture, SDL_BLENDMODE_ADD);
 
-    talkingText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
+    talkingText = new textbox(renderer, "", 2, 0, 0, 0.9);
     talkingText->boxWidth = 0.9;
     talkingText->width = 0.9;
     talkingText->boxHeight = 0.25;
@@ -9074,7 +8834,7 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     talkingText->worldspace = 1; //right align
     talkingText->dropshadow = 1;
 
-    responseText = new textbox(renderer, "Yes", 1700 * g_fontsize, 0, 0, 0.9);
+    responseText = new textbox(renderer, "", 2, 0, 0, 0.9);
     responseText->boxWidth = 0.95;
     responseText->width = 0.95;
     responseText->boxHeight = 0.2;
@@ -9084,30 +8844,30 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     responseText->align = 2; // center-align
     responseText->dropshadow = 1;
 
-                             
 
-//    scoreText = new textbox(renderer, "Yes", 1700 * g_fontsize, 0, 0, 0.9);
-//    scoreText->boxWidth = 0;
-//    scoreText->width = 0.95;
-//    scoreText->boxHeight = 0;
-//    scoreText->boxX = 0.2;
-//    scoreText->boxY = 1-0.1;
-//    scoreText->worldspace = 1;
-//    scoreText->align = 1; // right
-//    scoreText->dropshadow = 1;
-//    scoreText->layer0 = 1;
-//    scoreText->show = 0;
 
-//    systemClock = new textbox(renderer, "Yes", 1700 * g_fontsize, 0, 0, 0.9);
-//    systemClock->boxWidth = 1;
-//    systemClock->width = 0.95;
-//    systemClock->boxHeight = 0;
-//    systemClock->boxX = 1 -0.2;
-//    systemClock->boxY = 1-0.1;
-//    systemClock->worldspace = 1;
-//    systemClock->align = 2; // left
-//    systemClock->dropshadow = 1;
-//    systemClock->layer0 = 1;
+    //    scoreText = new textbox(renderer, "Yes", 1700 * g_fontsize, 0, 0, 0.9);
+    //    scoreText->boxWidth = 0;
+    //    scoreText->width = 0.95;
+    //    scoreText->boxHeight = 0;
+    //    scoreText->boxX = 0.2;
+    //    scoreText->boxY = 1-0.1;
+    //    scoreText->worldspace = 1;
+    //    scoreText->align = 1; // right
+    //    scoreText->dropshadow = 1;
+    //    scoreText->layer0 = 1;
+    //    scoreText->show = 0;
+
+    //    systemClock = new textbox(renderer, "Yes", 1700 * g_fontsize, 0, 0, 0.9);
+    //    systemClock->boxWidth = 1;
+    //    systemClock->width = 0.95;
+    //    systemClock->boxHeight = 0;
+    //    systemClock->boxX = 1 -0.2;
+    //    systemClock->boxY = 1-0.1;
+    //    systemClock->worldspace = 1;
+    //    systemClock->align = 2; // left
+    //    systemClock->dropshadow = 1;
+    //    systemClock->layer0 = 1;
     //systemClock->show = 0;
 
 
@@ -9133,7 +8893,7 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     crosshair->framewidth = 128;
     crosshair->frameheight = 128;
     crosshair->priority = -5; //crosshair goes ontop usable icons
-    
+
     b0_element = new ui(renderer, "resources/static/ui/behemoth_element.qoi", 0, 0, 0.05, 0.05, -15);
     b0_element->persistent = 1;
     b0_element->heightFromWidthFactor = 1;
@@ -9173,12 +8933,12 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     b3_element->framewidth = 128;
     b3_element->frameheight = 128;
     b3_element->priority = -5; //crosshair goes ontop usable icons
-    
-//    hearingDetectable = new ui(renderer, "resources/static/ui/detection-hearing.qoi", 0.85, 0.05, 0.1, 1, -10);
-//    hearingDetectable->persistent = 1;
-//    hearingDetectable->heightFromWidthFactor = 1.3392;
-//    hearingDetectable->show = 1;
-//    hearingDetectable->priority = -3;
+
+    //    hearingDetectable = new ui(renderer, "resources/static/ui/detection-hearing.qoi", 0.85, 0.05, 0.1, 1, -10);
+    //    hearingDetectable->persistent = 1;
+    //    hearingDetectable->heightFromWidthFactor = 1.3392;
+    //    hearingDetectable->show = 1;
+    //    hearingDetectable->priority = -3;
 
     seeingDetectable = new ui(renderer, "resources/static/ui/detection-seeing.qoi", 0.85, 0.075, 0.1, 1, -10);
     seeingDetectable->persistent = 1;
@@ -9190,31 +8950,31 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     seeingDetectable->show = 1;
     seeingDetectable->priority = -2;
 
-//    healthText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
-//    healthText->boxWidth = 0.95;
-//    healthText->width = 0.95;
-//    healthText->boxHeight = 0;
-//    healthText->boxX = 0.05;
-//    healthText->boxY = 0.15; //0.3 to get it under the heart
-//    healthText->worldspace = 1;
-//    healthText->show = 1;
-//    healthText->align = 0;
-//    healthText->dropshadow = 1;
-//    healthText->layer0 = 1;
+    //    healthText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
+    //    healthText->boxWidth = 0.95;
+    //    healthText->width = 0.95;
+    //    healthText->boxHeight = 0;
+    //    healthText->boxX = 0.05;
+    //    healthText->boxY = 0.15; //0.3 to get it under the heart
+    //    healthText->worldspace = 1;
+    //    healthText->show = 1;
+    //    healthText->align = 0;
+    //    healthText->dropshadow = 1;
+    //    healthText->layer0 = 1;
 
-//    hungerText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
-//    hungerText->boxWidth = 0.95;
-//    hungerText->width = 0.95;
-//    hungerText->boxHeight = 0;
-//    hungerText->boxX = 1 - 0.05;
-//    hungerText->boxY = 1 - 0.15;
-//    hungerText->worldspace = 1;
-//    hungerText->show = 1;
-//    hungerText->align = 1;
-//    hungerText->dropshadow = 1;
-//    hungerText->layer0 = 1;
+    //    hungerText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
+    //    hungerText->boxWidth = 0.95;
+    //    hungerText->width = 0.95;
+    //    hungerText->boxHeight = 0;
+    //    hungerText->boxX = 1 - 0.05;
+    //    hungerText->boxY = 1 - 0.15;
+    //    hungerText->worldspace = 1;
+    //    hungerText->show = 1;
+    //    hungerText->align = 1;
+    //    hungerText->dropshadow = 1;
+    //    hungerText->layer0 = 1;
 
-    escText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
+    escText = new textbox(renderer, "", 2, 0, 0, 0.9);
 
     escText->boxX = 0.5;
     escText->boxY = 0.83;
@@ -9225,29 +8985,8 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     escText->align = 2;
     escText->dropshadow = 1; 
 
-    levelHitsText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
 
-    levelHitsText->boxX = 0.1;
-    levelHitsText->boxY = 0.83;
-    levelHitsText->boxWidth = 0.98;
-    levelHitsText->boxHeight = 0.25 - 0.02;
-    levelHitsText->worldspace = 0;
-    levelHitsText->show = 1;
-    levelHitsText->align = 0;
-    levelHitsText->dropshadow = 1; 
-
-    levelTimeText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
-
-    levelTimeText->boxX = 0.9;
-    levelTimeText->boxY = 0.83;
-    levelTimeText->boxWidth = 0.98;
-    levelTimeText->boxHeight = 0.25 - 0.02;
-    levelTimeText->worldspace = 0;
-    levelTimeText->show = 1;
-    levelTimeText->align = 1;
-    levelTimeText->dropshadow = 1; 
-
-    inputText = new textbox(renderer, "", 1700 * g_fontsize * 1.4, 0, 0, 0.9);
+    inputText = new textbox(renderer, "", 2, 0, 0, 0.9);
 
     inputText->boxX = 0.5;
     inputText->boxY = 0.3;
@@ -9258,12 +8997,97 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     inputText->align = 2;
     inputText->dropshadow = 1; 
 
-
-
     playersUI = 1;
+
+    amPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.25, 0, 0.5, 0.22, 1);
+    amPanel->is9patch = true;
+    amPanel->patchwidth = 213;
+    amPanel->patchscale = 0.4;
+    amPanel->persistent = true;
+    amPanel->show = 0;
+    amPanel->layer0 = 1;
+
+    for(int i = 0; i < 6; i++) {
+      string hook = "AdventureMenuOption" + to_string(i);
+      textbox* a = new textbox(renderer, getLanguageData(hook).c_str(), 1, 0, 0, 0.9);
+      a->boxWidth = 0.9;
+      a->width = 0.9;
+      a->boxHeight = 0.25;
+      a->boxX = 0.05;
+      a->boxY = 0.7;
+      a->worldspace = 1; //right align
+      a->dropshadow = 1;
+      a->layer0 = 1;
+      amTextboxes.push_back(a);
+    }
+
+    amPicker = new ui(renderer, "resources/static/ui/menu_picker.qoi", 0.92, 0.88, 0.03, 1, 0);
+    amPicker->heightFromWidthFactor = 1;
+    amPicker->persistent = true;
+    amPicker->priority = 8;
+    amPicker->dropshadow = 1;
+    amPicker->y =  0.25;
+    amPicker->layer0 = 1;
+
+    kiPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0, 0.08, 0.3, 0.47, 1);
+    kiPanel->is9patch = true;
+    kiPanel->patchwidth = 213;
+    kiPanel->patchscale = 0.4;
+    kiPanel->persistent = true;
+    kiPanel->show = 0;
+
+    kiPicker = new ui(renderer, "resources/static/ui/menu_picker.qoi", 0.92, 0.88, 0.03, 1, 0);
+    kiPicker->heightFromWidthFactor = 1;
+    kiPicker->persistent = true;
+    kiPicker->priority = 8;
+    kiPicker->dropshadow = 1;
+    kiPicker->x = 0.01;
+
+    kiPrecede = new ui(renderer, "resources/engine/precede-indicator.qoi", 0.92, 0.88, 0.03, 1, 0);
+    kiPrecede->heightFromWidthFactor = 1;
+    kiPrecede->persistent = true;
+    kiPrecede->priority = 8;
+    kiPrecede->dropshadow = 1;
+    kiPrecede->x = 0.15 - 0.015;
+    kiPrecede->y = 0.08 + 0.02;
+
+    kiAdvance = new ui(renderer, "resources/engine/dialog_proceed.qoi", 0.92, 0.88, 0.03, 1, 0);
+    kiAdvance->heightFromWidthFactor = 1;
+    kiAdvance->persistent = true;
+    kiAdvance->priority = 8;
+    kiAdvance->dropshadow = 1;
+    kiAdvance->x = 0.15 - 0.015;
+    kiAdvance->y = 0.52 - 0.03;
+    
+    const float ystart = 0.13;
+    const float x = 0.065;
+    const float yinc = 0.06;
+    float curY = ystart;
+    for(int i = 0; i < 6; i++) {
+      textbox* a = new textbox(renderer, "", 1, 0, 0, 0.9);
+      a->boxWidth = 0.9;
+      a->width = 0.9;
+      a->boxHeight = 0.25;
+      a->boxX = 0.05;
+      a->boxY = 0.7;
+      a->worldspace = 1; //right align
+      a->dropshadow = 1;
+      a->boxX = x - 0.03;
+      a->boxY = curY;
+      kiTextboxes.push_back(a);
+
+      ui* b = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", x+0.18, curY+0.008, 0.03, 1, 1);
+      b->heightFromWidthFactor = 1;
+      b->persistent = true;
+      b->show = 0;
+      kiIcons.push_back(b);
+
+      curY+=yinc;
+    }
 
     hideInventoryUI();
     hideTalkingUI();
+    hideAm();
   }
 
 }
@@ -9272,46 +9096,46 @@ void adventureUI::initFullUI() {
 
 
 
-//    tastePicture = new ui(renderer, "resources/static/ui/taste.qoi", 0.2 + 0.01, 1-0.1, 0.05, 1, -15);
-//    tastePicture->persistent = 1;
-//    tastePicture->heightFromWidthFactor = 1;
-//    tastePicture->show = 1;
-//    tastePicture->framewidth = 410;
-//    tastePicture->frameheight = 465;
-//    tastePicture->layer0 = 1;
-//    tastePicture->glideSpeed = 0.1;
-//    tastePicture->widthGlideSpeed = 0.1;
-//    tastePicture->priority = -10; //taste is behind everything
-//    tastePicture->show = 1;
+  //    tastePicture = new ui(renderer, "resources/static/ui/taste.qoi", 0.2 + 0.01, 1-0.1, 0.05, 1, -15);
+  //    tastePicture->persistent = 1;
+  //    tastePicture->heightFromWidthFactor = 1;
+  //    tastePicture->show = 1;
+  //    tastePicture->framewidth = 410;
+  //    tastePicture->frameheight = 465;
+  //    tastePicture->layer0 = 1;
+  //    tastePicture->glideSpeed = 0.1;
+  //    tastePicture->widthGlideSpeed = 0.1;
+  //    tastePicture->priority = -10; //taste is behind everything
+  //    tastePicture->show = 1;
 
   adventureUIManager->tungShakeDurationMs = adventureUIManager->maxTungShakeDurationMs;
   adventureUIManager->tungShakeIntervalMs = adventureUIManager->maxTungShakeIntervalMs + rand() % adventureUIManager->tungShakeIntervalRandomMs;
 
-//    hungerPicture = new ui(renderer, "resources/static/ui/hunger.qoi", 0.8, 0.6, 0.25, 1, -15);
-//    hungerPicture->persistent = 1;
-//    hungerPicture->heightFromWidthFactor = 1;
-//    hungerPicture->show = 1;
-//    hungerPicture->framewidth = 410;
-//    hungerPicture->frameheight = 465;
-//    hungerPicture->layer0 = 1;
-//    hungerPicture->glideSpeed = 0.1;
-//    hungerPicture->widthGlideSpeed = 0.1;
-//    hungerPicture->priority = -10; //hunger is behind everything
-//    hungerPicture->show = 0;
-  
+  //    hungerPicture = new ui(renderer, "resources/static/ui/hunger.qoi", 0.8, 0.6, 0.25, 1, -15);
+  //    hungerPicture->persistent = 1;
+  //    hungerPicture->heightFromWidthFactor = 1;
+  //    hungerPicture->show = 1;
+  //    hungerPicture->framewidth = 410;
+  //    hungerPicture->frameheight = 465;
+  //    hungerPicture->layer0 = 1;
+  //    hungerPicture->glideSpeed = 0.1;
+  //    hungerPicture->widthGlideSpeed = 0.1;
+  //    hungerPicture->priority = -10; //hunger is behind everything
+  //    hungerPicture->show = 0;
+
   adventureUIManager->stomachShakeDurationMs = adventureUIManager->maxstomachShakeDurationMs;
   adventureUIManager->stomachShakeIntervalMs = adventureUIManager->maxstomachShakeIntervalMs + rand() % adventureUIManager->stomachShakeIntervalRandomMs;
 
-//  healthPicture = new ui(renderer, "resources/static/ui/health.qoi", -0.04, -0.09, 0.25, 1, -15);
-//  healthPicture->persistent = 1;
-//  healthPicture->heightFromWidthFactor = 1;
-//  healthPicture->show = 1;
-//  healthPicture->framewidth = 410;
-//  healthPicture->frameheight = 465;
-//  healthPicture->layer0 = 1;
-//  healthPicture->glideSpeed = 0.1;
-//  healthPicture->widthGlideSpeed = 0.1;
-//  healthPicture->priority = -10; //health is behind everything
+  //  healthPicture = new ui(renderer, "resources/static/ui/health.qoi", -0.04, -0.09, 0.25, 1, -15);
+  //  healthPicture->persistent = 1;
+  //  healthPicture->heightFromWidthFactor = 1;
+  //  healthPicture->show = 1;
+  //  healthPicture->framewidth = 410;
+  //  healthPicture->frameheight = 465;
+  //  healthPicture->layer0 = 1;
+  //  healthPicture->glideSpeed = 0.1;
+  //  healthPicture->widthGlideSpeed = 0.1;
+  //  healthPicture->priority = -10; //health is behind everything
 
   emotion = new ui(renderer, "resources/static/ui/emoticons.qoi", 0, 0, 0.05, 0.05, -15);
   emotion->persistent = 1;
@@ -9330,15 +9154,17 @@ adventureUI::~adventureUI()
     Mix_FreeChunk(blip);
     Mix_FreeChunk(confirm_noise);
   }
-  
+
   if(!light) {
     delete talkingBox;
-    // delete talkingBoxTexture;
     delete talkingText;
-    
 
     delete inventoryA;
     delete inventoryB;
+    delete amPanel;
+    for(int i = 0; i < 6; i++) {
+      delete amTextboxes[i];
+    }
   }
 
 }
@@ -9390,6 +9216,10 @@ void adventureUI::pushText(entity *ftalker)
     pushedText = scriptToUse->at(dialogue_index);
   }
 
+  if(scriptToUse->at(dialogue_index).substr(0,10) == "/keyprompt") {
+    pushedText = scriptToUse->at(dialogue_index).substr(11);
+  }
+
   //parse pushedText for variables within $$, e.g. $$playername$$
   int position = pushedText.find("$$");  
   if(position != string::npos) {
@@ -9405,7 +9235,7 @@ void adventureUI::pushText(entity *ftalker)
 
     }
   }
-  
+
 
   curText = "";
   typing = true;
@@ -9434,7 +9264,7 @@ void adventureUI::pushText(string text)
 
     }
   }
-  
+
 
   curText = "";
   typing = true;
@@ -9477,6 +9307,9 @@ void adventureUI::updateText()
         g_saveToDelete = g_saveNames[response_index];
       }
     }
+
+  }
+  else if (keyPrompting) {
 
   }
   else
@@ -9579,6 +9412,32 @@ void adventureUI::continueDialogue()
     scriptToUse = &talker->sayings;
   }
 
+  if(keyPrompting == 1) {
+    //absorb this Z press
+    M("Absorbed a Z press");
+    if(playersUI) {
+      protag_is_talking = 2;
+    }
+    executingScript = 0;
+    mobilize = 0;
+    return;
+  }
+
+  if(keyPrompting == 2) {
+    //just finished a keyprompt
+    //given item is in value of response_index
+    //-1 for nothing (canceled prompt or had no item)
+    D(response_index);
+    for(auto x : keyPromptMap) {
+      D(x.first);
+      if(x.first == response_index) {
+        dialogue_index = x.second - 3;
+      }
+    }
+    keyPrompting = 0;
+    M("Set keyPrompting to zero A");
+  }
+
 
   if (scriptToUse->size() <= dialogue_index + 2 || scriptToUse->at(dialogue_index + 1) == "#")
   {
@@ -9639,6 +9498,42 @@ void adventureUI::continueDialogue()
     askingQuestion = false;
   }
 
+  //keyprompt
+  //
+  // /keyprompt Can you give me something?
+  // *-1:<gavenothing>
+  // *0:<gavekey>
+  // *1:<gaveletter>
+  // #
+  //
+  if(scriptToUse->at(dialogue_index + 1).substr(0,10) == "/keyprompt") {
+   
+    dialogue_index++;
+    pushText(talker);
+    int j = 1;
+    string res = scriptToUse->at(dialogue_index + j).substr(1);
+    D(res);
+    keyPromptMap.clear();
+    g_amState = amState::KEYITEM;
+    oldinput[11] = 1;
+    oldinput[8] = 1;
+    while (res.find(':') != std::string::npos)
+    {
+      pair<int, int> keyPromptEntry;
+      int pos = res.find(':');
+      keyPromptEntry.first = stoi(res.substr(0, pos));
+      string jumpstr = res.substr(pos+1, res.size() - pos - 1);
+      D(jumpstr);
+      keyPromptEntry.second = stoi(jumpstr);
+      keyPromptMap.push_back(keyPromptEntry);
+      j++;
+      res = scriptToUse->at(dialogue_index + j).substr(1);
+    }
+
+    keyPrompting = true;
+    return;
+  }
+
   //add an entity to the combatlist
   // /combatant common/disaster 10
   if (scriptToUse->at(dialogue_index + 1).substr(0,10) == "/combatant") {
@@ -9654,7 +9549,7 @@ void adventureUI::continueDialogue()
     a->baseSkill = a->l0Skill + (a->skillGain * a->level);
     a->baseCritical = a->l0Critical + (a->criticalGain * a->level);
     a->baseRecovery = a->l0Recovery + (a->recoveryGain * a->level);
-    
+
     a->health = a->baseStrength;
     a->curStrength = a->baseStrength;
     a->curMind = a->baseMind;
@@ -9712,7 +9607,7 @@ void adventureUI::continueDialogue()
 
     combatUIManager->partyHealthBox->show = 1;
     combatUIManager->partyText->show = 1;
-    combatUIManager->finalText = "It's an enemy encounter!";
+    combatUIManager->finalText = getLanguageData("BattleStartText");
     combatUIManager->currentText = "";
     combatUIManager->dialogProceedIndicator->y = 0.25;
 
@@ -9725,22 +9620,22 @@ void adventureUI::continueDialogue()
       float mframes = 60;
       float transitionMinFrametime = 5;
       transitionMinFrametime = 1/mframes * 1000;
-    
-    
+
+
       SDL_Surface* transitionSurface = loadSurface("resources/engine/transition.qoi");
-    
+
       int imageWidth = transitionSurface->w;
       int imageHeight = transitionSurface->h;
-    
+
       SDL_Texture* transitionTexture = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, transitionSurface->w, transitionSurface->h );
       SDL_SetTextureBlendMode(transitionTexture, SDL_BLENDMODE_BLEND);
-    
-    
+
+
       void* pixelReference;
       int pitch;
-    
+
       float offset = imageHeight;
-    
+
       SDL_Texture* frame = SDL_CreateTexture( renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH, WIN_HEIGHT);
       SDL_SetRenderTarget(renderer, frame);
 
@@ -9752,7 +9647,7 @@ void adventureUI::continueDialogue()
           g_tiles[i]->render(renderer, g_camera);
         }
       }
-  
+
       for (long long unsigned int i = 0; i < g_tiles.size(); i++)
       {
         if (g_tiles[i]->z == 1)
@@ -9767,7 +9662,7 @@ void adventureUI::continueDialogue()
       {
         g_actors[i]->render(renderer, g_camera);
       }
-  
+
       for (long long unsigned int i = 0; i < g_tiles.size(); i++)
       {
         if (g_tiles[i]->z == 2)
@@ -9779,91 +9674,91 @@ void adventureUI::continueDialogue()
       //render black bars
       {
         SDL_Rect blackrect;
-        
+
         blackrect = {
           g_camera.desiredX - g_camera.width,
           g_camera.desiredY - g_camera.height,
           g_camera.width,
           g_camera.height*3
         };
-  
-  
+
+
         blackrect = transformRect(blackrect);
-  
+
         SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
-  
+
         blackrect = {
           g_camera.desiredX + g_camera.width,
           g_camera.desiredY - g_camera.height,
           g_camera.width,
           g_camera.height*3
         };
-  
-  
+
+
         blackrect = transformRect(blackrect);
-  
+
         SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
-  
+
         blackrect = {
           g_camera.desiredX,
           g_camera.desiredY - g_camera.height,
           g_camera.width,
           g_camera.height
         };
-  
+
         blackrect = transformRect(blackrect);
-  
+
         SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
-  
+
         blackrect = {
           g_camera.desiredX,
           g_camera.desiredY + g_camera.height,
           g_camera.width,
           g_camera.height
         };
-  
+
         blackrect = transformRect(blackrect);
-  
+
         SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
-  
-  
+
+
       }
-    
+
       SDL_RenderCopy(renderer, g_shade, NULL, NULL);
       SDL_SetRenderTarget(renderer, NULL);
       while (!cont) {
-    
+
         //onframe things
         SDL_LockTexture(transitionTexture, NULL, &pixelReference, &pitch);
-    
+
         memcpy( pixelReference, transitionSurface->pixels, transitionSurface->pitch * transitionSurface->h);
         Uint32 format = SDL_PIXELFORMAT_ARGB8888;
         SDL_PixelFormat* mappingFormat = SDL_AllocFormat( format );
         Uint32* pixels = (Uint32*)pixelReference;
         Uint32 transparent = SDL_MapRGBA( mappingFormat, 0, 0, 0, 255);
-    
+
         offset += g_transitionSpeed + 0.02 * offset;
-    
+
         for(int x = 0;  x < imageWidth; x++) {
           for(int y = 0; y < imageHeight; y++) {
-    
-    
+
+
             int dest = (y * imageWidth) + x;
             //int src =  (y * imageWidth) + x;
-    
+
             if(pow(pow(imageWidth/2 - x,2) + pow(imageHeight + y,2),0.5) < offset) {
               pixels[dest] = transparent;
             } else {
               pixels[dest] = 0;
             }
-    
+
           }
         }
-    
-    
-    
-    
-    
+
+
+
+
+
         ticks = SDL_GetTicks();
         transitionElapsed = ticks - lastticks;
         //lock framerate
@@ -9873,14 +9768,14 @@ void adventureUI::continueDialogue()
           transitionElapsed = ticks - lastticks;
         }
         lastticks = ticks;
-    
+
         SDL_RenderClear(renderer);
         //render last frame
         SDL_RenderCopy(renderer, frame, NULL, NULL);
         SDL_UnlockTexture(transitionTexture);
         SDL_RenderCopy(renderer, transitionTexture, NULL, NULL);
         SDL_RenderPresent(renderer);
-    
+
         if(offset > imageHeight + pow(pow(imageWidth/2,2) + pow(imageHeight,2),0.5)) {
           cont = 1;
         }
@@ -9901,8 +9796,8 @@ void adventureUI::continueDialogue()
   if (scriptToUse->at(dialogue_index + 1).substr(0,14) == "/menuloadnames")
   {
     vector<string> savenames = {"user/saves/a.save",
-                                "user/saves/b.save",
-                                "user/saves/c.save"};
+      "user/saves/b.save",
+      "user/saves/c.save"};
 
     ifstream data;
     string line;
@@ -9947,7 +9842,7 @@ void adventureUI::continueDialogue()
       j++;
       res = scriptToUse->at(dialogue_index + j).substr(1);
     }
-    
+
     return;
   }
 
@@ -9969,7 +9864,7 @@ void adventureUI::continueDialogue()
       j++;
       res = scriptToUse->at(dialogue_index + j).substr(1);
     }
-    
+
     return;
   }
 
@@ -9991,7 +9886,7 @@ void adventureUI::continueDialogue()
       j++;
       res = scriptToUse->at(dialogue_index + j).substr(1);
     }
-    
+
     return;
   }
 
@@ -10184,7 +10079,7 @@ void adventureUI::continueDialogue()
 
     string fStr = x[1];
     string sStr = x[2];
-  
+
     entity* firstEnt = searchEntities(fStr);
     entity* secondEnt = searchEntities(sStr);
 
@@ -10198,7 +10093,7 @@ void adventureUI::continueDialogue()
         // parse option
         //  *15:29 -> if distance is less than 15, go to line 29
         string s = scriptToUse->at(dialogue_index + 1 + j);
-I("s");
+        I("s");
         //I(s);
         s.erase(0, 1);
         int condition = stoi(s.substr(0, s.find(':')));
@@ -10301,7 +10196,7 @@ I("s");
     string s = scriptToUse->at(dialogue_index + 1);
     int firstvalue = stoi( s.substr(0, s.find('-')) ); s.erase(0, s.find('-') + 1);
     int secondvalue = stoi( s.substr(0, s.find('-')) ); s.erase(0, s.find('-') + 1);
-    
+
     string blockstr = s.substr(s.find('[')); 
     blockstr.pop_back(); blockstr.erase(0, 1);
     int block = stoi (blockstr);
@@ -10316,7 +10211,7 @@ I("s");
   if (scriptToUse->at(dialogue_index + 1).substr(0, 10) == "/printdata")
   {
     if(selected == nullptr) {E("Accessed selfdata without calling /select first");}
-    
+
     string s = scriptToUse->at(dialogue_index + 1);
     vector<string> x = splitString(s, ' ');
 
@@ -10342,7 +10237,7 @@ I("s");
     if(selected == nullptr) {E("Accessed selfdata without calling /select first");}
 
     string s = scriptToUse->at(dialogue_index + 1);
-    
+
     vector<string> x = splitString(s, '+');
     x[0] = x[0].substr(1, x[0].size()-2);
 
@@ -10363,7 +10258,7 @@ I("s");
     if(selected == nullptr) {E("Accessed selfdata without calling /select first");}
 
     string s = scriptToUse->at(dialogue_index + 1);
-    
+
     vector<string> x = splitString(s, '-');
     x[0] = x[0].substr(1, x[0].size()-2);
 
@@ -10384,7 +10279,7 @@ I("s");
     if(selected == nullptr) {E("Accessed selfdata without calling /select first");}
 
     string s = scriptToUse->at(dialogue_index + 1);
-    
+
     vector<string> x = splitString(s, '*');
     x[0] = x[0].substr(1, x[0].size()-2);
 
@@ -10406,7 +10301,7 @@ I("s");
     if(selected == nullptr) {E("Accessed selfdata without calling /select first");}
 
     string s = scriptToUse->at(dialogue_index + 1);
-    
+
     vector<string> x = splitString(s, '/');
     x[0] = x[0].substr(1, x[0].size()-2);
 
@@ -10648,7 +10543,7 @@ I("s");
     this->continueDialogue();
     return;
   }
-  
+
   //banish entity
   // why did i remove this lol
   if (scriptToUse->at(dialogue_index + 1).substr(0, 7) == "/banish")
@@ -10860,7 +10755,7 @@ I("s");
     } else {
       E("Not enough arguments for /pelletgoal");
     }
-    
+
     dialogue_index++;
     this->continueDialogue();
     return;
@@ -10880,7 +10775,7 @@ I("s");
       p->height = 0;
       p->shadow->visible = 0;
     }
-    
+
     dialogue_index++;
     this->continueDialogue();
     return;
@@ -10899,7 +10794,7 @@ I("s");
       p->height = p->originalHeight;
       p->shadow->visible = 1;
     }
-    
+
     dialogue_index++;
     this->continueDialogue();
     return;
@@ -10908,7 +10803,7 @@ I("s");
   //load/spawn particle effect
   if (scriptToUse->at(dialogue_index + 1).substr(0, 7) == "/effect")
   {
-    
+
     string s = scriptToUse->at(dialogue_index + 1);
     vector<string> x = splitString(s, ' ');
     //       /effect smoke zombie forwards_offset rightwards_offset (duration?)
@@ -10926,7 +10821,7 @@ I("s");
         for(int i = 0; i < g_effectIndexes.size(); i++) {
           if(g_effectIndexes[i]->name == effects_name) {
             hopeEffect = g_effectIndexes[i];
-            
+
           }
 
         }
@@ -10934,15 +10829,15 @@ I("s");
         if(hopeEffect == nullptr) {
           hopeEffect = new effectIndex( effects_name, renderer );
         }
-        
+
         hopeEffect->happen(hopeful->getOriginX(), hopeful->getOriginY(), hopeful->z, 0);
 
       }
-      
+
 
     }
 
-    
+
 
     dialogue_index++;
     this->continueDialogue();
@@ -10956,7 +10851,7 @@ I("s");
   //putting zero for the duration will make it everlasting
   if (scriptToUse->at(dialogue_index + 1).substr(0, 8) == "/emitter")
   {
-    
+
     string s = scriptToUse->at(dialogue_index + 1);
     vector<string> x = splitString(s, ' ');
     //       /emitter smoke zombie xoffset yoffset zoffset duration
@@ -10981,7 +10876,7 @@ I("s");
           if(g_effectIndexes[i]->name == effects_name) {
             hopeEffect = g_effectIndexes[i];
             M("Found effect");
-            
+
           }
 
         }
@@ -10989,7 +10884,7 @@ I("s");
         if(hopeEffect == nullptr) {
           hopeEffect = new effectIndex( effects_name, renderer );
         }
-        
+
         //hopeEffect->happen(hopeful->getOriginX(), hopeful->getOriginY(), hopeful->z );
         emitter* e = new emitter();
         e->type = hopeEffect;
@@ -11008,7 +10903,7 @@ I("s");
       E("/emitter error - not enough args");
     }
 
-    
+
 
     dialogue_index++;
     this->continueDialogue();
@@ -11086,10 +10981,10 @@ I("s");
       }
       teleportMe->steeringAngle = teleportToMe->steeringAngle;
       teleportMe->targetSteeringAngle = teleportToMe->steeringAngle;
-      
+
       selected = teleportMe;
     }
-    
+
 
     dialogue_index++;
     this->continueDialogue();
@@ -11138,10 +11033,10 @@ I("s");
       }
       teleportMe->steeringAngle = teleportToMe->steeringAngle;
       teleportMe->targetSteeringAngle = teleportToMe->steeringAngle;
-      
+
       selected = teleportMe;
     }
-    
+
 
     dialogue_index++;
     this->continueDialogue();
@@ -11351,29 +11246,6 @@ I("s");
     }
   }
 
-  // spawn item in world
-  if (scriptToUse->at(dialogue_index + 1).substr(0, 5) == "/item")
-  {
-    string s = scriptToUse->at(dialogue_index + 1);
-    s.erase(0, 6);
-    vector<string> x = splitString(s, ' ');
-    string name = x[0];
-    int p0 = stoi(x[1]);
-    int p1 = stoi(x[2]);
-    D(x[0]);
-    D(x[1]);
-    D(x[2]);
-    worldItem *a = new worldItem(name, 0);
-    a->x = p0;
-    a->y = p1;
-    M(a->x);
-    M(a->y);
-
-    dialogue_index++;
-    this->continueDialogue();
-    return;
-  }
-
   // refresh a trigger by ID
   if (scriptToUse->at(dialogue_index + 1).substr(0, 8) == "/refresh")
   {
@@ -11479,9 +11351,9 @@ I("s");
     auto x = splitString(g_mapOfLastSave, '/');
     g_mapdir = x[0];
     g_map = x[1];
-    
+
     //load_map(renderer, "resources/maps/" + g_mapOfLastSave + ".map", g_waypointOfLastSave);
-    
+
     string filename = g_levelSequence->levelNodes[0]->mapfilename;
     load_map(renderer, filename,"a");
 
@@ -11496,7 +11368,6 @@ I("s");
       protag_is_talking = 2;
     }
     executingScript = 0;
-    g_inTitleScreen = 0;
     adventureUIManager->showHUD();
 
     return;
@@ -11643,22 +11514,22 @@ I("s");
 
   //Launch options menu
   /*
-    
-    Up              Up        1
-    Down            Down      2
-    Left            Left      3
-    Right           Right     4
-    Jump            X         5
-    Interact        Z         6
-    Inventory       C         7
-    Spin/Use Item   A         8
-    Fullscreen      Off       9
-    Music Volume    0.4      10
-    Sound Volume    0.4      11
-    Graphics        3        12
-    Brightness      100      13
 
-  */
+     Up              Up        1
+     Down            Down      2
+     Left            Left      3
+     Right           Right     4
+     Jump            X         5
+     Interact        Z         6
+     Inventory       C         7
+     Spin/Use Item   A         8
+     Fullscreen      Off       9
+     Music Volume    0.4      10
+     Sound Volume    0.4      11
+     Graphics        3        12
+     Brightness      100      13
+
+*/
   if (scriptToUse->at(dialogue_index + 1).substr(0, 9) == "/settings") 
   {
     //write to settingsUi from related variables
@@ -11764,7 +11635,7 @@ I("s");
 
     entity *modifyMe = 0;
     auto x = splitString(s, ' ');
-    
+
     D("check params");
     for(auto i : x) {
       D(i);
@@ -11788,7 +11659,7 @@ I("s");
     } else {
       E("Not enough parameters for /movement call");
     }
-    
+
 
 
 
@@ -11835,7 +11706,7 @@ I("s");
       ent->loopAnimation = stoi(split[4]);
       //I("Set loopAnimation to ");
       //I(ent->loopAnimation);
-      
+
       ent->reverseAnimation = stoi(split[5]);
       //I("Set reverseAnimation to ");
       //I(ent->reverseAnimation);
@@ -11911,7 +11782,7 @@ I("s");
     vector<string> split = splitString(s, ' ');
     string loadstring = "resources/static/sounds/" + split[1] + ".wav";
     D(loadstring);
-    
+
     float volume = stof(split[2]);
 
     Mix_Chunk *a = nullptr;
@@ -11960,7 +11831,7 @@ I("s");
 
     return;
   }
-  
+
   // make selected entity tangible
   //  /tangible 0
   //  /tangible 1
@@ -12050,14 +11921,14 @@ I("s");
       this->continueDialogue();
       return;
     }
-    
+
     //for safety
-//    if(s.find("..") != std::string::npos) {
-//      E("Tried to write a save outside of user/saves directory");
-//      dialogue_index++;
-//      this->continueDialogue();
-//      return;
-//    }
+    //    if(s.find("..") != std::string::npos) {
+    //      E("Tried to write a save outside of user/saves directory");
+    //      dialogue_index++;
+    //      this->continueDialogue();
+    //      return;
+    //    }
 
     I("trying to clear save " + s);
     try {
@@ -12093,7 +11964,7 @@ I("s");
       string lowerName = g_levelSequence->levelNodes[i]->name;
 
       std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), [](unsigned char c) { if(c == ' ') {int e = '-'; return e;} else {return std::tolower(c);}  } );
-      
+
       if(lowerName == x[1]) {
         g_levelSequence->levelNodes[i]->locked = 0;
       }
@@ -12101,7 +11972,7 @@ I("s");
       //!!! add some popup message
 
     }
-    
+
     dialogue_index++;
     this->continueDialogue();
     return;
@@ -12117,7 +11988,7 @@ I("s");
     inventorySelection = 0;
     inPauseMenu = 1;
     g_firstFrameOfPauseMenu = 1;
-    
+
     adventureUIManager->escText->updateText("", -1, 0.9);
     adventureUIManager->positionInventory();
     adventureUIManager->showInventoryUI();
@@ -12163,9 +12034,9 @@ I("s");
     M("/unlockusable");
     string s = scriptToUse->at(dialogue_index + 1);
     vector<string> x = splitString(s, ' ');
-    
+
     if(x.size() <= 1) { E("Not enough args for /unlockusable call");}
-    
+
     string nameOfUsable = x[1];
 
     //make sure we haven't already unlocked it
@@ -12210,8 +12081,8 @@ void adventureUI::hideHUD() {
 
 void adventureUI::showHUD() {
   showHud = 1;
-//  healthPicture->show = 1;
-//  healthText->show = 1;
+  //  healthPicture->show = 1;
+  //  healthText->show = 1;
   //systemClock->show = 1;
 }
 
@@ -12290,4 +12161,16 @@ void gradient::render(SDL_Renderer* renderer, camera fcamera) {
     SDL_FRect dstrect = { (float)obj.x, (float)obj.y, (float)obj.width, (float)obj.height};
     SDL_RenderCopyF(renderer, texture, NULL, &dstrect);
   }
+}
+
+keyItemInfo::keyItemInfo(int findex) {
+  index = findex;
+  texture = loadTexture(renderer, "resources/static/key-items/"+to_string(findex) + ".qoi");
+  name = getLanguageData("KeyItem"+to_string(findex) + "Name");
+  g_keyItems.push_back(this);
+}
+
+keyItemInfo::~keyItemInfo() {
+  SDL_DestroyTexture(texture);
+  g_keyItems.erase(remove(g_keyItems.begin(), g_keyItems.end(), this), g_keyItems.end());
 }

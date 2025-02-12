@@ -904,7 +904,6 @@ class adventureUI {
     bool useOwnScriptInsteadOfTalkersScript = 0;
     vector<string> ownScript;
 
-
     ui* talkingBox = 0;
     ui* talkingBoxTexture = 0;
 
@@ -998,18 +997,11 @@ class adventureUI {
       {"innocent","engine/fonts/ConcertOne-Regular.ttf"}
     };
    
-    //scripts need a way to remember
-    //an entity so that we can spawn someone
-    //and then animate them
-    //without worrying if we are dealing with
-    //the same entity
     entity* lastReferencedEntity = 0;
 
     textbox* talkingText = 0;
     textbox* responseText = 0;
     textbox* escText = 0;
-    textbox* levelTimeText = 0;
-    textbox* levelHitsText = 0;
     textbox* inputText = 0;
 
     string keyboardPrompt = "";
@@ -1030,6 +1022,9 @@ class adventureUI {
     int sleepingMS = 0; //MS to sleep cutscene/script
     bool sleepflag = 0; //true for one frame after starting a sleep
     bool mobilize = 0; //used to allow the player to move during /sleep calls
+
+    int keyPrompting = 0;
+    vector<pair<int, int>> keyPromptMap; //map of where to jump after a keyprompt, if at all
 
     ui* emotion = 0;
 
@@ -1094,7 +1089,40 @@ class adventureUI {
 
     int countEntities = 0; //used now for /lookatall to count how many entities we've looked at
         
+ 
+    //for the adventure menu (am)
+    ui* amPanel = 0;
+    vector<textbox*> amTextboxes;
+    ui* amPicker;
+    int amIndex = 0;
+
+    vector<pair<float, float>> amTexPos = {
+      {0.29,0.04},
+      {0.29,0.12},
+      {0.49,0.04},
+      {0.49,0.12},
+      {0.64,0.04},
+      {0.64,0.12},
+    };
+
+    //for key-items-panel
+    ui* kiPanel = 0;
+    ui* kiPicker = 0;
+    ui* kiPrecede = 0;
+    ui* kiAdvance = 0;
+    pair<float,float> kiStartCoord;
+    vector<textbox*> kiTextboxes;
+    vector<ui*> kiIcons;
+    int kiIndex = 0;
+    int kiOffset = 0;
+
+    void showAm();
+    void hideAm();
+    void showKi();
+    void hideKi();
+
     void showTalkingUI();
+
     void hideTalkingUI();
 
     void showInventoryUI();
@@ -1214,8 +1242,21 @@ struct state {
   vector<float> nextStateProbabilities; //based on probabilities
 };
 
+class keyItemInfo {
+public:
+  int index;
+  SDL_Texture* texture;
+  string name;
+
+  keyItemInfo(int findex);
+
+  ~keyItemInfo();
+
+};
+
 class entity:public actor {
   public:
+    string displayName = "";
     int ignoreSolids = 0;
     float widthmodifier;
     float heightmodifier;
@@ -1379,6 +1420,7 @@ class entity:public actor {
     bool dynamic = true; //true for things such as wallcaps. movement/box is not calculated if this is false
     bool CalcDynamicForOneFrame = false; //set this to true to do dynamic calcs only for one frame
     vector<string> sayings;
+    vector<wstring> wsayings;
     bool inParty = false;
     bool talks = false;
     bool wallcap = false; //used for wallcaps
@@ -1456,7 +1498,7 @@ class entity:public actor {
     bool asset_sharer = 0;
 
     //self-data
-    int data[255] = {0};
+    int data[25] = {0};
 
     //combat
     weapon* hisweapon = 0;
@@ -1575,9 +1617,7 @@ class entity:public actor {
     int activeState = 0;
     vector<state> states;
 
-
     int attackDamageMultiplier = 1;
-
 
     float seeAgroMs = 0;
 
@@ -1623,7 +1663,6 @@ class entity:public actor {
     // !!! was 800 try to turn this down some hehe
     float dijkstraSpeed = 100; //how many updates to wait between calling dijkstra's algorithm
     float timeSinceLastDijkstra = -1;
-    bool justLostLosToTarget = 0;
     bool pathfinding = 0;
     float maxDistanceFromHome = 1400;
     float range = 3;
@@ -1859,7 +1898,7 @@ class textbox {
 
     void render(SDL_Renderer* renderer, int winwidth, int winheight); 
 
-    void updateText(string content, float size, float fwidth, SDL_Color fcolor = g_textcolor, string fontstr = g_font);
+    void updateText(string content, float size = -1, float fwidth = 1, SDL_Color fcolor = g_textcolor, string fontstr = g_font);
 
 };
 
@@ -2131,8 +2170,6 @@ class settingsUI {
     vector<textbox*> optionTextboxes;
 
     vector<textbox*> valueTextboxes;
-
-    int optionIndex = 0;
 
     float yStart = 0.05;
     float yEnd = 0.9;

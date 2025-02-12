@@ -2,6 +2,7 @@
 #include "globals.h"
 #include <string>
 #include <sstream>
+#include <vector>
 
 map<string, string> languagePack;
 
@@ -308,12 +309,78 @@ void initLanguageIndices() {
     if(y[1].back() == '\r') {
       y[1].pop_back();
     }
-
+  
     string key = x[0];
     int pos = stoi(y[0]);
     int length = stoi(y[1]);
     languagePackIndices[key] = std::make_pair(pos, length);
   }
+}
+
+std::wstring bytes_to_wstring(const std::vector<unsigned char>& bytes) {
+    std::string str(bytes.begin(), bytes.end());
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+    return converter.from_bytes(str);
+}
+
+//first stage: fetch dialog from the major.json file using it's handle
+//this will get to be more wonderful later
+wstring getLanguageDataSpecial(string handle) {
+  string fileaddress = "resources/languagepack/" + g_language + "/major.txt";
+
+  int position = 0;
+  int length = 0;
+  try {
+    position = languagePackIndices[handle].first;
+    length = languagePackIndices[handle].second;
+  } catch (...) {
+    E("Languge-pack key error for " + handle + ".");
+    abort();
+  }
+
+  if(PHYSFS_exists(fileaddress.c_str())) {
+    PHYSFS_getLastErrorCode();
+    PHYSFS_file* myfile = PHYSFS_openRead(fileaddress.c_str());
+    PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
+
+    if(error != 0) {
+      D(fileaddress);
+      D(error);
+      const char* errorStr = PHYSFS_getErrorByCode(error);
+      D(errorStr);
+      breakpoint();
+      abort();
+    }
+
+    PHYSFS_seek(myfile, position);
+    vector<unsigned char> buf(length);
+    PHYSFS_readBytes(myfile, buf.data(), length);
+    PHYSFS_close(myfile);
+
+    wstring myWStr = bytes_to_wstring(buf);
+    if(myWStr.back() == '\r') {
+      myWStr.pop_back();
+    }
+    myWStr.pop_back();
+
+    int pos = myWStr.find(':');
+
+    if(pos == string::npos) {
+      E("Missing ':' in language-pack-file, check near " + handle + ".");
+    }
+
+    //string ret = myString.substr(pos+2, myString.size()-(pos+2));
+    wstring ret = myWStr.substr(pos+2, myWStr.size()-(pos+2));
+    D(ret.size());
+    return ret;
+
+
+  } else {
+    E("No language-pack-file found for " + g_language + ".");
+    abort();
+  }
+
+  return L"";
 }
 
 
@@ -333,6 +400,7 @@ string getLanguageData(string handle) {
   }
 
   if(PHYSFS_exists(fileaddress.c_str())) {
+    PHYSFS_getLastErrorCode();
     PHYSFS_file* myfile = PHYSFS_openRead(fileaddress.c_str());
     PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
 
@@ -375,4 +443,27 @@ string getLanguageData(string handle) {
   }
 
   return "";
+}
+
+std::string stringMultiInject(const std::string &templateStr, const std::vector<std::string> &values) {
+  std::string result = templateStr;
+
+  size_t pos = 0;
+  int valueIndex = 0;
+  while ((pos = result.find('<', pos)) != std::string::npos) {
+    size_t endPos = result.find('>', pos);
+    if (endPos != std::string::npos) {
+      string valstr = result.substr(pos+1, endPos-pos-1);
+      valueIndex = stoi(valstr);
+      if (valueIndex >= values.size()) {
+        break;
+      }
+      result.replace(pos, endPos - pos + 1, values[valueIndex]);
+      pos = endPos + values[valueIndex].length();
+    } else {
+      break;
+    }
+  }
+
+  return result;
 }

@@ -8,6 +8,7 @@
 #include <chrono>
 #include <thread>
 #include <algorithm>
+#include <locale>
 
 #include "physfs.h"
 
@@ -208,6 +209,185 @@ void ExplorationLoop() {
 
   }
 
+  {
+    // Adventure Menu
+    if(input[12] && !oldinput[12]) {
+      if(!inPauseMenu && !g_inSettingsMenu) {
+        D(int(g_amState));
+        if(g_amState == amState::CLOSED) {
+          g_amState = amState::MAJOR;
+          adventureUIManager->keyPrompting = 0;
+          adventureUIManager->showAm();
+          adventureUIManager->amIndex = 0;
+        } else if(g_amState == amState::MAJOR) {
+          g_amState = amState::CLOSED;
+          adventureUIManager->hideAm();
+        }
+      }
+    }
+    
+    adventureUIManager->hideKi();
+    switch(g_amState) {
+      case amState::MAJOR:
+      {
+        if(input[8] && !oldinput[8]) {
+          g_amState = amState::CLOSED;
+          adventureUIManager->hideAm();
+          oldinput[8] = 1;
+        }
+        if(input[0] && !oldinput[0]) {
+          if(adventureUIManager->amIndex == 1
+             || adventureUIManager->amIndex == 3
+             || adventureUIManager->amIndex == 5) {
+            adventureUIManager->amIndex -= 1;
+          }
+        }
+        if(input[1] && !oldinput[1]) {
+          if(adventureUIManager->amIndex == 0
+             || adventureUIManager->amIndex == 2
+             || adventureUIManager->amIndex == 4) {
+            adventureUIManager->amIndex += 1;
+          }
+        }
+        if(input[2] && !oldinput[2]) {
+          if(adventureUIManager->amIndex - 2 >= 0) {
+            adventureUIManager->amIndex -= 2;
+          }
+        }
+        if(input[3] && !oldinput[3]) {
+          if(adventureUIManager->amIndex + 2 <= 5) {
+            adventureUIManager->amIndex += 2;
+          }
+        }
+        adventureUIManager->amPicker->x = adventureUIManager->amTexPos[adventureUIManager->amIndex].first - 0.028;
+        adventureUIManager->amPicker->y = adventureUIManager->amTexPos[adventureUIManager->amIndex].second + 0.007;
+        if(input[11]) {
+          switch(adventureUIManager->amIndex) {
+            case 0:
+              {
+                g_amState = amState::KEYITEM;
+                adventureUIManager->kiIndex = 0;
+                adventureUIManager->kiOffset = 0;
+                break;
+              }
+          }
+        }
+        break;
+      }
+      case amState::KEYITEM:
+      {
+
+        adventureUIManager->showKi();
+
+
+        if(input[8] && !oldinput[8]) {
+          if(adventureUIManager->keyPrompting) {
+            adventureUIManager->response_index = -1; //give nothing
+            adventureUIManager->keyPrompting = 2;
+            g_amState = amState::CLOSED;
+            g_amState = amState::CLOSED;
+            adventureUIManager->hideKi();
+            adventureUIManager->continueDialogue();
+            break;
+            break;
+          } else {
+            g_amState = amState::MAJOR;
+          }
+        }
+
+        if(input[11] && !oldinput[11]) {
+          //D(adventureUIManager->keyPrompting);
+          if(adventureUIManager->keyPrompting) {
+            //D(g_keyItems.size());
+            if(adventureUIManager->kiIndex >= 0 && adventureUIManager->kiIndex < (int)g_keyItems.size()) {
+              adventureUIManager->response_index = g_keyItems[adventureUIManager->kiIndex]->index;
+              //D(adventureUIManager->response_index);
+              M("Key prompt selection made");
+              adventureUIManager->keyPrompting = 2;
+              g_amState = amState::CLOSED;
+              adventureUIManager->hideKi();
+              adventureUIManager->continueDialogue();
+              break;
+
+            }
+          }
+        }
+
+        if(input[0]) {
+          if(SoldUIUp <= 0) {
+            if(adventureUIManager->kiIndex -1 >= 0) {
+              adventureUIManager->kiIndex--;
+            }
+            SoldUIUp = (oldUIUp) ? g_inputDelayRepeatFrames : g_inputDelayFrames;
+          } else {
+            oldUIUp = 1;
+          }
+        } else {
+          oldUIUp = 0;
+          SoldUIUp = 0;
+        }
+
+        if(input[1]) {
+          if(SoldUIDown <= 0) {
+            if(adventureUIManager->kiIndex + 1< g_keyItems.size()) {
+              adventureUIManager->kiIndex++;
+            }
+            SoldUIDown = (oldUIDown) ? g_inputDelayRepeatFrames : g_inputDelayFrames;
+          } else {
+            oldUIDown = 1;
+          }
+        } else {
+          oldUIDown = 0;
+          SoldUIDown = 0;
+        }
+
+        if(adventureUIManager->kiIndex > adventureUIManager->kiOffset + 5) {
+          adventureUIManager->kiOffset++;
+        }
+        if(adventureUIManager->kiIndex < adventureUIManager->kiOffset) {
+          adventureUIManager->kiOffset--;
+        }
+
+        if(adventureUIManager->kiOffset > 0) {
+          adventureUIManager->kiPrecede->show = 1;
+        } else {
+          adventureUIManager->kiPrecede->show = 0;
+        }
+
+        int a = g_keyItems.size();
+        int b = 6 + adventureUIManager->kiOffset;
+        if(a > b) {
+          adventureUIManager->kiAdvance->show = 1;
+        } else {
+          adventureUIManager->kiAdvance->show = 0;
+        }
+
+        for(int i = 0; i < 6; i++) {
+          if(i < adventureUIManager->kiTextboxes.size()) {
+            int j = i + adventureUIManager->kiOffset;
+            if(j < g_keyItems.size()) {
+              if(j == adventureUIManager->kiIndex) {
+                adventureUIManager->kiPicker->y = adventureUIManager->kiTextboxes[i]->boxY + 0.0075;
+              }
+              adventureUIManager->kiTextboxes[i]->updateText(g_keyItems[j]->name);
+              adventureUIManager->kiIcons[i]->texture = g_keyItems[j]->texture;
+              adventureUIManager->kiIcons[i]->show = 1;
+            } else {
+              adventureUIManager->kiTextboxes[i]->updateText("");
+              adventureUIManager->kiIcons[i]->show = 0;
+
+            }
+          }
+        }
+
+        if(g_keyItems.size() == 0) {
+          adventureUIManager->kiPicker->show = 0;
+        }
+        
+        break;
+      }
+    }
+  }
 
   // spring
   if ((input[8] && !oldinput[8] && protag->grounded && protag_can_move) || (input[8] && storedJump && protag->grounded && protag_can_move))
@@ -319,51 +499,6 @@ void ExplorationLoop() {
         protag->curwidth = 0;
         g_cameraShove = protag->hisweapon->attacks[0]->range / 2;
         // prevent infinite loop
-        i++;
-        if (i > 600)
-        {
-          M("Avoided infinite loop: no living partymembers yet no essential death. (Did the player's party contain at least one essential character?)");
-          break;
-          quit = 1;
-        }
-      } while (protag->hp <= 0);
-    }
-  }
-  // party swap
-  if (input[10] && !oldinput[10])
-  {
-    if (party.size() > 1 && protag->cooldown <= 0)
-    {
-      int i = 0;
-      do
-      {
-        M("Cycle party left");
-        std::rotate(party.begin(), party.begin() + party.size() - 1, party.end());
-        protag->tangible = 0;
-        protag->flashingMS = 0;
-        party[0]->tangible = 1;
-        party[0]->x = protag->getOriginX() - party[0]->bounds.x - party[0]->bounds.width / 2;
-        party[0]->y = protag->getOriginY() - party[0]->bounds.y - party[0]->bounds.height / 2;
-        party[0]->z = protag->z;
-        party[0]->xvel = protag->xvel;
-        party[0]->yvel = protag->yvel;
-        party[0]->zvel = protag->zvel;
-
-        party[0]->animation = protag->animation;
-        party[0]->flip = protag->flip;
-        protag->zvel = 0;
-        protag->xvel = 0;
-        protag->yvel = 0;
-        protag->zaccel = 0;
-        protag->xaccel = 0;
-        protag->yaccel = 0;
-        protag = party[0];
-        protag->shadow->x = protag->x + protag->shadow->xoffset;
-        protag->shadow->y = protag->y + protag->shadow->yoffset;
-        g_focus = protag;
-        protag->curheight = 0;
-        protag->curwidth = 0;
-        g_cameraShove = protag->hisweapon->attacks[0]->range / 2;
         i++;
         if (i > 600)
         {
@@ -1558,6 +1693,7 @@ void ExplorationLoop() {
     g_lt_collisions.clear();
     //for fog of war, keep a list of map Collisions to use 
     //which are close to the player and on layer 0
+    g_is_collisions.clear();
     for(auto x : g_impliedSlopes) {
       SDL_FRect obj;
       obj.x = (x->bounds.x -g_camera.x)* g_camera.zoom;
@@ -1590,7 +1726,7 @@ void ExplorationLoop() {
   B("close collision check");
 
   // ui
-  if (!inPauseMenu && g_showHUD && !g_inTitleScreen)
+  if (!inPauseMenu && g_showHUD)
   {
     // !!! segfaults on mapload sometimes
 
@@ -1949,54 +2085,10 @@ void ExplorationLoop() {
 
           if(g_levelSequence->levelNodes[i]->locked) {
             adventureUIManager->escText->updateText("Locked", -1, 0.9);
-            adventureUIManager->levelTimeText->show = 0;
-            adventureUIManager->levelHitsText->show = 0;
           } else {
             string dispText = g_levelSequence->levelNodes[i]->name;
             std::replace(dispText.begin(), dispText.end(),'_',' ');
             adventureUIManager->escText->updateText(g_levelSequence->levelNodes[i]->name, -1, 0.9);
-            if(g_levelSequence->levelNodes[i]->dungeonFloors > 0) {
-              string field = g_levelSequence->levelNodes[i]->name + "-time";
-              int ms = checkSaveField(field);
-
-              int sec = (ms / 1000) % 60;
-              int min = ms / 60000;
-              string secstr = to_string(sec);
-              if(secstr.size() < 2) {secstr = "0" + secstr;}
-              string minstr = to_string(min);
-              if(minstr.size() < 2) {minstr = "0" + minstr;}
-
-              string levelTimeStr = minstr + ":" + secstr;
-
-              field = g_levelSequence->levelNodes[i]->name + "-hits";
-              int levelHits = checkSaveField(field);
-              string levelHitsStr = to_string(levelHits);
-
-              if(ms == -1) {levelTimeStr = "--";}
-              if(levelHits == -1) { levelHitsStr = "--"; }
-
-              SDL_Color timeColor = g_textcolor;
-              SDL_Color hitsColor = g_textcolor;
-
-              if(ms < g_levelSequence->levelNodes[i]->dungeonGoldMs && ms != -1) {
-                timeColor = g_goldcolor;
-              }
-
-              if(levelHits == 0) {
-                hitsColor = g_goldcolor;
-              }
-
-              adventureUIManager->levelTimeText->updateText(levelTimeStr, -1, 0, timeColor);
-              adventureUIManager->levelHitsText->updateText(levelHitsStr, -1, 0, hitsColor);
-              adventureUIManager->levelTimeText->show = 1;
-              adventureUIManager->levelHitsText->show = 1;
-            } else {
-              adventureUIManager->levelTimeText->show = 0;
-              adventureUIManager->levelHitsText->show = 0;
-
-            }
-
-
           }
 
           // this item should have the marker
@@ -2298,10 +2390,9 @@ g_lastGrassY = grassY;
 }*/
 B("Tall grass update");
 
-
 // ENTITY MOVEMENT (ENTITY UPDATE)
 // dont update movement while transitioning
-if (1/*!transition*/)
+if (1)
 {
   for (long long unsigned int i = 0; i < g_entities.size(); i++)
   {
@@ -2311,7 +2402,10 @@ if (1/*!transition*/)
       int index = g_entities[i]->bounceindex;
       g_entities[i]->floatheight = g_itemsines[index];
     }
-    door *taken = g_entities[i]->update(g_doors, elapsed);
+    door* taken = nullptr;
+    if( (protag_is_talking == 0 && g_amState == amState::CLOSED && inPauseMenu == 0) || adventureUIManager->talker == g_entities[i]) {
+      taken = g_entities[i]->update(g_doors, elapsed);
+    }
 
 
     // added the !transition because if a player went into a map with a door located in the same place
@@ -2915,6 +3009,10 @@ B("End of frame");
 
 int WinMain()
 {
+  locale::global(locale(""));
+  cout.imbue(locale());
+
+
   canSwitchOffDevMode = devMode;
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
   IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG);
@@ -2964,6 +3062,13 @@ int WinMain()
   //language pack
   initLanguageIndices();
 
+  g_graphicsStrings.push_back(getLanguageData("Graphics0"));
+  g_graphicsStrings.push_back(getLanguageData("Graphics1"));
+  g_graphicsStrings.push_back(getLanguageData("Graphics2"));
+  g_graphicsStrings.push_back(getLanguageData("Graphics3"));
+
+  g_affirmStr = getLanguageData("Affirmative");
+  g_negStr = getLanguageData("Negative");
 
   // for brightness
   // reuse texture for transition, cuz why not
@@ -2998,7 +3103,10 @@ int WinMain()
 
   // font
   g_font = "resources/engine/fonts/Rubik-Bold.ttf";
-  g_ttf_font = loadFont(g_font, 60);
+  g_ttf_fontLarge = loadFont(g_font, 60);
+  g_ttf_fontMedium = loadFont(g_font, 55);
+  g_ttf_fontSmall = loadFont(g_font, 40);
+  g_ttf_fontTiny = loadFont(g_font, 20);
 
   // setup UI
   adventureUIManager = new adventureUI(renderer);
@@ -3021,7 +3129,7 @@ int WinMain()
   {
     //init_map_writing(renderer);
     // done once, because textboxes aren't cleared during clear_map()
-    nodeInfoText = new textbox(renderer, "floof", 1000* g_fontsize, 50, 50, WIN_WIDTH);
+    nodeInfoText = new textbox(renderer, "", 1000* g_fontsize, 50, 50, WIN_WIDTH);
     nodeInfoText->dropshadow = 1;
     nodeInfoText->align = 0;
     g_config = "dev";
@@ -3214,7 +3322,7 @@ int WinMain()
   //TTF_Font* alphabetfont = 0;
   //alphabetfont = TTF_OpenFont(g_font.c_str(), 60 * g_fontsize);
   //TTF_Font* alphabetfont = loadFont(g_font, 60*g_fontsize, );
-  TTF_Font* alphabetfont = g_ttf_font;
+  TTF_Font* alphabetfont = g_ttf_fontLarge;
   SDL_Surface* textsurface = 0;
   SDL_Texture* texttexture = 0;
   g_alphabet_textures = &g_alphabetLower_textures;
@@ -3386,7 +3494,6 @@ int WinMain()
     //    ->inParty = 1;
     //    party.push_back(a);
     //    g_focus = protag;
-    //g_inTitleScreen = 1;
     //load_map(renderer, "resources/maps/base/start.map","a"); //lol
     //g_levelFlashing = 1;
     //clear_map(g_camera); 
@@ -3408,15 +3515,14 @@ int WinMain()
   inventoryText->show = 0;
   inventoryText->align = 1;
 
-
-  g_itemsines.push_back( sin(g_elapsed_accumulator / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator - 1400) / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator + 925) / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator + 500) / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator + 600) / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator + 630) / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator + 970) / 300) * 10 + 30);
-  g_itemsines.push_back( sin((g_elapsed_accumulator + 1020) / 300) * 10 + 30);
+  //  g_itemsines.push_back( sin(g_elapsed_accumulator / 300) * 10 + 30);
+  //  g_itemsines.push_back( sin((g_elapsed_accumulator - 1400) / 300) * 10 + 30);
+  //  g_itemsines.push_back( sin((g_elapsed_accumulator + 925) / 300) * 10 + 30);
+  //  g_itemsines.push_back( sin((g_elapsed_accumulator + 500) / 300) * 10 + 30);
+  //  g_itemsines.push_back( sin((g_elapsed_accumulator + 600) / 300) * 10 + 30);
+  //  g_itemsines.push_back( sin((g_elapsed_accumulator + 630) / 300) * 10 + 30);
+  //  g_itemsines.push_back( sin((g_elapsed_accumulator + 970) / 300) * 10 + 30);
+  //  g_itemsines.push_back( sin((g_elapsed_accumulator + 1020) / 300) * 10 + 30);
 
 
   // This stuff is for the FoW mechanic
@@ -3761,10 +3867,63 @@ int WinMain()
     }
 
     ticks = SDL_GetTicks();
-    g_globalAccumulator += ticks;
+    //g_globalAccumulator += ticks;
     elapsed = ticks - lastticks;
     lastticks = ticks;
     B("On Tick");
+
+    if(g_entityBenchmarking) {
+      g_eu_exec++;
+
+      if(g_eu_exec > 600) {
+        g_eu_a /= 600;
+        g_eu_b /= 600;
+        g_eu_c /= 600;
+        g_eu_d /= 600;
+        g_eu_e /= 600;
+        g_eu_f /= 600;
+        g_eu_g /= 600;
+        g_eu_h /= 600;
+        //calculate multipliers
+        if(g_eu_ab == -1) {
+          g_eu_ab = g_eu_a;
+          g_eu_bb = g_eu_b;
+          g_eu_cb = g_eu_c;
+          g_eu_db = g_eu_d;
+          g_eu_eb = g_eu_e;
+          g_eu_fb = g_eu_f;
+          g_eu_gb = g_eu_g;
+          g_eu_hb = g_eu_h;
+        }
+        float am = g_eu_a / g_eu_ab;
+        float bm = g_eu_b / g_eu_bb;
+        float cm = g_eu_c / g_eu_cb;
+        float dm = g_eu_d / g_eu_db;
+        float em = g_eu_e / g_eu_eb;
+        float fm = g_eu_f / g_eu_fb;
+        float gm = g_eu_g / g_eu_gb;
+        float hm = g_eu_h / g_eu_hb;
+
+        M("----------------");
+        M("A region: " + to_string(g_eu_a) + " (" + to_string(am) + "x)");
+        M("B region: " + to_string(g_eu_b) + " (" + to_string(bm) + "x)");
+        M("C region: " + to_string(g_eu_c) + " (" + to_string(cm) + "x)");
+        M("D region: " + to_string(g_eu_d) + " (" + to_string(dm) + "x)");
+        M("E region: " + to_string(g_eu_e) + " (" + to_string(em) + "x)");
+        M("F region: " + to_string(g_eu_f) + " (" + to_string(fm) + "x)");
+        M("G region: " + to_string(g_eu_g) + " (" + to_string(gm) + "x)");
+        M("H region: " + to_string(g_eu_h) + " (" + to_string(hm) + "x)");
+        g_eu_exec -= 600;
+        g_eu_a = 0;
+        g_eu_b = 0;
+        g_eu_c = 0;
+        g_eu_d = 0;
+        g_eu_e = 0;
+        g_eu_f = 0;
+        g_eu_g = 0;
+        g_eu_h = 0;
+      }
+    }
     //D(elapsed);
 
 
@@ -4134,8 +4293,6 @@ int interact(float elapsed, entity *protag)
           }
         }
 
-        protagMakesNoise();
-
         //adventureUIManager->blip = g_entities[i]->voice;
         adventureUIManager->blip = g_ui_voice;
         //adventureUIManager->sayings = &g_entities[i]->sayings;
@@ -4145,26 +4302,12 @@ int interact(float elapsed, entity *protag)
         adventureUIManager->useOwnScriptInsteadOfTalkersScript = 0;
         g_forceEndDialogue = 0;
         adventureUIManager->continueDialogue();
-        // removing this in early july to fix problem moving after a script changes map
-        // may cause unexpected problems
-        // protag_is_talking = 1;
         g_ignoreInput = 1;
         return 0;
       }
     }
   }
 
-  // we didnt have anything to interact with- lets do a dash
-  //  if(g_dash_cooldown < 0 && protag_can_move) {
-  //  	M("dash");
-  //  	//convert frame to angle
-  //  	float angle = convertFrameToAngle(protag->frame, protag->flip);
-  //  	protag->xvel += 500 * (1 - (protag->friction * 3)) * cos(angle);
-  //  	protag->yvel += 500 * (1 - (protag->friction * 3)) * sin(angle);
-  //  	protag->spinningMS = 700;
-  //  	playSound(-1, g_spin_sound, 0);
-  //  	g_dash_cooldown = g_max_dash_cooldown;
-  //  }
   return 0;
 }
 
@@ -4241,6 +4384,27 @@ void getExplorationInput(float &elapsed)
     devinput[10] = 1;
   } 
 
+  if(keystate[bindings[0]]) {
+    input[0] = 1;
+  } else { 
+    input[0] = 0;
+  }
+  if(keystate[bindings[1]]) {
+    input[1] = 1;
+  } else { 
+    input[1] = 0;
+  }
+  if(keystate[bindings[2]]) {
+    input[2] = 1;
+  } else { 
+    input[2] = 0;
+  }
+  if(keystate[bindings[3]]) {
+    input[3] = 1;
+  } else { 
+    input[3] = 0;
+  }
+
 
   if (keystate[bindings[9]])
   {
@@ -4250,6 +4414,15 @@ void getExplorationInput(float &elapsed)
   {
     input[9] = 0;
   }
+  if (keystate[bindings[11]])
+  {
+    input[11] = 1;
+  }
+  else
+  {
+    input[11] = 0;
+  }
+
 
   if (keystate[SDL_SCANCODE_W])
   {
@@ -4327,12 +4500,16 @@ void getExplorationInput(float &elapsed)
           protag->move_up();
         }
       }
-      oldUIUp = 1;
+      if(inPauseMenu) {
+        oldUIUp = 1;
+      }
     }
     else
     {
-      oldUIUp = 0;
-      SoldUIUp = 0;
+      if(inPauseMenu) {
+        oldUIUp = 0;
+        SoldUIUp = 0;
+      }
     }
     SoldUIUp--;
 
@@ -4356,12 +4533,16 @@ void getExplorationInput(float &elapsed)
           protag->move_down();
         }
       }
-      oldUIDown = 1;
+      if(inPauseMenu) {
+        oldUIDown = 1;
+      }
     }
     else
     {
-      oldUIDown = 0;
-      SoldUIDown = 0;
+      if(inPauseMenu) {
+        oldUIDown = 0;
+        SoldUIDown = 0;
+      }
     }
     SoldUIDown--;
 
@@ -4637,7 +4818,6 @@ void getExplorationInput(float &elapsed)
             outfile << "Transitionspeed " << g_transitionSpeed << endl;
             outfile << "Graphics0lowto3high " << g_graphicsquality << endl;
             outfile << "brightness0lowto100high " << g_brightness << endl;
-            outfile << "This config was autowritten" << endl;
             outfile.close();
 
 
@@ -4979,6 +5159,15 @@ void getExplorationInput(float &elapsed)
   else
   {
     input[9] = 0;
+  }
+
+  if (keystate[bindings[12]])
+  {
+    input[12] = 1;
+  }
+  else
+  {
+    input[12] = 0;
   }
 
   if(keystate[bindings[13]]) 
@@ -5381,7 +5570,7 @@ void getExplorationInput(float &elapsed)
 
   dialogue_cooldown -= elapsed;
 
-  if (keystate[bindings[11]] && !inPauseMenu && !transition && g_menuTalkReset == 0)
+  if (input[11] && !inPauseMenu && !transition && g_menuTalkReset == 0 && (g_amState == amState::CLOSED || adventureUIManager->keyPrompting))
   {
     if (protag_is_talking == 1)
     { // advance or speedup diaglogue

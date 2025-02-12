@@ -3,6 +3,7 @@
 #include "main.h"
 #include "utils.h"
 #include <unordered_map>
+#include <vector>
 
 void loadPalette(SDL_Renderer* renderer, const char* filePath, std::vector<Uint32>& palette) {
   // Load the image into a surface
@@ -27,35 +28,35 @@ string getPossessivePronoun(combatant* c) {
   string pronoun = "";
   switch(c->gender) {
     case 0:
-      pronoun = "his";
+      return pronounTable[0];
       break;
     case 1:
-      pronoun = "her";
+      return pronounTable[1];
       break;
     case 2:
-      pronoun = "its";
+      return pronounTable[2];
       break;
     case 3:
-      pronoun = "their";
+      return pronounTable[3];
       break;
   }
-  return pronoun;
+  return "";
 }
 
 string getReflexivePronoun(combatant* c) {
   string pronoun = "";
   switch(c->gender) {
     case 0:
-      pronoun = "himself";
+      return pronounTable[4];
       break;
     case 1:
-      pronoun = "herself";
+      return pronounTable[5];
       break;
     case 2:
-      pronoun = "itself";
+      return pronounTable[6];
       break;
     case 3:
-      pronoun = "themselves";
+      return pronounTable[7];
       break;
   }
   return pronoun;
@@ -65,16 +66,16 @@ string getSubjectivePronoun(combatant* c) {
   string pronoun = "";
   switch(c->gender) {
     case 0:
-      pronoun = "He";
+      return pronounTable[8];
       break;
     case 1:
-      pronoun = "She";
+      return pronounTable[9];
       break;
     case 2:
-      pronoun = "It";
+      return pronounTable[10];
       break;
     case 3:
-      pronoun = "They";
+      return pronounTable[11];
       break;
   }
   return pronoun;
@@ -317,7 +318,7 @@ combatant::combatant(string ffilename, int fxp) {
 
   file >> temp;
   file >> temp;
-  myType = stringToType(temp);
+  myType = (type)stoi(temp);
 
   file >> temp;
   file >> l0Attack;
@@ -453,52 +454,11 @@ spiritInfo::spiritInfo() {
   cost = 0;
 }
 
-type stringToType(const std::string& str) {
-  static std::unordered_map<std::string, type> typeMap = {
-    {"none", NONE},
-    {"animal", ANIMAL},
-    {"plant", PLANT},
-    {"bug", BUG},
-    {"robot", ROBOT},
-    {"alien", ALIEN},
-    {"undead", UNDEAD},
-    {"ghost", GHOST},
-    {"demon", DEMON}
-  };
-
-  auto it = typeMap.find(str);
-  if (it != typeMap.end()) {
-    return it->second;
-  } else {
-    return NONE; // Default value if string not found
-  }
-}
-
-string typeToString(type t) {
-  static std::unordered_map<type, std::string> typeMap = {
-    {NONE, "None"},
-    {ANIMAL, "Animal"},
-    {PLANT, "Plant"},
-    {BUG, "Bug"},
-    {ROBOT, "Robot"},
-    {ALIEN, "Alien"},
-    {UNDEAD, "Undead"},
-    {GHOST, "Ghost"},
-    {DEMON, "Demon"}
-  };
-
-  auto it = typeMap.find(t);
-  if (it != typeMap.end()) {
-    return it->second;
-  } else {
-    return "None"; // Default value if string not found
-  }
-  
-}
-
 std::unordered_map<int, itemInfo> itemsTable;
 
 std::unordered_map<int, spiritInfo> spiritTable;
+
+vector<string> pronounTable;
 
 void spawnBullets(int pattern, int& accumulator) {
   switch(pattern) {
@@ -1150,9 +1110,26 @@ void spawnBullets(int pattern, int& accumulator) {
 
 void initTables() {
   {
-    itemsTable[0] = itemInfo("Bandage", 1);
-    itemsTable[1] = itemInfo("Bomb", 2);
-    itemsTable[2] = itemInfo("Glasses", 2);
+    pronounTable.push_back(getLanguageData("PossessivePronoun0"));
+    pronounTable.push_back(getLanguageData("PossessivePronoun1"));
+    pronounTable.push_back(getLanguageData("PossessivePronoun2"));
+    pronounTable.push_back(getLanguageData("PossessivePronoun3"));
+
+    pronounTable.push_back(getLanguageData("ReflexivePronoun0"));
+    pronounTable.push_back(getLanguageData("ReflexivePronoun1"));
+    pronounTable.push_back(getLanguageData("ReflexivePronoun2"));
+    pronounTable.push_back(getLanguageData("ReflexivePronoun3"));
+
+    pronounTable.push_back(getLanguageData("SubjectivePronoun0"));
+    pronounTable.push_back(getLanguageData("SubjectivePronoun1"));
+    pronounTable.push_back(getLanguageData("SubjectivePronoun2"));
+    pronounTable.push_back(getLanguageData("SubjectivePronoun3"));
+  }
+
+  {
+    itemsTable[0] = itemInfo(getLanguageData("I0"), 1);
+    itemsTable[1] = itemInfo(getLanguageData("I1"), 2);
+    itemsTable[2] = itemInfo(getLanguageData("I2"), 2);
   }
 
   {
@@ -1160,15 +1137,15 @@ void initTables() {
     // 1 -> ally targeted
     // 2 -> untargeted
     //name, targeting, cost
-    spiritTable[0] = spiritInfo("Debug", 0, 1);
-    spiritTable[1] = spiritInfo("Harden", 2, 5);
-    spiritTable[2] = spiritInfo("Tackle", 0, 2);
-    spiritTable[3] = spiritInfo("Coffee", 1, 5);
-    spiritTable[4] = spiritInfo("Chant", 2, 2);
-    spiritTable[5] = spiritInfo("Inspect", 0, 5);
-    spiritTable[6] = spiritInfo("Taunt", 0, 2);
-    spiritTable[7] = spiritInfo("Slime", 0, 2);
-    spiritTable[8] = spiritInfo("Synchronize", 2, 2);
+    spiritTable[0] = spiritInfo(getLanguageData("S0"), 0, 1); //Debug
+    spiritTable[1] = spiritInfo(getLanguageData("S1"), 2, 5); //Harden
+    spiritTable[2] = spiritInfo(getLanguageData("S2"), 0, 2); //Tackle
+    spiritTable[3] = spiritInfo(getLanguageData("S3"), 1, 5); //Coffee 
+    spiritTable[4] = spiritInfo(getLanguageData("S4"), 2, 2); //Chant
+    spiritTable[5] = spiritInfo(getLanguageData("S5"), 0, 5); //Inspect
+    spiritTable[6] = spiritInfo(getLanguageData("S6"), 0, 2); //Taunt
+    spiritTable[7] = spiritInfo(getLanguageData("S7"), 0, 2); //Slime
+    spiritTable[8] = spiritInfo(getLanguageData("S8"), 2, 2); //Synchronize
 
 
   }
@@ -1221,7 +1198,7 @@ void useItem(int item, int target, combatant* user) {
           combatUIManager->dialogProceedIndicator->y = 0.25;
           combatant* e = g_enemyCombatants[i];
           if(e->health < 0) {
-            string deathmessage = e->name +  e->deathText;
+            string deathmessage = e->name + " " + e->deathText;
             combatUIManager->queuedStrings.push_back(make_pair(deathmessage,1));
             g_enemyCombatants.erase(g_enemyCombatants.begin() + i);
             g_deadCombatants.push_back(e);
@@ -1267,7 +1244,8 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
 
         if(mag < 0) {mag = 0;}
         g_enemyCombatants[target]->health -= mag;
-        string message = user->name + " hurt " + g_enemyCombatants[target]->name + " for " + to_string(mag) + ".";
+        string message = getLanguageData("DebugMoveText");
+        message = stringMultiInject(message, {user->name, g_enemyCombatants[target]->name});
         combatUIManager->finalText = message;
         combatUIManager->currentText = "";
         combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
@@ -1304,7 +1282,8 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
           user->statuses.push_back(e);
         }
 
-        string message = user->name + " hardens " + getPossessivePronoun(user) + " skin.";
+        string message = getLanguageData("HardenMoveText");
+        message = stringMultiInject(message, {user->name, getPossessivePronoun(user)});
         combatUIManager->finalText = message;
         combatUIManager->currentText = "";
         combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
@@ -1329,7 +1308,8 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
         if(selfdmg > user->health) {selfdmg = user->health;}
         user->health -= selfdmg;
 
-        string message = user->name + " tackles " + g_enemyCombatants[target]->name + " for " + to_string(dmg) + ". " + user->name + "  takes " + to_string(selfdmg) + ".";
+        string message = getLanguageData("TackleMoveText");
+        message = stringMultiInject(message, {user->name, g_enemyCombatants[target]->name, to_string(dmg), to_string(selfdmg)});
 
         combatUIManager->finalText = message;
         combatUIManager->currentText = "";
@@ -1367,9 +1347,9 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
           if(healedOne->health > healedOne->curStrength) {
             healedOne->health = healedOne->curStrength;
           }
-          message = healedOne->name + " drinks coffee, gaining " + to_string(heal) + " health.";
+          message = stringMultiInject(getLanguageData("CoffeeMoveSuccessText"), {healedOne->name, to_string(heal)});
         } else {
-          message = healedOne->name + " couldn't drink the coffee.";
+          message = stringMultiInject(getLanguageData("CoffeeMoveFailText"), {healedOne->name});
         }
 
 
@@ -1398,7 +1378,7 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
           user->statuses.push_back(e);
         }
 
-        string message = user->name + " chants.";
+        string message = stringMultiInject(getLanguageData("ChantMoveText"), {user->name});
         combatUIManager->finalText = message;
         combatUIManager->currentText = "";
         combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
@@ -1409,9 +1389,12 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
     case 5: //Inspect
       {
         combatant* e = g_enemyCombatants[target];
-        string message = "Level " + to_string(e->level) + " " + e->name + " has a base Strength of " + to_string(e->baseStrength) + ", a base Attack of " + to_stringF(e->baseAttack) + ", and a base Defense of " + to_stringF(e->baseDefense) + ".";
-        string message2 = getSubjectivePronoun(e) + " has a health of " + to_string(e->health) + ", a current Strength of " + to_stringF(e->curStrength) + ", and a current Defense of " + to_stringF(e->curDefense) + ".";
-        string message3 = e->name + " has type " + typeToString(e->myType) + ".";
+        string message = getLanguageData("InspectMoveText0");
+        message = stringMultiInject(message, {to_string(e->level), e->name, to_string(e->baseStrength), to_stringF(e->baseAttack), to_stringF(e->baseDefense)});
+        string message2 = getLanguageData("InspectMoveText1");
+        message2 = stringMultiInject(message2, {getSubjectivePronoun(e), to_string(e->health), to_stringF(e->curStrength), to_stringF(e->curDefense)});
+        string message3 = getLanguageData("InspectMoveText2");
+        message3 = stringMultiInject(message3, {e->name, getLanguageData("CombatType" + to_string(e->myType))});
 
 
 
@@ -1449,7 +1432,11 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
           e->statuses.push_back(se);
         }
 
-        string message = user->name + " taunts " + e->name + ".";
+        //string message = user->name + " taunts " + e->name + ".";
+        string message = getLanguageData("TauntMoveText");
+        message = stringMultiInject(message, {user->name, e->name});
+
+
         combatUIManager->finalText = message;
         combatUIManager->currentText = "";
         combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
@@ -1646,7 +1633,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   partyHealthBox->persistent = true;
   partyHealthBox->show = 0;
 
-  partyText = new textbox(renderer, "", 1500 * g_fontsize, 0, 0, 0.9);
+  partyText = new textbox(renderer, "", 1, 0, 0, 0.9);
   partyText->boxWidth = 0;
   partyText->width = 0.95;
   partyText->boxHeight = 0;
@@ -1656,7 +1643,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   partyText->dropshadow = 1;
   partyText->show = 1;
 
-  partyMiniText = new textbox(renderer, "", 800 * g_fontsize, 0, 0, 0.9);
+  partyMiniText = new textbox(renderer, "", 0, 0, 0, 0.9);
   partyMiniText->boxWidth = 0;
   partyMiniText->width = 0.95;
   partyMiniText->boxHeight = 0;
@@ -1673,14 +1660,14 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   mainPanel->persistent = true;
   mainPanel->y = 0;
 
-  dialogProceedIndicator = new ui(renderer, "resources/static/ui/dialog_proceed.qoi", 0.92, 0.88, 0.05, 1, 0);
+  dialogProceedIndicator = new ui(renderer, "resources/engine/dialog_proceed.qoi", 0.92, 0.88, 0.05, 1, 0);
   dialogProceedIndicator->heightFromWidthFactor = 1;
   dialogProceedIndicator->persistent = true;
   dialogProceedIndicator->priority = 8;
   dialogProceedIndicator->dropshadow = 1;
   dialogProceedIndicator->y =  0.25;
 
-  mainText = new textbox(renderer, "", 1700 * g_fontsize, 0, 0, 0.9);
+  mainText = new textbox(renderer, "", 2, 0, 0, 0.9);
   mainText->boxWidth = 0.9;
   mainText->width = 0.9;
   mainText->boxHeight = 0.25;
@@ -1695,7 +1682,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   optionsPanel->is9patch = true;
   optionsPanel->persistent = true;
 
-  optionsText = new textbox(renderer, "", 1600 * g_fontsize, 0, 0, 0.9);
+  optionsText = new textbox(renderer, "", 1, 0, 0, 0.9);
   optionsText->boxWidth = 0.9;
   optionsText->width = 0.9;
   optionsText->boxHeight = 0.25;
@@ -1703,7 +1690,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   optionsText->boxY = 0.05;
   optionsText->dropshadow = 1;
 
-  optionsMiniText = new textbox(renderer, "", 800 * g_fontsize, 0, 0, 0.9);
+  optionsMiniText = new textbox(renderer, "", 0, 0, 0, 0.9);
   optionsMiniText->boxWidth = 0;
   optionsMiniText->width = 0.95;
   optionsMiniText->boxHeight = 0;
@@ -1725,7 +1712,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   targetPanel->is9patch = true;
   targetPanel->persistent = true;
 
-  targetText = new textbox(renderer, "", 1600 * g_fontsize, 0, 0, 0.9);
+  targetText = new textbox(renderer, "", 1, 0, 0, 0.9);
   targetText->boxWidth = 0.3;
   targetText->boxHeight = 0.12;
   targetText->boxX = 0.55;
@@ -1739,7 +1726,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   inventoryPanel->is9patch = true;
   inventoryPanel->persistent = true;
 
-  inventoryText = new textbox(renderer, "", 1600 * g_fontsize, 0, 0, 0.9);
+  inventoryText = new textbox(renderer, "", 1, 0, 0, 0.9);
   inventoryText->boxWidth = 0.3;
   inventoryText->boxHeight = 0.12;
   inventoryText->boxX = 0.45;
@@ -1752,7 +1739,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   spiritPanel->is9patch = true;
   spiritPanel->persistent = true;
 
-  spiritText = new textbox(renderer, "", 1600 * g_fontsize, 0, 0, 0.9);
+  spiritText = new textbox(renderer, "", 1, 0, 0, 0.9);
   spiritText->boxWidth = 0.3;
   spiritText->boxHeight = 0.12;
   spiritText->boxX = 0.45;
@@ -1765,7 +1752,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   forgetPanel->is9patch = true;
   forgetPanel->persistent = true;
 
-  forgetText = new textbox(renderer, "", 1600 * g_fontsize, 0, 0, 0.9);
+  forgetText = new textbox(renderer, "", 1, 0, 0, 0.9);
   forgetText->boxWidth = 0.3;
   forgetText->boxHeight = 0.12;
   forgetText->boxX = 0.45;
@@ -1779,7 +1766,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   forgetPicker->dropshadow = 1;
   forgetPicker->y =  0.25;
 
-  yes = new textbox(renderer, "Yes", 1700 * g_fontsize, 0, 0, 0.9);
+  yes = new textbox(renderer, "Yes", 1, 0, 0, 0.9);
   yes->boxX = 0.50 - 0.07;
   yes->boxY = 0.2;
   yes->boxWidth = 0.01;
@@ -1787,7 +1774,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   yes->dropshadow = 1;
   yes->align = 2;
 
-  no = new textbox(renderer, "No", 1700 * g_fontsize, 0, 0, 0.9);
+  no = new textbox(renderer, "No", 1, 0, 0, 0.9);
   no->boxX = 0.50 + 0.07;
   no->boxY = 0.2;
   no->boxWidth = 0;
@@ -2806,7 +2793,7 @@ void CombatLoop() {
         drawOptionsPanel();
 
         //combatUIManager->targetText->updateText("To " + g_enemyCombatants.at(combatUIManager->currentTarget)->name, -1, 34);
-        combatUIManager->targetText->updateText(combatUIManager->directionalPreposition + g_enemyCombatants.at(combatUIManager->currentTarget)->name, -1, 34);
+        combatUIManager->targetText->updateText(combatUIManager->directionalPreposition + " " + g_enemyCombatants.at(combatUIManager->currentTarget)->name, -1, 34);
 
         combatUIManager->targetPanel->render(renderer, g_camera, elapsed);
         combatUIManager->targetText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
@@ -2908,9 +2895,13 @@ void CombatLoop() {
           e->health -= damage;
           string message;
           if(crit) {
-            message = c->name + " crits " + e->name + " for " + to_string(damage) + ".";
+            //message = c->name + " crits " + e->name + " for " + to_string(damage) + ".";
+            message = getLanguageData("CombatProtagCrit");
+            message = stringMultiInject(message, {c->name, e->name, to_string(damage)});
           } else {
-            message = c->name + " deals " + to_string(damage) + " to " + e->name + ".";
+            //message = c->name + " deals " + to_string(damage) + " to " + e->name + ".";
+            message = getLanguageData("CombatProtagAttack");
+            message = stringMultiInject(message, {c->name, e->name, to_string(damage)});
           }
 
           if(e->health < 0) {
@@ -2967,7 +2958,10 @@ void CombatLoop() {
             g_submode = submode::FINAL;
             break;
           }
-          combatUIManager->finalText = g_partyCombatants[combatUIManager->executePIndex]->name + " shrinks.";
+          string text = getLanguageData("CombatProtagShrinks");
+          text = stringMultiInject(text, {g_partyCombatants[combatUIManager->executePIndex]->name});
+          combatUIManager->finalText = text;
+
           combatUIManager->currentText = "";
           combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
           combatUIManager->dodgingThisTurn[combatUIManager->executePIndex] = 1;
@@ -3222,7 +3216,10 @@ void CombatLoop() {
           combatUIManager->invincibleMs = 0;
 
           //g_submode = submode::DODGING;
-          string message = c->name + " attacks " + e->name + " for " + to_string(damage) + " damage.";
+          //string message = c->name + " attacks " + e->name + " for " + to_string(damage) + " damage.";
+          string message = getLanguageData("CombatEnemyAttack");
+          message = stringMultiInject(message, {c->name, e->name, to_string(damage)});
+
           if(combatUIManager->dodgingThisTurn[adjustedDIndex] == 1) {
             combatUIManager->shrink = 1;
           } else {

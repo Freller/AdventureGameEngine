@@ -476,19 +476,6 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
       }
 
     }
-    if (word == "item")
-    {
-      // M("loading entity" << endl;
-      iss >> s0 >> s1 >> p0 >> p1 >> p2;
-      const char *plik = s1.c_str();
-      worldItem *e = new worldItem(plik, 0);
-      e->x = p0;
-      e->y = p1;
-      e->z = p2;
-      e->shadow->x = e->x + e->shadow->xoffset;
-      e->shadow->y = e->y + e->shadow->yoffset;
-      (void)e;
-    }
     if (word == "tile")
     {
       // M("loading tile" << endl;
@@ -1858,11 +1845,6 @@ bool mapeditor_save_map(string word)
   {
     if (!g_entities[i]->inParty && !g_entities[i]->persistentHidden && !g_entities[i]->persistentGeneral && !g_entities[i]->isOrbital && !g_entities[i]->dontSave)
     {
-      if (g_entities[i]->isWorlditem)
-      {
-        ofile << "item " << g_entities[i]->name.substr(5) << " " << to_string(g_entities[i]->x) << " " << to_string(g_entities[i]->y) << " " << to_string(g_entities[i]->z) << endl;
-      }
-      else
       {
         //some ents have one frame but i still wanna set angle
         if(g_entities[i]->yframes == 1) {
@@ -3384,7 +3366,7 @@ void write_map(entity *mapent)
 
     // set material
     // textbox(SDL_Renderer* renderer, const char* content, float size, int x, int y, int width) {
-    textbox *consoleDisplay = new textbox(renderer, "console", g_fontsize * 30, 0, 0, 4000);
+    textbox *consoleDisplay = new textbox(renderer, "console", 1, 0, 0, 4000);
     string input;
     SDL_Event console_event;
     bool polling = 1;
@@ -3504,9 +3486,33 @@ void write_map(entity *mapent)
     //instruction
     while (line >> word)
     {
+      if(word == "runtime") {
+        long long ms = SDL_GetTicks();
+        long long totalsec = ms / 1000;
+        int seconds = totalsec % 60;
+        int minutes = (totalsec / 60) % 60;
+        int hours = totalsec / 3600;
+        string res = to_string(hours) + ":" + to_string(minutes) + ":" + to_string(seconds);
+        M(res);
+        break;
+      }
       if(word == "darkness") {
         line >> word;
         g_dungeonDarkness = stoi(word);
+        break;
+      }
+      if(word == "benchmarking") {
+        g_benchmarking = !g_benchmarking;
+        break;
+      }
+      if(word == "entitybenchmarking") {
+        g_entityBenchmarking = !g_entityBenchmarking;
+        if(g_entityBenchmarking) {
+          M("Entity benchmarking on.");
+        } else {
+          M("Entity benchmarking off.");
+        }
+        break;
       }
       if(word == "die") {
         clear_map(g_camera);
@@ -5127,12 +5133,12 @@ void write_map(entity *mapent)
           D(chosenEntity->persistentHidden);
           D(chosenEntity->persistentGeneral);
           D(chosenEntity->isOrbital);
-          D(chosenEntity->isWorlditem);
           D(chosenEntity->isAI);
           D(chosenEntity->aiIndex);
           D(chosenEntity->isBoardable);
           D(chosenEntity->transportEntPtr);
           D(chosenEntity->tangible);
+          D(chosenEntity->identity);
           M("");
 
           M("Combat Data:");
@@ -5588,21 +5594,6 @@ void write_map(entity *mapent)
         for(auto x : e->children) {
           specialObjectsInit(x);
         }
-        break;
-      }
-      if (word == "item")
-      {
-        line >> entstring;
-        const char *plik = entstring.c_str();
-        worldItem *e = new worldItem(plik, 0);
-        (void)e;
-        e->x = px + marker->width / 2 - (e->getOriginX());
-        e->y = py + marker->height / 2 - (e->getOriginY());
-        e->stop_hori();
-        e->stop_verti();
-        e->z = wallstart;
-        e->shadow->x = e->x + e->shadow->xoffset;
-        e->shadow->y = e->y + e->shadow->yoffset;
         break;
       }
       if (word == "sound" || word == "snd" || word == "worldsound" || word == "ws")

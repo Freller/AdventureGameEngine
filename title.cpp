@@ -29,7 +29,7 @@ void titleUI::showAll() {
 }
 
 titleUI::titleUI(SDL_Renderer* renderer) {
-  newText = new textbox(renderer, "New", 1600 * g_fontsize, 0, 0, 0.9);
+  newText = new textbox(renderer, getLanguageData("NewGameText").c_str(), 2, 0, 0, 0.9);
   newText->boxWidth = 1;
   newText->boxHeight = 0.5;
   newText->boxX = 0.5;
@@ -37,8 +37,7 @@ titleUI::titleUI(SDL_Renderer* renderer) {
   newText->align = 2;
   newText->dropshadow = 1;
 
-
-  continueText = new textbox(renderer, "Continue", 1600 * g_fontsize, 0, 0, 0.9);
+  continueText = new textbox(renderer, getLanguageData("ContinueGameText").c_str(), 2, 0, 0, 0.9);
   continueText->boxWidth = 1;
   continueText->boxHeight = 0.5;
   continueText->boxX = 0.5;
@@ -46,7 +45,7 @@ titleUI::titleUI(SDL_Renderer* renderer) {
   continueText->align = 2;
   continueText->dropshadow = 1;
 
-  endText = new textbox(renderer, "Quit", 1600 * g_fontsize, 0, 0, 0.9);
+  endText = new textbox(renderer, getLanguageData("QuitGameText").c_str(), 2, 0, 0, 0.9);
   endText->boxWidth = 1;
   endText->boxHeight = 0.5;
   endText->boxX = 0.5;
@@ -54,14 +53,14 @@ titleUI::titleUI(SDL_Renderer* renderer) {
   endText->align = 2;
   endText->dropshadow = 1;
 
-  creditText = new textbox(renderer, "", 800 * g_fontsize, 0, 0, 0.9);
+  creditText = new textbox(renderer, "", 0, 0, 0, 0.9);
   creditText->boxWidth = 1;
   creditText->boxHeight = 0.5;
   creditText->boxX = 0.5;
   creditText->boxY = 0.3;
   creditText->align = 2;
   creditText->dropshadow = 1;
-  creditText->updateText("by J.M.", 400 * g_fontsize, 0, {235, 235, 235}, g_font);
+  creditText->updateText(getLanguageData("AuthorText"), 400 * g_fontsize, 0, {235, 235, 235}, g_font);
 
 
   handMarker = new ui(renderer, "resources/static/ui/finger_selector_angled.qoi", 0.5, 0.65, 0.1, 1, 2);

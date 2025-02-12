@@ -8,6 +8,8 @@
 #include <string>
 #include "physfs.h"
 #include "globals.h"
+#include <locale>
+#include <codecvt>
 
 using namespace std;
 
@@ -33,6 +35,12 @@ void initLanguageIndices();
 
 void generateIndicesFile();
 
+wstring bytes_to_wstring(const std::vector<unsigned char>& bytes);
+
+wstring getLanguageDataSpecial(string handle);
+
 string getLanguageData(string handle);
+
+string stringMultiInject(const string &templateStr, const vector<string> &values);
 
 #endif

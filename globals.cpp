@@ -20,6 +20,7 @@
 #include "unistd.h"
 #include "stdio.h"
 #include "title.h"
+#include "globals.h"
 
 #include "objects.h"
 
@@ -107,8 +108,6 @@ vector<projectile *> g_projectiles;
 vector<attack *> g_attacks;
 
 vector<weapon *> g_weapons;
-
-vector<worldItem *> g_worldItems;
 
 vector<particle *> g_particles;
 
@@ -303,7 +302,7 @@ float basePunishValueDegrade = -0.1;
 // for having items bounce
 vector<float> g_itemsines;
 
-float g_elapsed_accumulator = 0;
+//float g_elapsed_accumulator = 0;
 
 // I've bounced around thinking these matter and turning them down
 // or deciding that they don't matter and pumping them up
@@ -358,7 +357,10 @@ float g_cameraAimingOffsetLerpScale = 0.91;
 // text
 string g_font;
 float g_fontsize = 0.031; // 0.021 - 0.04
-TTF_Font* g_ttf_font;
+TTF_Font* g_ttf_fontLarge;
+TTF_Font* g_ttf_fontMedium;
+TTF_Font* g_ttf_fontSmall;
+TTF_Font* g_ttf_fontTiny;
 float g_minifontsize = 0.01;
 float g_transitionSpeed = 1; // 3, 9
 
@@ -391,6 +393,8 @@ int SoldUIRight = 1;
 int g_inputDelayFrames = 30;      //For the nice effect where the user can press a button or hold it
 int g_inputDelayRepeatFrames = 6;
 
+amState g_amState = amState::CLOSED;
+
 //options / settings menu
 bool g_inSettingsMenu = 0;
 settingsUI* g_settingsUI;
@@ -400,10 +404,9 @@ bool g_awaitSwallowedKey = 0;
 bool g_swallowedAKeyThisFrame = 0;
 int g_pollForThisBinding = -1;
 int g_whichRebindValue;
-const string g_affirmStr = "Yes";
-const string g_negStr = "No";
-const string g_leaveStr = "Lets Leave";
-const vector<string> g_graphicsStrings = {"Very Low", "Low", "Medium", "High"};
+string g_affirmStr;
+string g_negStr;
+vector<string> g_graphicsStrings = {};
 
 //escape menu
 bool g_inEscapeMenu = 0;
@@ -660,6 +663,29 @@ float camx = 0;
 float camy = 0;
 SDL_Renderer *renderer;
 
+//for benchmarking the Entity Update function
+// (EU)
+float g_eu_a = 0;
+float g_eu_b = 0;
+float g_eu_c = 0;
+float g_eu_d = 0;
+float g_eu_e = 0;
+float g_eu_f = 0;
+float g_eu_g = 0;
+float g_eu_h = 0;
+
+float g_eu_ab=-1;
+float g_eu_bb=-1;
+float g_eu_cb=-1;
+float g_eu_db=-1;
+float g_eu_eb=-1;
+float g_eu_fb=-1;
+float g_eu_gb=-1;
+float g_eu_hb=-1;
+
+int g_eu_timer = 0;
+int g_eu_exec = 0;
+
 // g_map specifies the name of the map, g_mapdir specifies the folder with in maps the map is in.
 // so its maps/{g_mapdir}/{g_map}.map
 string g_map = "sp-title";
@@ -723,7 +749,7 @@ std::map<string, Mix_Chunk> g_static_sounds = {};
 
 // ui
 int g_textDropShadowColor = 100;
-float g_textDropShadowDist = 0.04; //this is the pixels of the texture, for better or worse
+float g_textDropShadowDist = 2; //this is the pixels of the texture, for better or worse
 bool protag_can_move = true;
 int protag_is_talking = 0; // 0 - not talking 1 - talking 2 - about to stop talking
 adventureUI *adventureUIManager;
@@ -733,7 +759,6 @@ float curTextWait = 0;
 bool old_z_value = 1; // the last value of the z key. used for advancing dialogue, i.e. z key was down and is now up or was up and is now down if old_z_value != SDL[SDL_SCANCODE_Z]
 float g_healthbarBorderSize = 0;
 bool g_showHUD = 1;
-bool g_inTitleScreen = 0;
 
 //for hungersystem
 int g_foodpoints = 100;
@@ -1028,6 +1053,7 @@ int g_holddelete = 0;
 int g_globalAccumulator = 0;
 int g_tempAccumulator = 0;
 bool g_benchmarking = 0;
+bool g_entityBenchmarking = 0;
 
 gamemode g_gamemode = gamemode::TITLE; //exploration, combat, gameover
 
@@ -1064,6 +1090,8 @@ int g_combatEntryType = 0;
 lossSub g_lossSub = lossSub::INWIPE;
 
 lossUI* lossUIManager = 0;
+
+vector<keyItemInfo*> g_keyItems;
 
 bool fileExists(const std::string &name)
 {

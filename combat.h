@@ -207,6 +207,12 @@ extern std::unordered_map<int, itemInfo> itemsTable;
 
 extern std::unordered_map<int, spiritInfo> spiritTable;
 
+extern unordered_map<type, string> c_typeToStringMap;
+
+extern unordered_map<string, type> c_stringToTypeMap;
+
+extern vector<string> pronounTable;
+
 void spawnBullets(int pattern, int& accumulator);
 
 void initTables();

@@ -103,8 +103,6 @@ class hitbox;
 
 class listener;
 
-class worldItem;
-
 class ribbon;
 
 class effectIndex;
@@ -140,6 +138,8 @@ class camBlocker;
 class gradient;
 
 class lossUI;
+
+class keyItemInfo;
 
 class camera
 {
@@ -265,8 +265,6 @@ extern vector<attack *> g_attacks;
 
 extern vector<weapon *> g_weapons;
 
-extern vector<worldItem *> g_worldItems;
-
 extern vector<particle *> g_particles;
 
 extern vector<emitter *> g_emitters;
@@ -338,6 +336,7 @@ struct cmpCoord
 extern int g_globalAccumulator;
 extern int g_tempAccumulator;
 extern bool g_benchmarking;
+extern bool g_entityBenchmarking;
 
 #define B(a) \
 { \
@@ -558,7 +557,7 @@ extern float basePunishValueDegrade;
 // for having items bounce
 extern vector<float> g_itemsines;
 
-extern float g_elapsed_accumulator;
+//extern float g_elapsed_accumulator;
 
 extern int g_platformResolution;
 extern float g_TiltResolution;
@@ -600,7 +599,10 @@ extern float g_cameraAimingOffsetLerpScale;
 
 extern string g_font;
 extern float g_fontsize;
-extern TTF_Font* g_ttf_font;
+extern TTF_Font* g_ttf_fontLarge;
+extern TTF_Font* g_ttf_fontMedium;
+extern TTF_Font* g_ttf_fontSmall;
+extern TTF_Font* g_ttf_fontTiny;
 extern float g_minifontsize;
 extern float g_transitionSpeed;
 
@@ -633,6 +635,15 @@ extern int SoldUIRight;
 extern int g_inputDelayFrames;
 extern int g_inputDelayRepeatFrames;
 
+//states for adventure menu
+enum class amState {
+  CLOSED,
+  MAJOR,
+  KEYITEM
+};
+
+extern amState g_amState;
+
 extern bool g_inSettingsMenu;
 extern settingsUI* g_settingsUI;
 extern SDL_Scancode g_swallowedKey;
@@ -641,10 +652,9 @@ extern bool g_awaitSwallowedKey;
 extern bool g_swallowedAKeyThisFrame;
 extern int g_pollForThisBinding;
 extern int g_whichRebindValue;
-extern const string g_affirmStr;
-extern const string g_negStr;
-extern const string g_leaveStr;
-extern const vector<string> g_graphicsStrings;
+extern string g_affirmStr;
+extern string g_negStr;
+extern vector<string> g_graphicsStrings;
 
 extern bool g_inEscapeMenu;
 extern escapeUI* g_escapeUI;
@@ -723,6 +733,27 @@ extern float camx;
 extern float camy;
 extern SDL_Renderer *renderer;
 
+extern float g_eu_a;
+extern float g_eu_b;
+extern float g_eu_c;
+extern float g_eu_d;
+extern float g_eu_e;
+extern float g_eu_f;
+extern float g_eu_g;
+extern float g_eu_h;
+
+extern float g_eu_ab;
+extern float g_eu_bb;
+extern float g_eu_cb;
+extern float g_eu_db;
+extern float g_eu_eb;
+extern float g_eu_fb;
+extern float g_eu_gb;
+extern float g_eu_hb;
+
+extern int g_eu_timer;
+extern int g_eu_exec;
+
 extern string g_map;
 extern string g_mapdir;
 extern string g_waypoint;
@@ -792,7 +823,6 @@ extern float curTextWait;
 extern bool old_z_value;
 extern float g_healthbarBorderSize;
 extern bool g_showHUD;
-extern bool g_inTitleScreen;
 
 extern int g_foodpoints;
 extern int g_maxFoodpoints;
@@ -1120,6 +1150,8 @@ enum class lossSub {
 extern lossSub g_lossSub;
 
 extern lossUI* lossUIManager;
+
+extern vector<keyItemInfo*> g_keyItems;
 
 bool fileExists(const std::string &name);
 

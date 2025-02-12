@@ -359,6 +359,13 @@ void specialObjectsInit(entity* a) {
 
       break;
     }
+    case 35:
+    {
+      //key item found in overworld
+      //use faction parameter to represent which key item it is
+
+      break;
+    }
 
     case 100:
     {
@@ -1449,7 +1456,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
         
           combatUIManager->partyHealthBox->show = 1;
           combatUIManager->partyText->show = 1;
-          combatUIManager->finalText = "It's an enemy encounter!";
+          combatUIManager->finalText = getLanguageData("BattleStartText");
           combatUIManager->currentText = "";
           combatUIManager->dialogProceedIndicator->y = 0.25;
         
@@ -1633,6 +1640,20 @@ void specialObjectsUpdate(entity* a, float elapsed) {
         }
 
       }
+      break;
+    }
+    case 35:
+    {
+      if(RectOverlap(protag->getMovedBounds(), a->getMovedBounds())) {
+        if(a->faction >= 0) {
+          keyItemInfo* k = new keyItemInfo(a->faction); //automatically pushed back
+          a->faction = -1;
+          protag->children.push_back(a);
+          a->usingTimeToLive = 1;
+          a->timeToLiveMs = 1000;
+        }
+      }
+      break;
     }
 
     case 100: 
