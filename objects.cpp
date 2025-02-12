@@ -5314,57 +5314,57 @@ door* entity::update(vector<door*> doors, float elapsed) {
   //try ramps?
   //!!! can crash if the player gets too high
 
-//  if(layer < g_layers) {
-//    for(auto r : g_ramps[this->layer]) {
-//      rect a = rect(r->x, r->y, 64, 55);
-//      rect movedBounds = rect(bounds.x + x, bounds.y + y + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
-//      if(RectOverlap(movedBounds, a)) {
-//        if(r->type == 0) {
-//          //contribute to protag z based on how far we are along
-//          //the y axis
-//          float push = (55 - abs((((float)movedBounds.y - (float)r->y ))))/55;
-//
-//          float possiblefloor = r->layer * 64 + 64 * push;
-//          if( abs(this->z - possiblefloor ) < 15) {
-//            floor = possiblefloor;
-//            this->shadow->z = floor + 1;
-//          }
-//
-//        } else {
-//          if(r->type == 1) {
-//            float push = (64 - abs((( (float)(movedBounds.x + movedBounds.width) - (float)(r->x + 64) ))))/64;
-//
-//            float possiblefloor = r->layer * 64 + 64 * push;
-//            if( abs(this->z - possiblefloor ) < 15) {
-//              floor = possiblefloor;
-//              this->shadow->z = floor + 1;
-//            }
-//          } else {
-//            if(r->type == 2) {
-//              //contribute to protag z based on how far we are along
-//              //the y axis
-//              float push = (55 - abs((( (float)(movedBounds.y + movedBounds.height) - (float)(r->y + 55) ))))/55;
-//
-//              float possiblefloor = r->layer * 64 + 64 * push;
-//              if( abs(this->z - possiblefloor ) < 15) {
-//                floor = possiblefloor;
-//                this->shadow->z = floor + 1;
-//              }
-//
-//            } else {
-//              float push = (64 - abs((( (float)(movedBounds.x) - (float)(r->x) ))))/64;
-//
-//              float possiblefloor = r->layer * 64 + 64 * push;
-//              if( abs(this->z - possiblefloor ) < 15) {
-//                floor = possiblefloor;
-//                this->shadow->z = floor + 1;
-//              }
-//            }
-//          }
-//        }
-//      }
-//    }
-//  }
+  if(layer < g_layers) {
+    for(auto r : g_ramps[this->layer]) {
+      rect a = rect(r->x, r->y, 64, 55);
+      rect movedBounds = rect(bounds.x + x, bounds.y + y + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
+      if(RectOverlap(movedBounds, a)) {
+        if(r->type == 0) {
+          //contribute to protag z based on how far we are along
+          //the y axis
+          float push = (55 - abs((((float)movedBounds.y - (float)r->y ))))/55;
+
+          float possiblefloor = r->layer * 64 + 64 * push;
+          if( abs(this->z - possiblefloor ) < 15) {
+            floor = possiblefloor;
+            this->shadow->z = floor + 1;
+          }
+
+        } else {
+          if(r->type == 1) {
+            float push = (64 - abs((( (float)(movedBounds.x + movedBounds.width) - (float)(r->x + 64) ))))/64;
+
+            float possiblefloor = r->layer * 64 + 64 * push;
+            if( abs(this->z - possiblefloor ) < 15) {
+              floor = possiblefloor;
+              this->shadow->z = floor + 1;
+            }
+          } else {
+            if(r->type == 2) {
+              //contribute to protag z based on how far we are along
+              //the y axis
+              float push = (55 - abs((( (float)(movedBounds.y + movedBounds.height) - (float)(r->y + 55) ))))/55;
+
+              float possiblefloor = r->layer * 64 + 64 * push;
+              if( abs(this->z - possiblefloor ) < 15) {
+                floor = possiblefloor;
+                this->shadow->z = floor + 1;
+              }
+
+            } else {
+              float push = (64 - abs((( (float)(movedBounds.x) - (float)(r->x) ))))/64;
+
+              float possiblefloor = r->layer * 64 + 64 * push;
+              if( abs(this->z - possiblefloor ) < 15) {
+                floor = possiblefloor;
+                this->shadow->z = floor + 1;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 
   //look for solid entities (new as of Nov 2023 for the bed)
   if(this == protag || this->isAI) { //seems to be causing slowdown
@@ -7435,15 +7435,25 @@ void textbox::updateText(string content, float size, float fwidth, SDL_Color fco
 
 
 
+// ui constructor
 ui::ui(SDL_Renderer * renderer, const char* ffilename, float fx, float fy, float fwidth, float fheight, int fpriority) {
   //M("ui()" );
   filename = ffilename;
   bool sharingTexture = 0;
+  bool dontShare = 0;
 
-  for(auto x : g_ui) {
-    if(x->filename == filename) {
-      texture = x->texture;
-      sharingTexture = 1;
+  if(this == floortexDisplay ||
+      this == captexDisplay ||
+      this == walltexDisplay) {
+    dontShare = 1;
+  }
+
+  if(dontShare == 0) {
+    for(auto x : g_ui) {
+      if(x->filename == filename) {
+        texture = x->texture;
+        sharingTexture = 1;
+      }
     }
   }
 
@@ -9029,7 +9039,7 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     amPicker->y =  0.25;
     amPicker->layer0 = 1;
 
-    kiPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0, 0.08, 0.3, 0.47, 1);
+    kiPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0, 0.08, 0.4, 0.47, 1);
     kiPanel->is9patch = true;
     kiPanel->patchwidth = 213;
     kiPanel->patchscale = 0.4;
@@ -9076,7 +9086,7 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
       a->boxY = curY;
       kiTextboxes.push_back(a);
 
-      ui* b = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", x+0.18, curY+0.008, 0.03, 1, 1);
+      ui* b = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", x+0.28, curY+0.008, 0.03, 1, 1);
       b->heightFromWidthFactor = 1;
       b->persistent = true;
       b->show = 0;
@@ -9370,6 +9380,7 @@ void adventureUI::initDialogue() {
 //scripts
 void adventureUI::continueDialogue()
 {
+  breakpoint();
   g_fancybox->show = 0;
   // has our entity died?
   if (g_forceEndDialogue && playersUI)
@@ -9414,7 +9425,6 @@ void adventureUI::continueDialogue()
 
   if(keyPrompting == 1) {
     //absorb this Z press
-    M("Absorbed a Z press");
     if(playersUI) {
       protag_is_talking = 2;
     }
@@ -9427,15 +9437,13 @@ void adventureUI::continueDialogue()
     //just finished a keyprompt
     //given item is in value of response_index
     //-1 for nothing (canceled prompt or had no item)
-    D(response_index);
     for(auto x : keyPromptMap) {
-      D(x.first);
       if(x.first == response_index) {
         dialogue_index = x.second - 3;
       }
     }
+    keyPromptCancelForceReset = 30;
     keyPrompting = 0;
-    M("Set keyPrompting to zero A");
   }
 
 
@@ -9468,6 +9476,11 @@ void adventureUI::continueDialogue()
         talker->animation = talker->defaultAnimation;
       }
     }
+
+    if(g_keyItemFlavorDisplay) {
+      g_keyItemFlavorDisplay = 0;
+      oldinput[11] = 1;
+    }
     M("Ret C");
     return;
   }
@@ -9480,6 +9493,7 @@ void adventureUI::continueDialogue()
     // make a question
     dialogue_index++;
     pushText(talker);
+    response_index = 0;
     askingQuestion = true;
     // put responses in responses vector
     int j = 1;
@@ -9512,9 +9526,9 @@ void adventureUI::continueDialogue()
     pushText(talker);
     int j = 1;
     string res = scriptToUse->at(dialogue_index + j).substr(1);
-    D(res);
     keyPromptMap.clear();
     g_amState = amState::KEYITEM;
+    adventureUIManager->kiIndex = 0;
     oldinput[11] = 1;
     oldinput[8] = 1;
     while (res.find(':') != std::string::npos)
@@ -9523,7 +9537,6 @@ void adventureUI::continueDialogue()
       int pos = res.find(':');
       keyPromptEntry.first = stoi(res.substr(0, pos));
       string jumpstr = res.substr(pos+1, res.size() - pos - 1);
-      D(jumpstr);
       keyPromptEntry.second = stoi(jumpstr);
       keyPromptMap.push_back(keyPromptEntry);
       j++;
@@ -9531,6 +9544,42 @@ void adventureUI::continueDialogue()
     }
 
     keyPrompting = true;
+    return;
+  }
+
+  //take key item
+  //
+  // /takekey 0
+  if(scriptToUse->at(dialogue_index + 1).substr(0,8) == "/takekey") {
+    string s = scriptToUse->at(dialogue_index + 1);
+    vector<string> x = splitString(s, ' ');
+
+    int removeIndex = stoi(x[1]);
+    D(removeIndex);
+    for(int i = 0; i < g_keyItems.size(); i++) {
+      if(g_keyItems[i]->index == removeIndex) {
+        delete g_keyItems[i];
+        break;
+      }
+    }
+
+    dialogue_index++;
+    this->continueDialogue();
+    return;
+  }
+
+  //give key-item to player
+  // 
+  // /givekey 0
+  if(scriptToUse->at(dialogue_index + 1).substr(0,8) == "/givekey") {
+    string s = scriptToUse->at(dialogue_index + 1);
+    vector<string> x = splitString(s, ' ');
+
+    int giveIndex = stoi(x[1]);
+    keyItemInfo* k = new keyItemInfo(giveIndex);
+
+    dialogue_index++;
+    this->continueDialogue();
     return;
   }
 
@@ -12165,12 +12214,19 @@ void gradient::render(SDL_Renderer* renderer, camera fcamera) {
 
 keyItemInfo::keyItemInfo(int findex) {
   index = findex;
-  texture = loadTexture(renderer, "resources/static/key-items/"+to_string(findex) + ".qoi");
+  string addr = "resources/static/key-items/"+to_string(findex) + ".qoi";
+  if(PHYSFS_exists(addr.c_str())) {
+    texture = loadTexture(renderer, addr);
+  } else {
+    texture = 0;
+  }
   name = getLanguageData("KeyItem"+to_string(findex) + "Name");
   g_keyItems.push_back(this);
 }
 
 keyItemInfo::~keyItemInfo() {
-  SDL_DestroyTexture(texture);
+  if(texture != 0) {
+    SDL_DestroyTexture(texture);
+  }
   g_keyItems.erase(remove(g_keyItems.begin(), g_keyItems.end(), this), g_keyItems.end());
 }

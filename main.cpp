@@ -280,7 +280,7 @@ void ExplorationLoop() {
         adventureUIManager->showKi();
 
 
-        if(input[8] && !oldinput[8]) {
+        if(input[8] && !oldinput[8] && !g_keyItemFlavorDisplay) {
           if(adventureUIManager->keyPrompting) {
             adventureUIManager->response_index = -1; //give nothing
             adventureUIManager->keyPrompting = 2;
@@ -289,31 +289,53 @@ void ExplorationLoop() {
             adventureUIManager->hideKi();
             adventureUIManager->continueDialogue();
             break;
-            break;
           } else {
             g_amState = amState::MAJOR;
           }
         }
 
-        if(input[11] && !oldinput[11]) {
+        if(input[11] && !oldinput[11] && !g_keyItemFlavorDisplay) {
           //D(adventureUIManager->keyPrompting);
           if(adventureUIManager->keyPrompting) {
             //D(g_keyItems.size());
             if(adventureUIManager->kiIndex >= 0 && adventureUIManager->kiIndex < (int)g_keyItems.size()) {
               adventureUIManager->response_index = g_keyItems[adventureUIManager->kiIndex]->index;
-              //D(adventureUIManager->response_index);
-              M("Key prompt selection made");
               adventureUIManager->keyPrompting = 2;
               g_amState = amState::CLOSED;
               adventureUIManager->hideKi();
               adventureUIManager->continueDialogue();
               break;
 
+            } else {
+              adventureUIManager->response_index = -1; //give nothing
+              adventureUIManager->keyPrompting = 2;
+              g_amState = amState::CLOSED;
+              g_amState = amState::CLOSED;
+              adventureUIManager->hideKi();
+              adventureUIManager->continueDialogue();
+              break;
+
+            }
+          } else {
+            if(adventureUIManager->kiIndex < g_keyItems.size()) {
+              //show flavortext
+              adventureUIManager->talker = narrarator;
+              vector<string> flavorScript = {};
+              flavorScript.push_back("`" + getLanguageData("KeyItem" + to_string(g_keyItems[adventureUIManager->kiIndex]->index) + "Flavor"));
+              flavorScript.push_back("#");
+              adventureUIManager->ownScript = flavorScript;
+              adventureUIManager->dialogue_index = -1;
+              adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
+              adventureUIManager->sleepingMS = 0;
+              g_forceEndDialogue = 0;
+              g_keyItemFlavorDisplay = 1;
+              adventureUIManager->continueDialogue();
+              oldinput[11] = 1;
             }
           }
         }
 
-        if(input[0]) {
+        if(input[0] && !g_keyItemFlavorDisplay) {
           if(SoldUIUp <= 0) {
             if(adventureUIManager->kiIndex -1 >= 0) {
               adventureUIManager->kiIndex--;
@@ -327,7 +349,7 @@ void ExplorationLoop() {
           SoldUIUp = 0;
         }
 
-        if(input[1]) {
+        if(input[1] && !g_keyItemFlavorDisplay) {
           if(SoldUIDown <= 0) {
             if(adventureUIManager->kiIndex + 1< g_keyItems.size()) {
               adventureUIManager->kiIndex++;
@@ -371,6 +393,9 @@ void ExplorationLoop() {
               }
               adventureUIManager->kiTextboxes[i]->updateText(g_keyItems[j]->name);
               adventureUIManager->kiIcons[i]->texture = g_keyItems[j]->texture;
+              if(adventureUIManager->kiIcons[i]->texture == 0) {
+                adventureUIManager->kiIcons[i]->show = 0;
+              }
               adventureUIManager->kiIcons[i]->show = 1;
             } else {
               adventureUIManager->kiTextboxes[i]->updateText("");
@@ -5305,7 +5330,7 @@ void getExplorationInput(float &elapsed)
     keyboard_marker_vertical_modifier_refresh_b = 0;
   }
 
-  if (keystate[bindings[11]] && !old_z_value && !inPauseMenu && !g_inSettingsMenu && !g_inEscapeMenu)
+  if (input[11] && !oldinput[11] && !inPauseMenu && !g_inSettingsMenu && !g_inEscapeMenu)
   {
     if (protag_is_talking == 1)
     {
@@ -5315,7 +5340,7 @@ void getExplorationInput(float &elapsed)
       }
     }
   }
-  else if (keystate[bindings[11]] && !old_z_value && inPauseMenu && !g_firstFrameOfPauseMenu)
+  else if (input[11] && !oldinput[11] && inPauseMenu && !g_firstFrameOfPauseMenu)
   {
     if(g_inventoryUiIsLevelSelect == 0) {
 
@@ -5361,8 +5386,6 @@ void getExplorationInput(float &elapsed)
 
             adventureUIManager->dialogue_index++;
             adventureUIManager->continueDialogue();
-
-
           }
 
 
@@ -5570,7 +5593,7 @@ void getExplorationInput(float &elapsed)
 
   dialogue_cooldown -= elapsed;
 
-  if (input[11] && !inPauseMenu && !transition && g_menuTalkReset == 0 && (g_amState == amState::CLOSED || adventureUIManager->keyPrompting))
+  if (input[11] && !oldinput[11] && !inPauseMenu && !transition && g_menuTalkReset == 0 && (g_amState == amState::CLOSED || adventureUIManager->keyPrompting))
   {
     if (protag_is_talking == 1)
     { // advance or speedup diaglogue
@@ -5596,8 +5619,17 @@ void getExplorationInput(float &elapsed)
     old_z_value = 0;
   }
 
-  if(keystate[bindings[8]] && protag_is_talking) {
+  if(keystate[bindings[8]] && protag_is_talking && adventureUIManager->keyPromptCancelForceReset <= 0) {
     adventureUIManager->skipText();
+  }
+
+  if(!keystate[bindings[8]]) {
+    //Used to stop the player from skipping text right after
+    //canceling a key item prompt
+    adventureUIManager->keyPromptCancelForceReset = 0; 
+  }
+  if(adventureUIManager->keyPromptCancelForceReset > 0 ) {
+    adventureUIManager->keyPromptCancelForceReset --;
   }
 
   if (keystate[bindings[11]] && inPauseMenu)

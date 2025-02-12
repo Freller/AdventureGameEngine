@@ -1153,6 +1153,8 @@ extern lossUI* lossUIManager;
 
 extern vector<keyItemInfo*> g_keyItems;
 
+extern bool g_keyItemFlavorDisplay;
+
 bool fileExists(const std::string &name);
 
 void playSound(int channel, Mix_Chunk *sound, int loops);

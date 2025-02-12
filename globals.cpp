@@ -1093,6 +1093,8 @@ lossUI* lossUIManager = 0;
 
 vector<keyItemInfo*> g_keyItems;
 
+bool g_keyItemFlavorDisplay = 0;
+
 bool fileExists(const std::string &name)
 {
   if (FILE *file = fopen(name.c_str(), "r"))

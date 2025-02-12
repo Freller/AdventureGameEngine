@@ -1024,6 +1024,7 @@ class adventureUI {
     bool mobilize = 0; //used to allow the player to move during /sleep calls
 
     int keyPrompting = 0;
+    int keyPromptCancelForceReset = 0;
     vector<pair<int, int>> keyPromptMap; //map of where to jump after a keyprompt, if at all
 
     ui* emotion = 0;
