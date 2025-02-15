@@ -38,6 +38,9 @@ void protagMakesNoise();
 void dungeonFlash();
 
 void drawUI() {
+
+  adventureUIManager->dialogpointer->render(renderer, g_camera);
+
   //bottom-most layer of ui
   for (long long unsigned int i = 0; i < g_ui.size(); i++)
   {
@@ -74,7 +77,6 @@ void drawUI() {
       g_ui[i]->render(renderer, g_camera, elapsed);
     }
   }
-
 }
 
 void updateWindowResolution() {
@@ -120,7 +122,6 @@ void updateWindowResolution() {
 }
 
 void ExplorationLoop() {
-  B("Start of frame");
   // cooldowns
   if(g_dungeonSystemOn) {g_dungeonMs += elapsed;}
   halfsecondtimer += elapsed;
@@ -212,56 +213,58 @@ void ExplorationLoop() {
   {
     // Adventure Menu
     if(input[12] && !oldinput[12]) {
-      if(!inPauseMenu && !g_inSettingsMenu) {
+      if(!inPauseMenu && !g_inSettingsMenu && !protag_is_talking) {
         D(int(g_amState));
         if(g_amState == amState::CLOSED) {
           g_amState = amState::MAJOR;
           adventureUIManager->keyPrompting = 0;
           adventureUIManager->showAm();
           adventureUIManager->amIndex = 0;
-        } else if(g_amState == amState::MAJOR) {
-          g_amState = amState::CLOSED;
-          adventureUIManager->hideAm();
         }
+//        else if(g_amState == amState::MAJOR) {
+//          g_amState = amState::CLOSED;
+//          adventureUIManager->hideAm();
+//        }
       }
     }
     
     adventureUIManager->hideKi();
+    adventureUIManager->hideSt();
     switch(g_amState) {
       case amState::MAJOR:
       {
-        if(input[8] && !oldinput[8]) {
+        if(input[8] && !oldinput[8] && !protag_is_talking) {
           g_amState = amState::CLOSED;
           adventureUIManager->hideAm();
           oldinput[8] = 1;
         }
-        if(input[0] && !oldinput[0]) {
+        if(input[0] && !oldinput[0] && !protag_is_talking) {
           if(adventureUIManager->amIndex == 1
              || adventureUIManager->amIndex == 3
              || adventureUIManager->amIndex == 5) {
             adventureUIManager->amIndex -= 1;
           }
         }
-        if(input[1] && !oldinput[1]) {
+        if(input[1] && !oldinput[1] && !protag_is_talking) {
           if(adventureUIManager->amIndex == 0
              || adventureUIManager->amIndex == 2
              || adventureUIManager->amIndex == 4) {
             adventureUIManager->amIndex += 1;
           }
         }
-        if(input[2] && !oldinput[2]) {
+        if(input[2] && !oldinput[2] && !protag_is_talking) {
           if(adventureUIManager->amIndex - 2 >= 0) {
             adventureUIManager->amIndex -= 2;
           }
         }
-        if(input[3] && !oldinput[3]) {
+        if(input[3] && !oldinput[3] && !protag_is_talking) {
           if(adventureUIManager->amIndex + 2 <= 5) {
             adventureUIManager->amIndex += 2;
           }
         }
         adventureUIManager->amPicker->x = adventureUIManager->amTexPos[adventureUIManager->amIndex].first - 0.028;
         adventureUIManager->amPicker->y = adventureUIManager->amTexPos[adventureUIManager->amIndex].second + 0.007;
-        if(input[11]) {
+        if(input[11] && !oldinput[11] && !protag_is_talking) {
           switch(adventureUIManager->amIndex) {
             case 0:
               {
@@ -270,6 +273,94 @@ void ExplorationLoop() {
                 adventureUIManager->kiOffset = 0;
                 break;
               }
+            case 2:
+              {
+                g_amState = amState::STATUS;
+                adventureUIManager->stIndex = 0;
+                break;
+              }
+            case 4:
+              {
+                //help
+                vector<string> helpScript = {};
+                adventureUIManager->talker = narrarator;
+
+                //keep trying to get language data until it fails
+                int i = 0;
+                for(;;) {
+                  string arg = "Help" + to_string(i) + "-" + g_mapdir + "/" + g_map;
+                  string resp = "`" + getLanguageData(arg);
+                  if(resp == "`") {break;}
+                  helpScript.push_back(resp);
+                  i++;
+                  if(i > 40) {
+                    E("Stuck trying to pull dialog for help");
+                    abort();
+                  }
+                  breakpoint();
+                }
+                if(helpScript.size() == 0) {
+                  helpScript.push_back('`' + getLanguageData("NoHelp"));
+                }
+                helpScript.push_back("#");
+
+                adventureUIManager->ownScript = helpScript;
+                adventureUIManager->dialogue_index = -1;
+                adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
+                adventureUIManager->sleepingMS = 0;
+                protag_is_talking = 1;
+                g_forceEndDialogue = 0;
+                g_keyItemFlavorDisplay = 1;
+                adventureUIManager->continueDialogue();
+                
+                break;
+              }
+            case 5:
+              {
+                //I think that the text from wifechat will not vary by map,
+                //but based on story progression, so scripts will have some way
+                //of updating the wifechatindex, which will be used to pull text
+                if(party.size() > 1 && party[1]->name == "common/neheten") {
+                  //wife
+                  vector<string> helpScript = {};
+                  adventureUIManager->talker = party[1];
+  
+                  //keep trying to get language data until it fails
+                  int i = 0;
+                  int wifeValue = checkSaveField("wifeValue");
+                  D(wifeValue);
+                  for(;;) {
+                    string arg = "Wife" + to_string(wifeValue) + "-" + to_string(i);
+                    string resp = "`" + getLanguageData(arg);
+                    D(resp);
+                    if(resp == "`") {break;}
+                    helpScript.push_back(resp);
+                    i++;
+                    if(i > 40) {
+                      E("Stuck trying to pull dialog for help");
+                      abort();
+                    }
+                    breakpoint();
+                  }
+                  if(helpScript.size() == 0) {
+                    helpScript.push_back('`' + getLanguageData("NoHelp"));
+                  }
+                  helpScript.push_back("#");
+  
+                  adventureUIManager->ownScript = helpScript;
+                  adventureUIManager->dialogue_index = -1;
+                  adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
+                  adventureUIManager->sleepingMS = 0;
+                  protag_is_talking = 1;
+                  g_forceEndDialogue = 0;
+                  g_keyItemFlavorDisplay = 1;
+                  adventureUIManager->continueDialogue();
+                  
+                }
+                break;
+
+              }
+
           }
         }
         break;
@@ -295,9 +386,7 @@ void ExplorationLoop() {
         }
 
         if(input[11] && !oldinput[11] && !g_keyItemFlavorDisplay) {
-          //D(adventureUIManager->keyPrompting);
           if(adventureUIManager->keyPrompting) {
-            //D(g_keyItems.size());
             if(adventureUIManager->kiIndex >= 0 && adventureUIManager->kiIndex < (int)g_keyItems.size()) {
               adventureUIManager->response_index = g_keyItems[adventureUIManager->kiIndex]->index;
               adventureUIManager->keyPrompting = 2;
@@ -320,6 +409,7 @@ void ExplorationLoop() {
             if(adventureUIManager->kiIndex < g_keyItems.size()) {
               //show flavortext
               adventureUIManager->talker = narrarator;
+              D(adventureUIManager->talker->turnToFacePlayer);
               vector<string> flavorScript = {};
               flavorScript.push_back("`" + getLanguageData("KeyItem" + to_string(g_keyItems[adventureUIManager->kiIndex]->index) + "Flavor"));
               flavorScript.push_back("#");
@@ -411,7 +501,211 @@ void ExplorationLoop() {
         
         break;
       }
+      case amState::STATUS:
+      {
+        adventureUIManager->showSt();
+        if(input[8] && !oldinput[8]) {
+          g_amState = amState::MAJOR;
+        }
+
+        if(input[2] && !oldinput[2]) {
+          if(adventureUIManager->stIndex - 1 >= 0) {
+            adventureUIManager->stIndex -= 1;
+          }
+        }
+        if(input[3] && !oldinput[3]) {
+          if(adventureUIManager->stIndex + 1 < g_partyCombatants.size()) {
+            adventureUIManager->stIndex += 1;
+          }
+        }
+
+        combatant* c = g_partyCombatants[adventureUIManager->stIndex];
+        int lastXP = levelToXp(c->level);
+        int nextXP = levelToXp(c->level+1);
+        int percentToNxt = 100*(c->xp - lastXP)/(nextXP - lastXP);
+
+        int usI = 0;
+        int usv = 0;
+        string cname = "";
+        if(c->filename == "common/fomm") {
+          usI = 0;
+          usv = (int)c->level * 1.3;
+          cname = getLanguageData("ProtagManCentered");
+        } else if(c->filename == "common/neheten") {
+          usI = 1;
+          usv = abs(sin((c->level *M_PI *36)/100)) *7 + 4;
+          cname = getLanguageData("ProtagWifeCentered");
+        } else if(c->filename == "common/blish") {
+          usI = 2;
+          usv = (int)c->level * 0.8;
+          cname = getLanguageData("ProtagFriendCentered");
+        } else if(c->filename == "common/dafua") {
+          usI = 3;
+          usv = (int)c->level * 1.1;
+          cname = getLanguageData("ProtagDaughterCentered");
+        }
+
+        string precede = " ";
+        string procede = " ";
+
+        if(adventureUIManager->stIndex > 0) {
+          precede = "    <";
+        }
+        
+        if(adventureUIManager->stIndex != g_partyCombatants.size()-1) {
+          procede = "    >";
+        }
+        string uselessStat = getLanguageData("UselessStat" + to_string(usI));
+        adventureUIManager->stTextbox3->updateText(precede);
+        adventureUIManager->stTextbox4->updateText(procede);
+
+        adventureUIManager->stTextbox->updateText(
+            "    " + cname +"\n\n"
+            +
+            "HP: " + to_string(c->health) + "/" + to_string(c->baseStrength) + "\n"
+            +
+            "SP: " + to_string(c->sp) + "/" + to_string(c->baseStrength) + "\n"
+            +
+            "Attack: " + to_stringF((int)c->baseAttack)+ "\n"
+            +
+            "Defense: " + to_stringF((int)c->baseDefense)+ "\n"
+            +
+            "Soul: " + to_stringF((int)c->baseSoul)+ "\n"
+            +
+            "Critical: " + to_stringF((int)c->baseCritical)+ "\n"
+            +
+            "Skill: " + to_stringF((int)c->baseSkill)+ "\n"
+            +
+            "Recovery: " + to_stringF((int)c->baseRecovery)+ "\n"
+            +
+            uselessStat + ": " + to_string(usv)+ "\n"
+            );
+        string s1 = "-";
+        string s2 = "-";
+        string s3 = "-";
+        string s4 = "-";
+
+        if(c->spiritMoves[0] >= 0) {
+          s1 = spiritTable[c->spiritMoves[0]].name;
+        }
+        if(c->spiritMoves[1] >= 0) {
+          s2 = spiritTable[c->spiritMoves[1]].name;
+        }
+        if(c->spiritMoves[2] >= 0) {
+          s3 = spiritTable[c->spiritMoves[2]].name;
+        }
+        if(c->spiritMoves[3] >= 0) {
+          s4 = spiritTable[c->spiritMoves[3]].name;
+        }
+
+        adventureUIManager->stTextbox2->updateText("Level " + to_string(c->level) + " (" + to_string(percentToNxt) + "% to next)\n\n"
+            +
+            "Spirit-moves:\n"
+            +
+            s1 + "\n"
+            +
+            s2 + "\n"
+            +
+            s3 + "\n"
+            +
+            s4 + "\n\n"
+            +
+            "Last fight:\n"
+            + 
+            "Damage Dealt: " + to_string((int)c->dmgDealtOverFight) + "\n"
+            +
+            "Damage Taken: " + to_string((int)c->dmgTakenOverFight) + "\n"
+
+            
+            );
+
+        break;
+      }
     }
+  }
+
+  //position dialog pointer
+  {
+    if(adventureUIManager->talker != nullptr) {
+
+      adventureUIManager->dialogpointer->x1 = adventureUIManager->talker->getOriginX();
+      adventureUIManager->dialogpointer->y1 = adventureUIManager->talker->getOriginY();
+      transform3dPoint(adventureUIManager->dialogpointer->x1, adventureUIManager->dialogpointer->y1, adventureUIManager->talker->z + adventureUIManager->talker->bounds.zeight, adventureUIManager->dialogpointer->x1, adventureUIManager->dialogpointer->y1);
+      adventureUIManager->dialogpointer->x1 /= WIN_WIDTH;
+      adventureUIManager->dialogpointer->y1 /= WIN_HEIGHT;
+
+      if(adventureUIManager->dialogpointer->x1 > 1 
+          || adventureUIManager->dialogpointer->x1 < 0
+          || adventureUIManager->dialogpointer->y1 < 0
+          || adventureUIManager->dialogpointer->y1 > 0.6)
+      {
+        adventureUIManager->dialogpointer->visible = 0;
+        adventureUIManager->dialogpointergap->show = 0;
+      }
+
+      {
+        float x2 = adventureUIManager->dialogpointer->x1 * WIN_WIDTH;
+        float y2 = adventureUIManager->dialogpointer->y1 * WIN_HEIGHT;
+        float x1 = adventureUIManager->dialogpointer->x2 * WIN_WIDTH;
+        float y1 = adventureUIManager->dialogpointer->y2 * WIN_HEIGHT;
+      
+        // Calculate slope and y-intercept of the original line
+        float m = (y2 - y1) / (x2 - x1);
+        float b = y1 - (m * x1);
+      
+        // Distance from the line
+        float distance = 52.0f;
+        float distanceL = 58;
+      
+        // Angle for the perpendicular line
+        float angle = atan(-1 / m);
+      
+        // Offset values for the perpendicular distance
+        float offsetX = distance * cos(angle);
+        float offsetY = distance * sin(angle);
+        float offsetXL = distanceL * cos(angle);
+        float offsetYL = distanceL * sin(angle);
+
+      
+        // Final point coordinates
+        float endX = x2;
+        float endY = y2;
+      
+        // Calculate points on either side of the line
+        float xLeft = x1 - offsetXL;
+        float yLeft = y1 - offsetYL;
+        float xRight = x1 + offsetX;
+        float yRight = y1 + offsetY;
+      
+        // Calculate slopes for lines converging to the end point
+        float mlLeft = (endY - yLeft) / (endX - xLeft);
+        float mlRight = (endY - yRight) / (endX - xRight);
+      
+        // Calculate new y-intercepts for the lines
+        float blLeft = yLeft - (mlLeft * xLeft);
+        float blRight = yRight - (mlRight * xRight);
+      
+        // Use any given y coordinate
+        float y = adventureUIManager->dialogpointergap->y * WIN_HEIGHT;
+      
+        // Calculate x coordinates along the two other lines for the given y
+        float xLeftConverge = (y - blLeft) / mlLeft;
+        float xRightConverge = (y - blRight) / mlRight;
+
+        adventureUIManager->dialogpointergap->x = xLeftConverge;
+        adventureUIManager->dialogpointergap->width = xRightConverge -xLeftConverge;
+        adventureUIManager->dialogpointergap->x /= WIN_WIDTH;
+        adventureUIManager->dialogpointergap->width /= WIN_WIDTH;
+//        // Draw squares on either side
+//        SDL_Rect rLeft = {static_cast<int>(xLeftConverge), static_cast<int>(y), 5, 5};
+//        SDL_RenderCopy(renderer, grassTexture, NULL, &rLeft);
+//      
+//        SDL_Rect rRight = {static_cast<int>(xRightConverge), static_cast<int>(y), 5, 5};
+//        SDL_RenderCopy(renderer, grassTexture, NULL, &rRight);
+      }	
+
+    }
+
   }
 
   // spring
@@ -555,7 +849,6 @@ void ExplorationLoop() {
     if (g_listeners[i]->update())
     {
       // !!! could need check that we aren't in dialogue or running a script
-      adventureUIManager->blip = NULL;
       adventureUIManager->ownScript = g_listeners[i]->script;
       adventureUIManager->talker = narrarator;
       adventureUIManager->dialogue_index = -1;
@@ -632,14 +925,8 @@ void ExplorationLoop() {
   // old Fogofwar
   if (g_fogofwarEnabled && !devMode)
   {
-
-    // this is the worst functional code I've written, with no exceptions
-
     int functionalX = g_focus->getOriginX();
     int functionalY = g_focus->getOriginY();
-
-    // int functionalX = g_camera.x + WIN_WIDTH/2;
-    // int functionalY = g_camera.y = WIN_HEIGHT/2;
 
     functionalX -= functionalX % 64;
     functionalX += 32;
@@ -3114,6 +3401,7 @@ int WinMain()
   narrarator = new entity(renderer, "engine/sp-deity");
   narrarator->tangible = 0;
   narrarator->persistentHidden = 1;
+  narrarator->turnToFacePlayer = 0; //idk why this doesn't load as expected
 
   // for transition
   transitionSurface = loadSurface("resources/engine/transition.qoi");
@@ -3135,6 +3423,7 @@ int WinMain()
 
   // setup UI
   adventureUIManager = new adventureUI(renderer);
+  adventureUIManager->blip = g_ui_voice;
   // The adventureUI class has three major uses:
   // The adventureUIManager points to an instance with the full UI for the player
   // The narrarator->myScriptCaller points to an instance which might have some dialogue, so it needs some ui

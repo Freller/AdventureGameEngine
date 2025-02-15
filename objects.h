@@ -831,6 +831,7 @@ public:
   bool show = 0;
   SDL_Texture* texture; //pointer to texture in g_fancyAlphabet
 
+  char debug = ' ';
   char movement = '0';
   
   void setIndex(int findex); 
@@ -956,7 +957,7 @@ class adventureUI {
     vector<pair<string,SDL_Color>> textcolors = {
       {"default", {155, 115, 115}}, //0, pink
 
-      {"red", {155, 115, 115}}, //1
+      {"red", {156, 70, 70}}, //1 standard highlight
       {"orange", {155, 135, 115}}, //2
       {"yellow", {155, 155, 115}}, //3
       {"green", {115, 155, 115}}, //4
@@ -1117,10 +1118,26 @@ class adventureUI {
     int kiIndex = 0;
     int kiOffset = 0;
 
+    //for dialog pointer
+    ribbon* dialogpointer = 0; //this does not live in g_ribbons
+
+    ui* dialogpointergap = 0; //this covers the border of the dialogbox to make the dialogpointer look connected
+
+    //for status menu
+    ui* stPanel;
+    int stIndex = 0; //which character to report on
+
+    textbox* stTextbox;
+    textbox* stTextbox2;
+    textbox* stTextbox3;
+    textbox* stTextbox4;
+
     void showAm();
     void hideAm();
     void showKi();
     void hideKi();
+    void showSt();
+    void hideSt();
 
     void showTalkingUI();
 
@@ -1876,7 +1893,6 @@ class textbox {
     int align = 0;  //0 - left
                     //1 - right
                     //2 - center
-
     float fontsize = 0;
 
     int errorflag = 0;
@@ -1889,7 +1905,6 @@ class textbox {
     float boxX = 0;
     float boxY = 0;
     float boxScale = 40;
-    bool worldspace = false; //use worldspace or screenspace;
     bool blinking = 0;
     bool layer0 = 0;
     
@@ -1907,8 +1922,8 @@ class ui {
   public:
     bool assetSharer = 0;
 
-    float x;
-    float y;
+    float x = 0;
+    float y = 0;
     
     float targetx = -10; //for gliding to a position
     float targety = -10;
@@ -2237,8 +2252,10 @@ class ribbon:public actor {
     float x1 = 0; float y1 = 0; float z1 = 0;
     float x2 = 0; float y2 = 0; float z2 = 0;
 
-    int r_length = 0; //ribbon width
-    int r_thickness = 0; //ribbon height
+    int r_length = 0;
+    int r_thickness = 0;
+
+    bool screenspace = 0; //if one, use percent of screen instead of worldcoords
 
     ribbon();
     ~ribbon();

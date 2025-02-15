@@ -1164,8 +1164,25 @@ int xpToLevel(int xp) {
     level++;
     totalXP+= static_cast<int>(baseXP * pow(1.5, level - 1));
   }
+  if(level > 100) {
+    level = 100;
+  }
 
   return level;
+}
+
+int levelToXp(int level) {
+  if(level > 100) {
+    level = 100;
+  }
+  int baseXP = 100;
+  int totalXP = baseXP;
+
+  for (int i = 1; i < level; i++) {
+    totalXP += static_cast<int>(baseXP * std::pow(1.5, i - 1));
+  }
+
+  return totalXP;
 }
 
 void useItem(int item, int target, combatant* user) {
@@ -1191,6 +1208,7 @@ void useItem(int item, int target, combatant* user) {
         int mag = 50.0f * frng(0.70, 1.30) * user->baseSkill;
         for(int i = 0; i < g_enemyCombatants.size(); i++) {
           g_enemyCombatants[i]->health -= mag;
+          user->dmgDealtOverFight += min(g_enemyCombatants[i]->health, (int)mag);
           string message = g_enemyCombatants[i]->name + " took " + to_string(mag) + " from the bomb.";
           combatUIManager->queuedStrings.push_back(make_pair(message,0));
           combatUIManager->currentText = "";
@@ -1244,6 +1262,8 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
 
         if(mag < 0) {mag = 0;}
         g_enemyCombatants[target]->health -= mag;
+        user->dmgDealtOverFight += min(g_enemyCombatants[target]->health, (int)mag);
+
         string message = getLanguageData("DebugMoveText");
         message = stringMultiInject(message, {user->name, g_enemyCombatants[target]->name});
         combatUIManager->finalText = message;
@@ -1302,6 +1322,7 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
         if(dmg < 0) {dmg = 0;}
 
         g_enemyCombatants[target]->health -= dmg;
+        user->dmgDealtOverFight += min(g_enemyCombatants[target]->health, (int)mag);
  
         int selfdmg = (mag - user->curDefense) * 0.2;
         if(selfdmg < 0) {selfdmg = 0;}
@@ -1468,6 +1489,9 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
           e->statuses.push_back(se);
           dmg = se.magnitude * frng(0.8, 1.2);
         }
+
+        g_enemyCombatants[target]->health -= dmg;
+        user->dmgDealtOverFight += min(g_enemyCombatants[target]->health, (int)dmg);
 
         string message = user->name + " slimes " + e->name + " for " + to_string(dmg) + " damage.";
         combatUIManager->finalText = message;
@@ -1673,7 +1697,6 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   mainText->boxHeight = 0.25;
   mainText->boxX = 0.05;
   mainText->boxY = 0.05;
-  mainText->worldspace = 1; //right align
   mainText->dropshadow = 1;
 
   optionsPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.05, 0.05, 0.6, 0.25, 0);
@@ -2116,16 +2139,16 @@ void drawCombatants() {
 
     combatUIManager->partyMiniText->textcolor = combatUIManager->partyText->textcolor;
     combatUIManager->partyMiniText->show = 1;
-    combatUIManager->partyMiniText->boxX = x + 0.02 + 0.15;
+    combatUIManager->partyMiniText->boxX = x + 0.15;
     combatUIManager->partyMiniText->boxY = 0.7 + 0.02 + bonusY + 0.028;
     combatUIManager->partyMiniText->boxWidth = actual_width;
     combatUIManager->partyMiniText->boxHeight = actual_height;
 
     combatUIManager->partyMiniText->boxY += 0.07;
-    combatUIManager->partyMiniText->updateText('/' + to_stringF(combatant->curStrength), -1, 34, combatUIManager->partyMiniText->textcolor);
+    combatUIManager->partyMiniText->updateText("HP\n/" + to_stringF(combatant->curStrength), -1, 34, combatUIManager->partyMiniText->textcolor);
     combatUIManager->partyMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
     combatUIManager->partyMiniText->boxY += 0.07;
-    combatUIManager->partyMiniText->updateText('/' + to_stringF(combatant->curMind), -1, 34, combatUIManager->partyMiniText->textcolor);
+    combatUIManager->partyMiniText->updateText("SP\n/" + to_stringF(combatant->curMind), -1, 34, combatUIManager->partyMiniText->textcolor);
     combatUIManager->partyMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
 
 
@@ -2154,6 +2177,11 @@ void CombatLoop() {
       {
         for(int i = 0; i < 4; i ++) {
           combatUIManager->dodgingThisTurn[i] = 0;
+        }
+
+        for(auto &x : g_partyCombatants) {
+          x->dmgDealtOverFight = 0;
+          x->dmgTakenOverFight = 0;
         }
 
         g_autoFight = 0;
@@ -2215,6 +2243,11 @@ void CombatLoop() {
     case submode::OUTWIPE:
       {
         M("OUTWIPE");
+
+        for(auto x : g_partyCombatants) {
+          writeSaveField(x->filename + "-dealt", x->dmgDealtOverFight);
+          writeSaveField(x->filename + "-taken", x->dmgTakenOverFight);
+        }
 
         {
           //SDL_GL_SetSwapInterval(0);
@@ -2354,6 +2387,8 @@ void CombatLoop() {
           delete g_deadCombatants[i];
         }
         g_deadCombatants.clear();
+
+        writeSave();
 
         break;
       }
@@ -2892,6 +2927,12 @@ void CombatLoop() {
           damage *= frng(0.80,1.20);
           if(crit) { damage *= 3;}
           if(damage < 0) {damage = 0;}
+          int dmgToReport = damage;
+          if(e->health < dmgToReport) {
+            dmgToReport = e->health;
+          }
+          c->dmgDealtOverFight += dmgToReport;
+
           e->health -= damage;
           string message;
           if(crit) {
@@ -2903,6 +2944,7 @@ void CombatLoop() {
             message = getLanguageData("CombatProtagAttack");
             message = stringMultiInject(message, {c->name, e->name, to_string(damage)});
           }
+
 
           if(e->health < 0) {
             string deathmessage = e->name + " " +  e->deathText;
@@ -3504,7 +3546,7 @@ void CombatLoop() {
         combatant* x = g_partyCombatants[curCombatantIndex];
         x->level = xpToLevel(x->xp);
         combatUIManager->oldLevel = x->level;
-        x->xp += combatUIManager->xpToGrant;
+        x->xp += combatUIManager->xpToGrant * frng(0.95, 1.05);
         combatUIManager->newLevel= xpToLevel(x->xp);
         combatUIManager->thisLevel = combatUIManager->oldLevel+1;
         //g_submode = submode::LEVELUP;
@@ -3598,30 +3640,44 @@ void CombatLoop() {
 
         combatUIManager->currentText = "";
         combatUIManager->mainText->updateText(combatUIManager->currentText, -1, 0.85, g_textcolor, g_font);
-        combatUIManager->finalText = g_partyCombatants[curCombatantIndex]->name + " has reached level " + to_string(combatUIManager->thisLevel) + ".";
+        string line = "";
+        line = stringMultiInject(getLanguageData("CombatLevelUp0"), {g_partyCombatants[curCombatantIndex]->name, to_string(combatUIManager->thisLevel)});
+        combatUIManager->finalText = line;
 
-        g_partyCombatants[curCombatantIndex]->baseAttack += g_partyCombatants[curCombatantIndex]->attackGain * rng(0.8, 1.2);
-        combatUIManager->queuedStrings.push_back(make_pair("New Attack is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseAttack) + ".",0));
 
-        g_partyCombatants[curCombatantIndex]->baseDefense += g_partyCombatants[curCombatantIndex]->defenseGain * rng(0.8, 1.2);
-        combatUIManager->queuedStrings.push_back(make_pair("New Defense is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseDefense) + ".",0));
+        g_partyCombatants[curCombatantIndex]->baseStrength += g_partyCombatants[curCombatantIndex]->strengthGain * frng(0.8, 1.2);
+        line = stringMultiInject(getLanguageData("CombatLevelUp1"), {to_stringF((int)g_partyCombatants[curCombatantIndex]->baseStrength)});
+        combatUIManager->queuedStrings.push_back(make_pair(line,0));
 
-        g_partyCombatants[curCombatantIndex]->baseStrength += g_partyCombatants[curCombatantIndex]->strengthGain * rng(0.8, 1.2);
-        combatUIManager->queuedStrings.push_back(make_pair("New Strength is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseStrength * combatUIManager->thisLevel)  + ".",0));
+        g_partyCombatants[curCombatantIndex]->baseMind += g_partyCombatants[curCombatantIndex]->mindGain * frng(0.8, 1.2);
+        line = stringMultiInject(getLanguageData("CombatLevelUp2"), {to_stringF((int)g_partyCombatants[curCombatantIndex]->baseMind)});
+        combatUIManager->queuedStrings.push_back(make_pair(line,0));
 
-        g_partyCombatants[curCombatantIndex]->baseCritical += g_partyCombatants[curCombatantIndex]->criticalGain * rng(0.8, 1.2);
-        combatUIManager->queuedStrings.push_back(make_pair("New Critical is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseCritical) + ".",0));
+        g_partyCombatants[curCombatantIndex]->baseAttack += g_partyCombatants[curCombatantIndex]->attackGain * frng(0.8, 1.2);
+        line = stringMultiInject(getLanguageData("CombatLevelUp3"), {to_stringF((int)g_partyCombatants[curCombatantIndex]->baseAttack)});
+        combatUIManager->queuedStrings.push_back(make_pair(line,0));
 
-        g_partyCombatants[curCombatantIndex]->baseSkill += g_partyCombatants[curCombatantIndex]->skillGain * rng(0.8, 1.2);
-        combatUIManager->queuedStrings.push_back(make_pair("New Skill is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseSkill) + ".",0));
+        g_partyCombatants[curCombatantIndex]->baseDefense += g_partyCombatants[curCombatantIndex]->defenseGain * frng(0.8, 1.2);
+        line = stringMultiInject(getLanguageData("CombatLevelUp4"), {to_stringF((int)g_partyCombatants[curCombatantIndex]->baseDefense)});
+        combatUIManager->queuedStrings.push_back(make_pair(line,0));
 
-        g_partyCombatants[curCombatantIndex]->baseSoul += g_partyCombatants[curCombatantIndex]->soulGain * rng(0.8, 1.2);
-        combatUIManager->queuedStrings.push_back(make_pair("New Soul is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseSoul) + ".",0));
+        g_partyCombatants[curCombatantIndex]->baseSoul += g_partyCombatants[curCombatantIndex]->soulGain * frng(0.8, 1.2);
+        line = stringMultiInject(getLanguageData("CombatLevelUp5"), {to_stringF((int)g_partyCombatants[curCombatantIndex]->baseSoul)});
+        combatUIManager->queuedStrings.push_back(make_pair(line,0));
 
-        g_partyCombatants[curCombatantIndex]->baseMind += g_partyCombatants[curCombatantIndex]->mindGain * rng(0.8, 1.2);
-        combatUIManager->queuedStrings.push_back(make_pair("New Mind is " + to_stringF(g_partyCombatants[curCombatantIndex]->baseMind + g_partyCombatants[curCombatantIndex]->mindGain * combatUIManager->thisLevel) + ".",0));
+        g_partyCombatants[curCombatantIndex]->baseCritical += g_partyCombatants[curCombatantIndex]->criticalGain * frng(0.8, 1.2);
+        line = stringMultiInject(getLanguageData("CombatLevelUp6"), {to_stringF((int)g_partyCombatants[curCombatantIndex]->baseCritical)});
+        combatUIManager->queuedStrings.push_back(make_pair(line,0));
+
+        g_partyCombatants[curCombatantIndex]->baseSkill += g_partyCombatants[curCombatantIndex]->skillGain * frng(0.8, 1.2);
+        line = stringMultiInject(getLanguageData("CombatLevelUp7"), {to_stringF((int)g_partyCombatants[curCombatantIndex]->baseSkill)});
+        combatUIManager->queuedStrings.push_back(make_pair(line,0));
+
+
+        g_partyCombatants[curCombatantIndex]->level = combatUIManager->thisLevel;
 
         g_submode = submode::LEVELTEXT;
+
 
 
         break;
@@ -5310,6 +5366,11 @@ void CombatLoop() {
         for(auto x : g_miniBullets) {
           if(Distance(combatUIManager->dodgerX, combatUIManager->dodgerY, x->x, x->y) < (combatUIManager->dodgerWidth + x->w)/2) {
             combatUIManager->partyDodgingCombatant->health -= combatUIManager->damageFromEachHit;
+            int dmgToReport = combatUIManager->damageFromEachHit;
+            if(dmgToReport > combatUIManager->partyDodgingCombatant->health) {
+              dmgToReport = combatUIManager->partyDodgingCombatant->health;
+            }
+            combatUIManager->partyDodgingCombatant->dmgTakenOverFight += dmgToReport;
             if(combatUIManager->partyDodgingCombatant->health < 0) {combatUIManager->partyDodgingCombatant->health = 0;}
 
             combatUIManager->damageTakenFromDodgingPhase += combatUIManager->damageFromEachHit;

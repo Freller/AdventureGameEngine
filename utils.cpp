@@ -391,12 +391,11 @@ string getLanguageData(string handle) {
 
   int position = 0;
   int length = 0;
-  try {
+  if(languagePackIndices.count(handle) > 0) { 
     position = languagePackIndices[handle].first;
     length = languagePackIndices[handle].second;
-  } catch (...) {
-    E("Languge-pack key error for " + handle + ".");
-    abort();
+  } else {
+    return "";
   }
 
   if(PHYSFS_exists(fileaddress.c_str())) {

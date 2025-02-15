@@ -639,7 +639,8 @@ extern int g_inputDelayRepeatFrames;
 enum class amState {
   CLOSED,
   MAJOR,
-  KEYITEM
+  STATUS,
+  KEYITEM,
 };
 
 extern amState g_amState;
@@ -1161,7 +1162,7 @@ void playSound(int channel, Mix_Chunk *sound, int loops);
 
 SDL_Texture *MaskTexture(SDL_Renderer *renderer, SDL_Texture *mask, SDL_Texture *diffuse);
 
-float Distance(int x1, int y1, int x2, int y2);
+float Distance(float x1, float y1, float x2, float y2);
 
 float XYDistance(int x1, int y1, int x2, int y2);
 

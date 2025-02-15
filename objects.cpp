@@ -2495,14 +2495,8 @@ void fancybox::arrange(string fcontent) {
       continue;
     }
     if(fcontent[i] == ' ') {
-      float oldwidth = word.width + word.x;
-      float oldy = word.y;
-      words.push_back(word);
-      word.chars.clear();
-      word.width = 0;
-      word.x = oldwidth + (0.01);
-      word.y = oldy;
-      if(word.x > 0.7) {
+
+      if(word.x + word.width > 0.85) {
         word.x = 0;
         word.y += 0.08;
         if(movement == '9') {
@@ -2514,6 +2508,15 @@ void fancybox::arrange(string fcontent) {
         }
 
       }
+
+      float newx = word.width + word.x;
+      float newy = word.y;
+
+      words.push_back(word);
+      word.chars.clear();
+      word.width = 0;
+      word.x = newx + (0.01);
+      word.y = newy;
       continue;
     }
 
@@ -2521,6 +2524,8 @@ void fancybox::arrange(string fcontent) {
     if(movement == '9') { bonusWidth = 3;}
     if(movement == 'a') { bonusWidth = 0.5; word.y=0.025;}
     word.append(g_fancyCharLookup[fcontent[i]], bonusWidth);
+
+    //word.chars.at(word.chars.size() -1).debug = fcontent[i];
     word.chars.at(word.chars.size() -1).index = runningIndex;
     word.chars.at(word.chars.size() -1).color = color;
     word.chars.at(word.chars.size() -1).movement = movement;
@@ -2541,6 +2546,18 @@ void fancybox::arrange(string fcontent) {
 
   }
 
+  if(word.x + word.width > 0.85) {
+    word.x = 0;
+    word.y += 0.08;
+    if(movement == '9') {
+      word.y += 0.08;
+    }
+    if(movement != '3') {
+      //parade movement involves dancing lines
+      runningIndex = 0;
+    }
+
+  }
   words.push_back(word);
 
 }
@@ -2550,6 +2567,9 @@ int fancybox::reveal() {
   // Play a clank
   if (adventureUIManager->typing)
   {
+    if(adventureUIManager->blip == nullptr) {
+      adventureUIManager->blip = g_ui_voice;
+    }
     Mix_HaltChannel(6);
     Mix_VolumeChunk(adventureUIManager->blip, 20);
     playSound(6, adventureUIManager->blip, 0);
@@ -6715,10 +6735,16 @@ int loadSave() {
   ifstream file;
   string line;
 
+  //might be unneeded
+  for(int i = 0; i < 6; i++) {
+    adventureUIManager->kiIcons[i]->texture = adventureUIManager->kiPanel->texture;
+  }
+
   int size = g_keyItems.size();
   for(int i = 0; i < size; i++) {
     delete g_keyItems[0];
   }
+  D(g_keyItems.size());
 
   string address = "user/saves/" + g_saveName + ".save";
   const char* plik = address.c_str();
@@ -6847,6 +6873,14 @@ int loadSave() {
     }
     if(spiritFour != -1) {
       b->spiritMoves.push_back(spiritFour);
+    }
+    b->dmgDealtOverFight = checkSaveField(b->filename + "-dealt");
+    b->dmgTakenOverFight = checkSaveField(b->filename + "-taken");
+    if(b->dmgDealtOverFight == -1) {
+      b->dmgDealtOverFight = 0;
+    }
+    if(b->dmgTakenOverFight == -1) {
+      b->dmgTakenOverFight = 0;
     }
     g_partyCombatants.push_back(b);
 
@@ -7301,14 +7335,31 @@ void textbox::render(SDL_Renderer* renderer, int winwidth, int winheight) {
       }
     }
 
-    if(worldspace) {
-      if(align == 1) {
-        //right
-        SDL_FRect dstrect = {(boxX * winwidth)-width, boxY * winheight, (float)width,  (float)thisrect.h};
+    if(align == 1) {
+      //right
+      SDL_FRect dstrect = {(boxX+width-thisrect.w) * winwidth, boxY * winheight, (float)width,  (float)thisrect.h};
+      dstrect.x /= g_zoom_mod;
+      dstrect.y /= g_zoom_mod;
+      dstrect.w /= g_zoom_mod;
+      dstrect.x /= g_zoom_mod;
+      if(dropshadow) {
+        SDL_FRect shadowRect = dstrect;
+        float booshAmount = getShadowOffset(fontsize);
+        shadowRect.x += booshAmount;
+        shadowRect.y += booshAmount;
+        SDL_SetTextureColorMod(texttexture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
+        SDL_RenderCopyF(renderer, texttexture, NULL, &shadowRect);
+        SDL_SetTextureColorMod(texttexture, 255,255,255);
+      }
+      SDL_RenderCopyF(renderer, texttexture, NULL, &dstrect);
+    } else {
+      if(align == 0) {
+        //left
+        SDL_FRect dstrect = {boxX * winwidth, boxY * winheight, (float)width,  (float)thisrect.h};
         dstrect.x /= g_zoom_mod;
         dstrect.y /= g_zoom_mod;
         dstrect.w /= g_zoom_mod;
-        dstrect.x /= g_zoom_mod;
+        dstrect.h /= g_zoom_mod;
         if(dropshadow) {
           SDL_FRect shadowRect = dstrect;
           float booshAmount = getShadowOffset(fontsize);
@@ -7318,50 +7369,11 @@ void textbox::render(SDL_Renderer* renderer, int winwidth, int winheight) {
           SDL_RenderCopyF(renderer, texttexture, NULL, &shadowRect);
           SDL_SetTextureColorMod(texttexture, 255,255,255);
         }
+
         SDL_RenderCopyF(renderer, texttexture, NULL, &dstrect);
       } else {
-        if(align == 0) {
-          //left
-          SDL_FRect dstrect = {boxX * winwidth, boxY * winheight, (float)width,  (float)thisrect.h};
-          dstrect.x /= g_zoom_mod;
-          dstrect.y /= g_zoom_mod;
-          dstrect.w /= g_zoom_mod;
-          dstrect.h /= g_zoom_mod;
-          if(dropshadow) {
-            SDL_FRect shadowRect = dstrect;
-            float booshAmount = getShadowOffset(fontsize);
-            shadowRect.x += booshAmount;
-            shadowRect.y += booshAmount;
-            SDL_SetTextureColorMod(texttexture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
-            SDL_RenderCopyF(renderer, texttexture, NULL, &shadowRect);
-            SDL_SetTextureColorMod(texttexture, 255,255,255);
-          }
-
-          SDL_RenderCopyF(renderer, texttexture, NULL, &dstrect);
-        } else {
-          //center text
-          SDL_FRect dstrect = {(boxX * winwidth)-width/2, boxY * winheight, (float)width,  (float)thisrect.h};
-          dstrect.x /= g_zoom_mod;
-          dstrect.y /= g_zoom_mod;
-          dstrect.w /= g_zoom_mod;
-          dstrect.h /= g_zoom_mod;
-          if(dropshadow) {
-            SDL_FRect shadowRect = dstrect;
-            float booshAmount = getShadowOffset(fontsize);
-            shadowRect.x += booshAmount;
-            shadowRect.y += booshAmount;
-            SDL_SetTextureColorMod(texttexture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
-            SDL_RenderCopyF(renderer, texttexture, NULL, &shadowRect);
-            SDL_SetTextureColorMod(texttexture, 255,255,255);
-          }
-          SDL_RenderCopyF(renderer, texttexture, NULL, &dstrect);
-        }
-      }
-
-
-    } else {
-      if(align == 1) {
-        SDL_FRect dstrect = {(boxX * winwidth)-width, boxY * winheight, (float)width,  (float)thisrect.h};
+        //center text
+        SDL_FRect dstrect = {(boxX * winwidth)-width/2, boxY * winheight, (float)width,  (float)thisrect.h};
         dstrect.x /= g_zoom_mod;
         dstrect.y /= g_zoom_mod;
         dstrect.w /= g_zoom_mod;
@@ -7376,41 +7388,6 @@ void textbox::render(SDL_Renderer* renderer, int winwidth, int winheight) {
           SDL_SetTextureColorMod(texttexture, 255,255,255);
         }
         SDL_RenderCopyF(renderer, texttexture, NULL, &dstrect);
-      } else {
-        if(align == 0) {
-          SDL_FRect dstrect = {boxX * winwidth, boxY * winheight, (float)width,  (float)thisrect.h};
-          dstrect.x /= g_zoom_mod;
-          dstrect.y /= g_zoom_mod;
-          dstrect.w /= g_zoom_mod;
-          dstrect.h /= g_zoom_mod;
-          if(dropshadow) {
-            SDL_FRect shadowRect = dstrect;
-            float booshAmount = getShadowOffset(fontsize);
-            shadowRect.x += booshAmount;
-            shadowRect.y += booshAmount;
-            SDL_SetTextureColorMod(texttexture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
-            SDL_RenderCopyF(renderer, texttexture, NULL, &shadowRect);
-            SDL_SetTextureColorMod(texttexture, 255,255,255);
-          }
-          SDL_RenderCopyF(renderer, texttexture, NULL, &dstrect);
-        } else {
-          //center text
-          SDL_FRect dstrect = {(boxX * winwidth)-width/2, boxY * winheight, (float)width,  (float)thisrect.h};
-          dstrect.x /= g_zoom_mod;
-          dstrect.y /= g_zoom_mod;
-          dstrect.w /= g_zoom_mod;
-          dstrect.h /= g_zoom_mod;
-          if(dropshadow) {
-            SDL_FRect shadowRect = dstrect;
-            float booshAmount = getShadowOffset(fontsize);
-            shadowRect.x += booshAmount;
-            shadowRect.y += booshAmount;
-            SDL_SetTextureColorMod(texttexture, g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
-            SDL_RenderCopyF(renderer, texttexture, NULL, &shadowRect);
-            SDL_SetTextureColorMod(texttexture, 255,255,255);
-          }
-          SDL_RenderCopyF(renderer, texttexture, NULL, &dstrect);
-        }
       }
     }
   }
@@ -8728,6 +8705,10 @@ void adventureUI::showTalkingUI()
   talkingText->updateText("", -1, 34);
   responseText->show = 1;
   responseText->updateText("", -1, 34);
+  if(talker->turnToFacePlayer) {
+    dialogpointer->visible = 1;
+    dialogpointergap->show = 1;
+  }
 }
 
 void adventureUI::hideTalkingUI()
@@ -8743,6 +8724,8 @@ void adventureUI::hideTalkingUI()
   talkingText->updateText("", -1, 34, defaultTextcolor);
   responseText->show = 0;
   responseText->updateText("", -1, 34, defaultTextcolor);
+  dialogpointer->visible = 0;
+  dialogpointergap->show = 0;
 }
 
 void adventureUI::showInventoryUI()
@@ -8814,6 +8797,22 @@ void adventureUI::hideKi() {
   kiAdvance->show = 0;
 }
 
+void adventureUI::showSt() {
+  stPanel->show = 1;
+  stTextbox->show = 1;
+  stTextbox2->show = 1;
+  stTextbox3->show = 1;
+  stTextbox4->show = 1;
+}
+
+void adventureUI::hideSt() {
+  stPanel->show = 0;
+  stTextbox->show = 0;
+  stTextbox2->show = 0;
+  stTextbox3->show = 0;
+  stTextbox4->show = 0;
+}
+
 adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, but due to the declaration plight is 0 by default
 {
   this->light = plight;
@@ -8841,7 +8840,6 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     talkingText->boxHeight = 0.25;
     talkingText->boxX = 0.05;
     talkingText->boxY = 0.7;
-    talkingText->worldspace = 1; //right align
     talkingText->dropshadow = 1;
 
     responseText = new textbox(renderer, "", 2, 0, 0, 0.9);
@@ -8850,7 +8848,6 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     responseText->boxHeight = 0.2;
     responseText->boxX = 0.5;
     responseText->boxY = 0.87;
-    responseText->worldspace = 1;
     responseText->align = 2; // center-align
     responseText->dropshadow = 1;
 
@@ -8990,7 +8987,6 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     escText->boxY = 0.83;
     escText->boxWidth = 0.98;
     escText->boxHeight = 0.25 - 0.02;
-    escText->worldspace = 0;
     escText->show = 1;
     escText->align = 2;
     escText->dropshadow = 1; 
@@ -9002,7 +8998,6 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     inputText->boxY = 0.3;
     inputText->boxWidth = 0.98;
     inputText->boxHeight = 0.25 - 0.02;
-    inputText->worldspace = 0;
     inputText->show = 1;
     inputText->align = 2;
     inputText->dropshadow = 1; 
@@ -9025,7 +9020,6 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
       a->boxHeight = 0.25;
       a->boxX = 0.05;
       a->boxY = 0.7;
-      a->worldspace = 1; //right align
       a->dropshadow = 1;
       a->layer0 = 1;
       amTextboxes.push_back(a);
@@ -9080,7 +9074,6 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
       a->boxHeight = 0.25;
       a->boxX = 0.05;
       a->boxY = 0.7;
-      a->worldspace = 1; //right align
       a->dropshadow = 1;
       a->boxX = x - 0.03;
       a->boxY = curY;
@@ -9094,6 +9087,67 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
 
       curY+=yinc;
     }
+
+
+    dialogpointer = new ribbon();
+    dialogpointer->texture = loadTexture(renderer, "resources/engine/dialogpointer.qoi");
+    dialogpointer->sortingOffset = 500;
+
+    dialogpointergap = new ui(renderer, "resources/engine/dialogpointergap.qoi", 0.26, 0.655, 0.1, 0.05, 1);
+    dialogpointergap->persistent = true;
+    dialogpointergap->show = 1;
+    
+    //remove dialogpointer from g_actors and g_ribbons
+    g_actors.erase(remove(g_actors.begin(), g_actors.end(), dialogpointer), g_actors.end());
+    g_ribbons.erase(remove(g_ribbons.begin(), g_ribbons.end(), dialogpointer), g_ribbons.end());
+    dialogpointer->visible = 1;
+    dialogpointer->screenspace = 1;
+    dialogpointer->x1 = 0.5;
+    dialogpointer->y1 = 0.5;
+    dialogpointer->x2 = 0.2;
+    dialogpointer->y2 = 0.75;
+
+    stPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.05, 0.05, 0.9, 0.8, 1);
+    stPanel->is9patch = true;
+    stPanel->patchwidth = 213;
+    stPanel->patchscale = 0.4;
+    stPanel->persistent = true;
+    stPanel->show = 0;
+
+    stTextbox = new textbox(renderer, "", 1, 0, 0, 0.9);
+    stTextbox->boxWidth = 0.8;
+    stTextbox->width = 0.8;
+    stTextbox->boxHeight = 0.8;
+    stTextbox->boxX = 0.1;
+    stTextbox->boxY = 0.12;
+    stTextbox->dropshadow = 1;
+
+    stTextbox2 = new textbox(renderer, "", 1, 0, 0, 0.9);
+    stTextbox2->align = 1;
+    stTextbox2->boxWidth = 0.8;
+    stTextbox2->width = 0.8;
+    stTextbox2->boxHeight = 0.8;
+    stTextbox2->boxX = 0.54;
+    stTextbox2->boxY = 0.12;
+    stTextbox2->dropshadow = 1;
+
+    stTextbox3 = new textbox(renderer, "", 1, 0, 0, 0.9);
+    stTextbox3->align = 1;
+    stTextbox3->boxWidth = 0.8;
+    stTextbox3->width = 0.8;
+    stTextbox3->boxHeight = 0.8;
+    stTextbox3->boxX = 0.08;
+    stTextbox3->boxY = 0.12;
+    stTextbox3->dropshadow = 1;
+
+    stTextbox4 = new textbox(renderer, "", 1, 0, 0, 0.9);
+    stTextbox4->align = 1;
+    stTextbox4->boxWidth = 0.8;
+    stTextbox4->width = 0.8;
+    stTextbox4->boxHeight = 0.8;
+    stTextbox4->boxX = 0.242;
+    stTextbox4->boxY = 0.12;
+    stTextbox4->dropshadow = 1;
 
     hideInventoryUI();
     hideTalkingUI();
@@ -9185,6 +9239,10 @@ void adventureUI::pushFancyText(entity * ftalker)
   talkingText->show = 0;
   adventureUIManager->hideInventoryUI();
   talkingBox->show = 1;
+  if(talker->turnToFacePlayer) {
+    dialogpointer->visible = 1;
+    dialogpointergap->show = 1;
+  }
   talker = ftalker;
   typing = 1;
 
@@ -9215,6 +9273,10 @@ void adventureUI::pushText(entity *ftalker)
   adventureUIManager->hideInventoryUI();
   talker = ftalker;
   g_talker = ftalker;
+  if(talker->turnToFacePlayer) {
+    dialogpointer->visible = 1;
+    dialogpointergap->show = 1;
+  }
   if (scriptToUse->at(dialogue_index).at(0) == '%' || scriptToUse->at(dialogue_index).at(0) == ')' || scriptToUse->at(dialogue_index).at(0) == '(')
   {
     pushedText = scriptToUse->at(dialogue_index).substr(1);
@@ -9380,7 +9442,6 @@ void adventureUI::initDialogue() {
 //scripts
 void adventureUI::continueDialogue()
 {
-  breakpoint();
   g_fancybox->show = 0;
   // has our entity died?
   if (g_forceEndDialogue && playersUI)
@@ -9445,6 +9506,7 @@ void adventureUI::continueDialogue()
     keyPromptCancelForceReset = 30;
     keyPrompting = 0;
   }
+
 
 
   if (scriptToUse->size() <= dialogue_index + 2 || scriptToUse->at(dialogue_index + 1) == "#")
@@ -9555,7 +9617,6 @@ void adventureUI::continueDialogue()
     vector<string> x = splitString(s, ' ');
 
     int removeIndex = stoi(x[1]);
-    D(removeIndex);
     for(int i = 0; i < g_keyItems.size(); i++) {
       if(g_keyItems[i]->index == removeIndex) {
         delete g_keyItems[i];
@@ -9576,6 +9637,7 @@ void adventureUI::continueDialogue()
     vector<string> x = splitString(s, ' ');
 
     int giveIndex = stoi(x[1]);
+    M("New keyitem from script");
     keyItemInfo* k = new keyItemInfo(giveIndex);
 
     dialogue_index++;
@@ -12149,25 +12211,32 @@ void ribbon::render(SDL_Renderer* renderer, camera fcamera) {
     SDL_QueryTexture(texture, NULL, NULL, &r_length, &r_thickness);
   }
 
-
   float u1; float v1;
-  transform3dPoint(x1,y1,z1,u1,v1);
   float u2; float v2;
-  transform3dPoint(x2,y2,z2,u2,v2);
+  if(screenspace) {
+    u1 = x1 * WIN_WIDTH;
+    v1 = y1 * WIN_HEIGHT;
+    u2 = x2 * WIN_WIDTH;
+    v2 = y2 * WIN_HEIGHT;
+  } else {
+    transform3dPoint(x1,y1,z1,u1,v1);
+    transform3dPoint(x2,y2,z2,u2,v2);
+  }
 
-  float uc = (u1 + u2)/2;
-  float vc = (v1 + v2)/2;
+  float dist = Distance(u1, v1, u2, v2);
 
-  int dist = Distance(u1, v1, u2, v2);
-
-
-  SDL_Rect drect = {(int)u2, (int)v2, dist, r_thickness};
+  SDL_Rect drect;
+  if(screenspace) {
+    drect = {u2, v2 -r_thickness/2, dist, r_thickness};
+  } else {
+    drect = {(int)u2, (int)v2, dist, r_thickness};
+  }
 
   float angle = atan2( (v1 - v2) , (u1 - u2) ) * (180 / M_PI);
 
   SDL_Point center;
   center.x = 0;
-  center.y = r_thickness/2;
+  center.y = (r_thickness)/2;
 
   SDL_RenderCopyEx(renderer, texture, NULL, &drect, angle, &center, SDL_FLIP_NONE);
 }
@@ -12217,6 +12286,7 @@ keyItemInfo::keyItemInfo(int findex) {
   string addr = "resources/static/key-items/"+to_string(findex) + ".qoi";
   if(PHYSFS_exists(addr.c_str())) {
     texture = loadTexture(renderer, addr);
+    M("Loaded a KI texture");
   } else {
     texture = 0;
   }
@@ -12227,6 +12297,7 @@ keyItemInfo::keyItemInfo(int findex) {
 keyItemInfo::~keyItemInfo() {
   if(texture != 0) {
     SDL_DestroyTexture(texture);
+    M("Destroyed a KI texture");
   }
   g_keyItems.erase(remove(g_keyItems.begin(), g_keyItems.end(), this), g_keyItems.end());
 }

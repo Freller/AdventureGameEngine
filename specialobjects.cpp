@@ -1646,9 +1646,11 @@ void specialObjectsUpdate(entity* a, float elapsed) {
     {
       if(RectOverlap(protag->getMovedBounds(), a->getMovedBounds())) {
         if(a->faction >= 0) {
+          M("New keyitem from special entity");
           keyItemInfo* k = new keyItemInfo(a->faction); //automatically pushed back
           a->faction = -1;
-          protag->children.push_back(a);
+          a->parent = protag;
+          a->isOrbital = true;
           a->usingTimeToLive = 1;
           a->timeToLiveMs = 1000;
         }

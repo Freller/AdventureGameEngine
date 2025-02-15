@@ -107,11 +107,9 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
     g_waypoint = destWaypointName;
   }
 
-  // hide HUD if this is a special map, show it otherwise
-  g_showHUD = !(g_map.substr(0, 3) == "sp-");
-
   vector<string> strings = {};
   if(PHYSFS_exists(filename.c_str())) {
+    D(filename);
     strings = loadText(filename);
   }
 

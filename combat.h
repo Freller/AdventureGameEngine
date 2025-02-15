@@ -136,6 +136,10 @@ public:
   float baseRecovery; //%hp/sp regen after a battle
   float curRecovery;
 
+  //stats for last fight
+  float dmgDealtOverFight = 0;
+  float dmgTakenOverFight = 0;
+
   type myType;
 
   int xp;
@@ -220,6 +224,8 @@ void initTables();
 void initCombat();
 
 int xpToLevel(int xp);
+
+int levelToXp(int level);
 
 void useItem(int item, int target, combatant* user);
 

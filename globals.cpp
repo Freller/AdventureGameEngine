@@ -1144,7 +1144,7 @@ SDL_Texture *MaskTexture(SDL_Renderer *renderer, SDL_Texture *mask, SDL_Texture 
   return result;
 }
 
-float Distance(int x1, int y1, int x2, int y2)
+float Distance(float x1, float y1, float x2, float y2)
 {
   return pow(pow((x1 - x2), 2) + pow((y1 - y2), 2), 0.5);
 }
@@ -1530,17 +1530,18 @@ string getCurrentDir() {
 //  return curdir;
 //}
 
-//trim remove trailing zeroes zeros
-string to_stringF(double value) {
-//  std::ostringstream out;
-//  out << value;
-//  string result = out.str();
-  string result = to_string(value);
+std::string to_stringF(double value) {
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(1) << value;
+    std::string result = out.str();
 
-  result.erase(result.find_last_not_of('0') + 1, std::string::npos);
+    // Remove trailing zeroes
+    result.erase(result.find_last_not_of('0') + 1, std::string::npos);
 
-  if(result.back() == '.') {
-    result.pop_back();
-  }
-  return result;
+    // Remove trailing decimal point if no digits follow
+    if (result.back() == '.') {
+        result.pop_back();
+    }
+
+    return result;
 }
