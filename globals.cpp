@@ -83,6 +83,8 @@ vector<vector<ramp *>> g_ramps;
 
 vector<heightmap *> g_heightmaps;
 
+vector<entity *> g_eheightmaps;
+
 vector<navNode *> g_navNodes;
 
 vector<vector<pointOfInterest *>> g_setsOfInterest;
@@ -302,7 +304,7 @@ float basePunishValueDegrade = -0.1;
 // for having items bounce
 vector<float> g_itemsines;
 
-//float g_elapsed_accumulator = 0;
+float g_elapsed_accumulator = 0;
 
 // I've bounced around thinking these matter and turning them down
 // or deciding that they don't matter and pumping them up
@@ -691,6 +693,11 @@ int g_eu_exec = 0;
 string g_map = "sp-title";
 string g_mapdir = "sp-title";
 string g_waypoint;
+float g_wayOffsetX = 0;
+float g_wayOffsetY = 0;
+int g_useOffset = 0;
+int g_oldDoorWidth = 0;
+int g_oldDoorHeight = 0;
 string g_mapOfLastSave = "sp-title";
 string g_waypointOfLastSave = "a";
 

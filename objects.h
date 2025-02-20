@@ -71,6 +71,8 @@ class heightmap {
     Uint32 getpixel(SDL_Surface *surface, int x, int y);
 };
 
+Uint32 getpixel(SDL_Surface *surface, int x, int y);
+
 class navNode {
   public:
     int x = 0;
@@ -1132,6 +1134,8 @@ class adventureUI {
     textbox* stTextbox3;
     textbox* stTextbox4;
 
+    ui* spPanel;
+
     void showAm();
     void hideAm();
     void showKi();
@@ -1274,6 +1278,7 @@ public:
 
 class entity:public actor {
   public:
+    SDL_Surface* eheightmap;
     string displayName = "";
     int ignoreSolids = 0;
     float widthmodifier;

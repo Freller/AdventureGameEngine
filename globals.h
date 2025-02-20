@@ -239,6 +239,8 @@ extern vector<vector<ramp *>> g_ramps;
 
 extern vector<heightmap *> g_heightmaps;
 
+extern vector<entity *> g_eheightmaps;
+
 extern vector<navNode *> g_navNodes;
 
 extern vector<vector<pointOfInterest *>> g_setsOfInterest;
@@ -557,7 +559,7 @@ extern float basePunishValueDegrade;
 // for having items bounce
 extern vector<float> g_itemsines;
 
-//extern float g_elapsed_accumulator;
+extern float g_elapsed_accumulator;
 
 extern int g_platformResolution;
 extern float g_TiltResolution;
@@ -641,6 +643,11 @@ enum class amState {
   MAJOR,
   STATUS,
   KEYITEM,
+  SPIRIT,
+  SPIRITSELECT,
+  STARGETING,
+  ITEM,
+  ITARGETING
 };
 
 extern amState g_amState;
@@ -758,6 +765,11 @@ extern int g_eu_exec;
 extern string g_map;
 extern string g_mapdir;
 extern string g_waypoint;
+extern float g_wayOffsetX;
+extern float g_wayOffsetY;
+extern int g_useOffset;
+extern int g_oldDoorWidth;
+extern int g_oldDoorHeight;
 extern string g_mapOfLastSave;
 extern string g_waypointOfLastSave;
 

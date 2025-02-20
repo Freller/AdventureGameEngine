@@ -325,48 +325,64 @@ combatant::combatant(string ffilename, int fxp) {
 
   file >> temp;
   file >> attackGain;
+  attackGain -= l0Attack;
+  attackGain /= 100; //attack at level 100
 
   file >> temp;
   file >> l0Defense;
 
   file >> temp;
   file >> defenseGain;
+  defenseGain -= l0Defense;
+  defenseGain /= 100; //attack at level 100
 
   file >> temp;
   file >> l0Strength;
 
   file >> temp;
   file >> strengthGain;
+  strengthGain -= l0Strength;
+  strengthGain /= 100; //attack at level 100
 
   file >> temp;
   file >> l0Critical;
 
   file >> temp;
   file >> criticalGain;
+  criticalGain -= l0Critical;
+  criticalGain /= 100; //attack at level 100
 
   file >> temp;
   file >> l0Skill;
 
   file >> temp;
   file >> skillGain;
+  skillGain -= l0Skill;
+  skillGain /= 100; //attack at level 100
 
   file >> temp;
   file >> l0Soul;
 
   file >> temp;
   file >> soulGain;
+  soulGain -= l0Soul;
+  soulGain /= 100; //attack at level 100
 
   file >> temp;
   file >> l0Mind;
 
   file >> temp;
   file >> mindGain;
+  mindGain -= l0Mind;
+  mindGain /= 100; //attack at level 100
 
   file >> temp;
   file >> l0Recovery;
 
   file >> temp;
   file >> recoveryGain;
+  recoveryGain -= l0Recovery;
+  recoveryGain /= 100; //attack at level 100
 
   file >> temp;
   file >> deathText;
@@ -1411,11 +1427,12 @@ void useSpiritMove(int spiritNumber, int target, combatant* user) {
       {
         combatant* e = g_enemyCombatants[target];
         string message = getLanguageData("InspectMoveText0");
+        D(message);
         message = stringMultiInject(message, {to_string(e->level), e->name, to_string(e->baseStrength), to_stringF(e->baseAttack), to_stringF(e->baseDefense)});
         string message2 = getLanguageData("InspectMoveText1");
         message2 = stringMultiInject(message2, {getSubjectivePronoun(e), to_string(e->health), to_stringF(e->curStrength), to_stringF(e->curDefense)});
         string message3 = getLanguageData("InspectMoveText2");
-        message3 = stringMultiInject(message3, {e->name, getLanguageData("CombatType" + to_string(e->myType))});
+        message3 = stringMultiInject(message3, {e->name, getLanguageData("CombatType"+ to_string((int)e->myType)) });
 
 
 
@@ -1699,7 +1716,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   mainText->boxY = 0.05;
   mainText->dropshadow = 1;
 
-  optionsPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.05, 0.05, 0.6, 0.25, 0);
+  optionsPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.08, 0.05, 0.48, 0.225, 0);
   optionsPanel->patchwidth = 213;
   optionsPanel->patchscale = 0.4;
   optionsPanel->is9patch = true;
@@ -1722,7 +1739,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   optionsMiniText->dropshadow = 1;
   optionsMiniText->show = 1;
 
-  menuPicker = new ui(renderer, "resources/static/ui/menu_picker.qoi", 0.92, 0.88, 0.04, 1, 0);
+  menuPicker = new ui(renderer, "resources/static/ui/menu_picker.qoi", 0.92, 0.88, 0.03, 1, 0);
   menuPicker->heightFromWidthFactor = 1;
   menuPicker->persistent = true;
   menuPicker->priority = 8;
@@ -1743,7 +1760,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   targetText->align = 2;
   targetText->dropshadow = 1;
 
-  inventoryPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.4, 0.05, 0.5, 0.65, 0);
+  inventoryPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.4, 0.05, 0.46, 0.6, 0);
   inventoryPanel->patchwidth = 213;
   inventoryPanel->patchscale = 0.4;
   inventoryPanel->is9patch = true;
@@ -1756,7 +1773,7 @@ combatUI::combatUI(SDL_Renderer* renderer) {
   inventoryText->boxY = 0.22;
   inventoryText->dropshadow = 1;
 
-  spiritPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.4, 0.05, 0.4, 0.42, 0);
+  spiritPanel = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", 0.41, 0.05, 0.34, 0.38, 0);
   spiritPanel->patchwidth = 213;
   spiritPanel->patchscale = 0.4;
   spiritPanel->is9patch = true;
@@ -1854,8 +1871,8 @@ void drawOptionsPanel() {
   combatUIManager->optionsMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
   const int rows = 2;
   const int columns = 3;
-  const float width = 0.18;
-  const float height = 0.08;
+  const float width = 0.16;
+  const float height = 0.07;
   const float initialX = 0.125;
   const float initialY = 0.1;
   int index = 0;
@@ -1865,8 +1882,8 @@ void drawOptionsPanel() {
       combatUIManager->optionsText->boxY = initialY + (j * height);
       combatUIManager->optionsText->updateText(combatUIManager->options[index], -1, 0.85, g_textcolor, g_font);
       if(index == combatUIManager->currentOption) {
-        combatUIManager->menuPicker->x = initialX + (i * width) - 0.035;
-        combatUIManager->menuPicker->y = initialY + (j * height) + 0.005;
+        combatUIManager->menuPicker->x = initialX + (i * width) - 0.027;
+        combatUIManager->menuPicker->y = initialY + (j * height) + 0.007;
       }
 
       combatUIManager->optionsText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
@@ -2004,6 +2021,97 @@ void getCombatInput() {
 
 }
 
+void renderSpiritPanel()
+{
+  const int rows = 4;
+  const int columns = 1;
+  const float width = 0.16;
+  const float height = 0.07;
+  const float initialX = 0.45;
+  const float initialY = 0.1;
+  int index = 0;
+
+  combatUIManager->menuPicker->x = 10;
+  if(g_partyCombatants[curCombatantIndex]->spiritMoves.size() > 0) {
+    for(int i = 0; i < columns; i++) {
+      for(int j = 0; j < rows; j++) {
+        combatUIManager->spiritText->boxX = initialX + (i * width);
+        combatUIManager->spiritText->boxY = initialY + (j * height);
+        string spiritName = "";
+        spiritName = spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[index]].name;
+
+        combatUIManager->spiritText->align = 0;
+        combatUIManager->spiritText->updateText(spiritName, -1, 0.85, g_textcolor, g_font);
+        if(index == combatUIManager->currentInventoryOption) {
+          combatUIManager->menuPicker->x = initialX + (i * width) - 0.027;
+          combatUIManager->menuPicker->y = initialY + (j * height) + 0.007;
+        }
+        combatUIManager->spiritText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+
+        //render cost
+        if(index < g_partyCombatants[curCombatantIndex]->spiritMoves.size() && spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[index]].cost > 0)
+        {
+          combatUIManager->spiritText->align = 1;
+          combatUIManager->spiritText->boxX += 0.27;
+          combatUIManager->spiritText->boxWidth = 0;
+          combatUIManager->spiritText->updateText(to_string(spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[index]].cost), -1, 0.85, g_textcolor, g_font);
+          combatUIManager->spiritText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+        }
+
+
+
+        index++;
+      }
+    }
+    combatUIManager->menuPicker->render(renderer, g_camera, elapsed);
+  }
+}
+
+void renderInventoryPanel() 
+{
+  const int rows = 7;
+  const int columns = 2;
+  const float width = 0.24;
+  const float height = 0.07;
+  const float initialX = 0.45;
+  const float initialY = 0.1;
+  int index = 0;
+  if(g_combatInventory.size() > 0) {
+    for(int i = 0; i < columns; i++) {
+      for(int j = 0; j < rows; j++) {
+        combatUIManager->inventoryText->boxX = initialX + (i * width);
+        combatUIManager->inventoryText->boxY = initialY + (j * height);
+
+        int itemIndex = 0;
+        if(index < g_combatInventory.size() && index >= 0) {
+          itemIndex = g_combatInventory[index];
+        }
+
+        string itemName = "";
+        if(itemIndex >= 0 && itemIndex < itemsTable.size()) {
+          itemName = itemsTable[itemIndex].name;
+        } else {
+          E("Bad itemIndex " + itemIndex);
+          abort();
+        }
+        combatUIManager->inventoryText->updateText(itemName, -1, 0.85, g_textcolor, g_font);
+        if(index == combatUIManager->currentInventoryOption) {
+          combatUIManager->menuPicker->x = initialX + (i * width) - 0.028;
+          combatUIManager->menuPicker->y = initialY + (j * height) + 0.007;
+        }
+        if(index < (int)g_combatInventory.size()) {
+          combatUIManager->inventoryText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+        }
+
+        index++;
+      }
+    }
+    combatUIManager->inventoryText->boxX = 10;
+    combatUIManager->menuPicker->render(renderer, g_camera, elapsed);
+  }
+}
+
+
 void drawCombatants() {
   int count = g_enemyCombatants.size();
 
@@ -2083,7 +2191,11 @@ void drawCombatants() {
         g_submode == submode::ALLYTARGETING ||
         g_submode == submode::SPIRITCHOOSE ||
         g_submode == submode::SPWARNING ||
-        g_submode == submode::RUNWARNING) {
+        g_submode == submode::RUNWARNING ||
+        g_amState == amState::SPIRIT ||
+        g_amState == amState::STARGETING ||
+        g_amState == amState::SPIRITSELECT
+        ) {
       if(i == curCombatantIndex){
         bonusY = -0.05;
       }
@@ -2095,7 +2207,9 @@ void drawCombatants() {
       combatUIManager->partyText->textcolor = g_healthtextlowcolor;
     }
 
-    if(g_submode == submode::ALLYTARGETING) {
+    if(g_submode == submode::ALLYTARGETING
+        || g_amState == amState::STARGETING
+        || g_amState == amState::ITARGETING) {
       if(i == combatUIManager->currentTarget) {
         combatUIManager->partyText->textcolor = { 108, 80, 80};
       } else {
@@ -2137,23 +2251,28 @@ void drawCombatants() {
     combatUIManager->partyText->updateText(to_string(combatant->sp), -1, 34, combatUIManager->partyText->textcolor);
     combatUIManager->partyText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
 
-    combatUIManager->partyMiniText->textcolor = combatUIManager->partyText->textcolor;
     combatUIManager->partyMiniText->show = 1;
-    combatUIManager->partyMiniText->boxX = x + 0.15;
-    combatUIManager->partyMiniText->boxY = 0.7 + 0.02 + bonusY + 0.028;
+    combatUIManager->partyMiniText->boxX = x + 0.15 + 0.02;
+    combatUIManager->partyMiniText->boxY = 0.7 + 0.02 + bonusY + 0.073;
     combatUIManager->partyMiniText->boxWidth = actual_width;
     combatUIManager->partyMiniText->boxHeight = actual_height;
 
-    combatUIManager->partyMiniText->boxY += 0.07;
-    combatUIManager->partyMiniText->updateText("HP\n/" + to_stringF(combatant->curStrength), -1, 34, combatUIManager->partyMiniText->textcolor);
+    combatUIManager->partyMiniText->updateText("HP", -1, 1, combatUIManager->partyText->textcolor);
     combatUIManager->partyMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-    combatUIManager->partyMiniText->boxY += 0.07;
-    combatUIManager->partyMiniText->updateText("SP\n/" + to_stringF(combatant->curMind), -1, 34, combatUIManager->partyMiniText->textcolor);
+    combatUIManager->partyMiniText->boxY += 0.025;
+    combatUIManager->partyMiniText->updateText('/' + to_stringF(combatant->curStrength), -1, 1, combatUIManager->partyText->textcolor);
+    combatUIManager->partyMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+    combatUIManager->partyMiniText->boxY += 0.045;
+    combatUIManager->partyMiniText->updateText("SP", -1, 1, combatUIManager->partyText->textcolor);
+    combatUIManager->partyMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+    combatUIManager->partyMiniText->boxY += 0.025;
+    combatUIManager->partyMiniText->updateText('/' + to_stringF(combatant->curMind), -1, 1, combatUIManager->partyText->textcolor);
     combatUIManager->partyMiniText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
 
 
   }
   combatUIManager->partyHealthBox->show = 0;
+  combatUIManager->partyMiniText->x = 10;
 
 
 }
@@ -2173,7 +2292,7 @@ void CombatLoop() {
 
   drawCombatants();
   switch (g_submode) {
-    case submode::INWIPE:
+    case submode::BEFORE:
       {
         for(int i = 0; i < 4; i ++) {
           combatUIManager->dodgingThisTurn[i] = 0;
@@ -2200,6 +2319,10 @@ void CombatLoop() {
         }
 
         g_forceEndDialogue = 0;
+        g_submode = submode::INWIPE;
+      }
+    case submode::INWIPE:
+      {
         // onframe things
         SDL_LockTexture(transitionTexture, NULL, &transitionPixelReference, &transitionPitch);
 
@@ -4241,37 +4364,7 @@ void CombatLoop() {
 
         }
 
-        const int rows = 7;
-        const int columns = 2;
-        const float width = 0.22;
-        const float height = 0.08;
-        const float initialX = 0.45;
-        const float initialY = 0.1;
-        int index = 0;
-        if(g_combatInventory.size() > 0) {
-          for(int i = 0; i < columns; i++) {
-            for(int j = 0; j < rows; j++) {
-              combatUIManager->inventoryText->boxX = initialX + (i * width);
-              combatUIManager->inventoryText->boxY = initialY + (j * height);
-              int itemIndex = g_combatInventory[index];
-              string itemName = "";
-              itemName = itemsTable[itemIndex].name;
-              combatUIManager->inventoryText->updateText(itemName, -1, 0.85, g_textcolor, g_font);
-              if(index == combatUIManager->currentInventoryOption) {
-                combatUIManager->menuPicker->x = initialX + (i * width) - 0.035;
-                combatUIManager->menuPicker->y = initialY + (j * height) + 0.005;
-              }
-              if(index < g_combatInventory.size()) {
-                combatUIManager->inventoryText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-              }
-
-
-              index++;
-            }
-          }
-          combatUIManager->menuPicker->render(renderer, g_camera, elapsed);
-        }
-
+        renderInventoryPanel();
 
         break;
       }
@@ -4311,9 +4404,6 @@ void CombatLoop() {
 
         if(input[11] && !oldinput[11]) {
           g_partyCombatants[curCombatantIndex]->serial.target = combatUIManager->currentTarget;
-          M("Set target from ally targeting");
-          D(g_partyCombatants[curCombatantIndex]->serial.target);
-          D(curCombatantIndex);
           g_submode = submode::CONTINUE;
         }
 
@@ -4424,47 +4514,7 @@ void CombatLoop() {
 
         }
 
-        const int rows = 4;
-        const int columns = 1;
-        const float width = 0.22;
-        const float height = 0.08;
-        const float initialX = 0.45;
-        const float initialY = 0.1;
-        int index = 0;
-        if(g_partyCombatants[curCombatantIndex]->spiritMoves.size() > 0) {
-          for(int i = 0; i < columns; i++) {
-            for(int j = 0; j < rows; j++) {
-              combatUIManager->spiritText->boxX = initialX + (i * width);
-              combatUIManager->spiritText->boxY = initialY + (j * height);
-              string spiritName = "";
-              spiritName = spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[index]].name;
-
-              combatUIManager->spiritText->align = 0;
-              combatUIManager->spiritText->updateText(spiritName, -1, 0.85, g_textcolor, g_font);
-              if(index == combatUIManager->currentInventoryOption) {
-                combatUIManager->menuPicker->x = initialX + (i * width) - 0.035;
-                combatUIManager->menuPicker->y = initialY + (j * height) + 0.005;
-              }
-              combatUIManager->spiritText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-
-              //render cost
-              if(index < g_partyCombatants[curCombatantIndex]->spiritMoves.size() && spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[index]].cost > 0)
-              {
-                combatUIManager->spiritText->align = 1;
-                combatUIManager->spiritText->boxX += 0.3;
-                combatUIManager->spiritText->boxWidth = 0;
-                combatUIManager->spiritText->updateText(to_string(spiritTable[g_partyCombatants[curCombatantIndex]->spiritMoves[index]].cost), -1, 0.85, g_textcolor, g_font);
-                combatUIManager->spiritText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-              }
-
-
-
-              index++;
-            }
-          }
-          combatUIManager->menuPicker->render(renderer, g_camera, elapsed);
-        }
-
+        renderSpiritPanel();
 
         break;
       }

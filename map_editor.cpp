@@ -994,7 +994,7 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
             }
           }
         }
-        else if (triangle->style == 1)
+        else if (triangle->style == 1) //outcurve
         {
           if (triangle->type == 0)
           {
@@ -1003,7 +1003,7 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
             {
               for (int i = 0; i < 55; i += step)
               {
-                child = new mapObject(renderer, triangle->captexture, "resources/engine/aro.qoi", triangle->x2, triangle->y1 + i + step, triangle->layer * 64 + 64, 64 - 1, step, 0);
+                child = new mapObject(renderer, triangle->captexture, "resources/engine/aro.qoi", triangle->x2, triangle->y1 + i + step, triangle->layer * 64 + 64, 64, step, 0);
                 child->parent = triangle;
                 triangle->children.push_back(child);
               }
@@ -1055,7 +1055,7 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
               {
                 for (int i = 0; i < 55; i += step)
                 {
-                  child = new mapObject(renderer, triangle->captexture, "resources/engine/bro.qoi", triangle->x1 + 1, triangle->y1 + i + step, triangle->layer * 64 + 64, 64 - 1, step, 0);
+                  child = new mapObject(renderer, triangle->captexture, "resources/engine/bro.qoi", triangle->x1, triangle->y1 + i + step, triangle->layer * 64 + 64, 64, step, 0);
                   child->parent = triangle;
                   triangle->children.push_back(child);
                 }
@@ -1107,7 +1107,7 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
                   int step = g_platformResolution;
                   for (int i = 0; i < 55; i += step)
                   {
-                    child = new mapObject(renderer, triangle->captexture, "resources/engine/cro.qoi", triangle->x1 + 1, triangle->y2 + i + step, triangle->layer * 64 + 64, 64 - 1, step, 0);
+                    child = new mapObject(renderer, triangle->captexture, "resources/engine/cro.qoi", triangle->x1, triangle->y2 + i + step, triangle->layer * 64 + 64, 64, step, 0);
                     child->parent = triangle;
                     triangle->children.push_back(child);
                   }
@@ -1130,7 +1130,7 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
                   int step = g_platformResolution;
                   for (int i = 0; i < 55; i += step)
                   {
-                    child = new mapObject(renderer, triangle->captexture, "resources/engine/dro.qoi", triangle->x2, triangle->y2 + i + step, triangle->layer * 64 + 64, 64 - 1, step, 0);
+                    child = new mapObject(renderer, triangle->captexture, "resources/engine/dro.qoi", triangle->x2, triangle->y2 + i + step, triangle->layer * 64 + 64, 64, step, 0);
                     child->parent = triangle;
                     triangle->children.push_back(child);
                   }
@@ -1403,6 +1403,32 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
   {
     if (g_waypoints[i]->name == destWaypointName)
     {
+      //find closest door to this waypoint
+      int flag = 1;
+      float dist = 0;
+      door* closestDoor = nullptr;
+      for(auto x :g_doors) {
+        float newdist = XYWorldDistance(g_waypoints[i]->x, g_waypoints[i]->y, x->x + x->width/2, x->y + x->height/2);
+        if(newdist < dist || flag){
+          flag = 0;
+          dist = newdist;
+          closestDoor = x;
+        }
+      }
+      if(closestDoor->width != g_oldDoorWidth ||
+          closestDoor->height != g_oldDoorHeight && (g_useOffset != 0)) {
+        if(canSwitchOffDevMode) {
+          D(g_oldDoorHeight);
+          D(g_oldDoorWidth);
+          D(closestDoor->width);
+          D(closestDoor->height);
+          M("");
+          E("DOOR HEIGHT/WIDTH MISMATCH!");
+          M("");
+        }
+ 
+
+      }
       for(auto e : party) {
         e->x = g_waypoints[i]->x - e->width / 2;
         e->y = g_waypoints[i]->y + e->bounds.height;
@@ -1425,6 +1451,14 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
           e->animation = 0;
         }
 
+        D(closestDoor);
+        if(closestDoor != nullptr) {
+          if(g_useOffset == 1) {
+            e->setOriginX(closestDoor->x + (closestDoor->width)/2 + g_wayOffsetX);
+          } else if(g_wayOffsetY > 0) {
+            e->setOriginY(closestDoor->y + (closestDoor->height)/2 + g_wayOffsetY);
+          }
+        }
       }
 
     }

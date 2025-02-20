@@ -40,6 +40,11 @@ void dungeonFlash();
 void drawUI() {
 
   adventureUIManager->dialogpointer->render(renderer, g_camera);
+  if((g_amState == amState::SPIRIT || g_amState == amState::SPIRITSELECT || g_amState == amState::STARGETING || g_amState == amState::ITARGETING || g_amState == amState::ITEM) && !protag_is_talking ) {
+    drawCombatants();
+  }
+
+
 
   //bottom-most layer of ui
   for (long long unsigned int i = 0; i < g_ui.size(); i++)
@@ -77,6 +82,15 @@ void drawUI() {
       g_ui[i]->render(renderer, g_camera, elapsed);
     }
   }
+
+  if(g_amState == amState::SPIRITSELECT || g_amState == amState::STARGETING) {
+    renderSpiritPanel();
+  }
+
+  if(g_amState == amState::ITEM || g_amState == amState::ITARGETING) {
+    renderInventoryPanel();
+  }
+
 }
 
 void updateWindowResolution() {
@@ -237,6 +251,7 @@ void ExplorationLoop() {
           g_amState = amState::CLOSED;
           adventureUIManager->hideAm();
           oldinput[8] = 1;
+          break;
         }
         if(input[0] && !oldinput[0] && !protag_is_talking) {
           if(adventureUIManager->amIndex == 1
@@ -273,10 +288,31 @@ void ExplorationLoop() {
                 adventureUIManager->kiOffset = 0;
                 break;
               }
+            case 1:
+              {
+                g_amState = amState::ITEM;
+                combatUIManager->inventoryPanel->show = 1;
+                combatUIManager->inventoryText->show = 1;
+                combatUIManager->currentInventoryOption = 0;
+                combatUIManager->menuPicker->show = 1;
+                combatUIManager->menuPicker->x = 10;
+                combatUIManager->partyText->show = 1;
+                combatUIManager->partyMiniText->show = 1;
+                break;
+              }
             case 2:
               {
                 g_amState = amState::STATUS;
                 adventureUIManager->stIndex = 0;
+                break;
+              }
+            case 3:
+              {
+                g_amState = amState::SPIRIT;
+                combatUIManager->partyText->show = 1;
+                combatUIManager->partyMiniText->show = 1;
+                oldinput[11] = 1;
+                curCombatantIndex = 0;
                 break;
               }
             case 4:
@@ -289,8 +325,8 @@ void ExplorationLoop() {
                 int i = 0;
                 for(;;) {
                   string arg = "Help" + to_string(i) + "-" + g_mapdir + "/" + g_map;
-                  string resp = "`" + getLanguageData(arg);
-                  if(resp == "`") {break;}
+                  string resp = getLanguageData(arg);
+                  if(resp == "") {break;}
                   helpScript.push_back(resp);
                   i++;
                   if(i > 40) {
@@ -300,7 +336,7 @@ void ExplorationLoop() {
                   breakpoint();
                 }
                 if(helpScript.size() == 0) {
-                  helpScript.push_back('`' + getLanguageData("NoHelp"));
+                  helpScript.push_back(getLanguageData("NoHelp"));
                 }
                 helpScript.push_back("#");
 
@@ -328,12 +364,10 @@ void ExplorationLoop() {
                   //keep trying to get language data until it fails
                   int i = 0;
                   int wifeValue = checkSaveField("wifeValue");
-                  D(wifeValue);
                   for(;;) {
                     string arg = "Wife" + to_string(wifeValue) + "-" + to_string(i);
-                    string resp = "`" + getLanguageData(arg);
-                    D(resp);
-                    if(resp == "`") {break;}
+                    string resp = getLanguageData(arg);
+                    if(resp == "") {break;}
                     helpScript.push_back(resp);
                     i++;
                     if(i > 40) {
@@ -343,7 +377,9 @@ void ExplorationLoop() {
                     breakpoint();
                   }
                   if(helpScript.size() == 0) {
-                    helpScript.push_back('`' + getLanguageData("NoHelp"));
+                    helpScript.push_back("");
+                    E("Couldn't find wifescript");
+                    abort();
                   }
                   helpScript.push_back("#");
   
@@ -373,45 +409,46 @@ void ExplorationLoop() {
 
         if(input[8] && !oldinput[8] && !g_keyItemFlavorDisplay) {
           if(adventureUIManager->keyPrompting) {
-            adventureUIManager->response_index = -1; //give nothing
-            adventureUIManager->keyPrompting = 2;
-            g_amState = amState::CLOSED;
-            g_amState = amState::CLOSED;
-            adventureUIManager->hideKi();
-            adventureUIManager->continueDialogue();
-            break;
+            if(adventureUIManager->typing == 0) {
+              adventureUIManager->response_index = -1; //give nothing
+              adventureUIManager->keyPrompting = 2;
+              g_amState = amState::CLOSED;
+              adventureUIManager->hideKi();
+              adventureUIManager->continueDialogue();
+              break;
+            }
           } else {
             g_amState = amState::MAJOR;
           }
         }
-
         if(input[11] && !oldinput[11] && !g_keyItemFlavorDisplay) {
           if(adventureUIManager->keyPrompting) {
-            if(adventureUIManager->kiIndex >= 0 && adventureUIManager->kiIndex < (int)g_keyItems.size()) {
-              adventureUIManager->response_index = g_keyItems[adventureUIManager->kiIndex]->index;
-              adventureUIManager->keyPrompting = 2;
-              g_amState = amState::CLOSED;
-              adventureUIManager->hideKi();
-              adventureUIManager->continueDialogue();
-              break;
-
-            } else {
-              adventureUIManager->response_index = -1; //give nothing
-              adventureUIManager->keyPrompting = 2;
-              g_amState = amState::CLOSED;
-              g_amState = amState::CLOSED;
-              adventureUIManager->hideKi();
-              adventureUIManager->continueDialogue();
-              break;
-
+            if(adventureUIManager->typing == 0) {
+              if(adventureUIManager->kiIndex >= 0 && adventureUIManager->kiIndex < (int)g_keyItems.size()) {
+                  adventureUIManager->response_index = g_keyItems[adventureUIManager->kiIndex]->index;
+                  adventureUIManager->keyPrompting = 2;
+                  g_amState = amState::CLOSED;
+                  adventureUIManager->hideKi();
+                  adventureUIManager->continueDialogue();
+                break;
+  
+              } else {
+                adventureUIManager->response_index = -1; //give nothing
+                adventureUIManager->keyPrompting = 2;
+                g_amState = amState::CLOSED;
+                adventureUIManager->hideKi();
+                breakpoint();
+                adventureUIManager->continueDialogue();
+                break;
+  
+              }
             }
           } else {
             if(adventureUIManager->kiIndex < g_keyItems.size()) {
               //show flavortext
               adventureUIManager->talker = narrarator;
-              D(adventureUIManager->talker->turnToFacePlayer);
               vector<string> flavorScript = {};
-              flavorScript.push_back("`" + getLanguageData("KeyItem" + to_string(g_keyItems[adventureUIManager->kiIndex]->index) + "Flavor"));
+              flavorScript.push_back(getLanguageData("KeyItem" + to_string(g_keyItems[adventureUIManager->kiIndex]->index) + "Flavor"));
               flavorScript.push_back("#");
               adventureUIManager->ownScript = flavorScript;
               adventureUIManager->dialogue_index = -1;
@@ -499,6 +536,99 @@ void ExplorationLoop() {
           adventureUIManager->kiPicker->show = 0;
         }
         
+        break;
+      }
+      case amState::ITEM:
+      {
+        if(input[8] && !oldinput[8]&& !protag_is_talking) {
+          g_amState = amState::MAJOR;
+          combatUIManager->inventoryPanel->show = 0;
+          combatUIManager->inventoryText->show = 0;
+          combatUIManager->menuPicker->show = 0;
+          combatUIManager->partyText->show = 0;
+          combatUIManager->partyMiniText->show = 0;
+        }
+        if(input[0] && !oldinput[0]&& !protag_is_talking) {
+          if(combatUIManager->currentInventoryOption != 0 &&
+              combatUIManager->currentInventoryOption != 7) {
+            combatUIManager->currentInventoryOption --;
+          }
+        }
+
+        if(input[1] && !oldinput[1]&& !protag_is_talking) {
+          if(combatUIManager->currentInventoryOption != 6 &&
+              combatUIManager->currentInventoryOption != 13) {
+            if(combatUIManager->currentInventoryOption + 1 < g_combatInventory.size()) {
+              combatUIManager->currentInventoryOption ++;
+            }
+          }
+        }
+
+        if(input[2] && !oldinput[2]&& !protag_is_talking) {
+          if(combatUIManager->currentInventoryOption >= 7) {
+            combatUIManager->currentInventoryOption -= 7;
+          }
+        }
+
+        if(input[3] && !oldinput[3]&& !protag_is_talking) {
+          if(combatUIManager->currentInventoryOption <= 6) {
+            combatUIManager->currentInventoryOption += 7;
+          }
+        }
+        combatUIManager->currentInventoryOption = clamp(combatUIManager->currentInventoryOption, 0, g_combatInventory.size()-1);
+        if(input[11] &&!oldinput[11]&& !protag_is_talking) {
+          if(combatUIManager->currentInventoryOption >= 0 && combatUIManager->currentInventoryOption < g_combatInventory.size()) {
+            if(itemsTable[g_combatInventory[combatUIManager->currentInventoryOption]].targeting == 1) {
+              g_amState = amState::ITARGETING;
+              combatUIManager->currentTarget = 0;
+              combatUIManager->partyText->show = 1;
+              combatUIManager->partyMiniText->show = 1;
+
+              break;
+            } else {
+              vector<string> spiritScript = {};
+              adventureUIManager->talker = narrarator;
+              spiritScript.push_back(getLanguageData("ItemError"));
+              spiritScript.push_back("#");
+  
+              adventureUIManager->ownScript = spiritScript;
+              adventureUIManager->dialogue_index = -1;
+              adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
+              adventureUIManager->sleepingMS = 0;
+              protag_is_talking = 1;
+              g_keyItemFlavorDisplay = 1; //really just means make sure we dont use the input from the dialog ending to start another one
+              g_forceEndDialogue = 0;
+              adventureUIManager->continueDialogue();
+
+            }
+          }
+        }
+        break;
+      }
+      case amState::ITARGETING:
+      {
+        if(input[8] && !oldinput[8]) {
+          g_amState = amState::ITEM;
+        }
+        if(input[2] && !oldinput[2] && !protag_is_talking) {
+          combatUIManager->currentTarget--;
+        }
+        if(input[3] && !oldinput[3] && !protag_is_talking) {
+          combatUIManager->currentTarget++;
+        }
+        combatUIManager->currentTarget = clamp(combatUIManager->currentTarget, 0, g_partyCombatants.size()-1);
+        if(input[11] && !oldinput[11]) {
+          combatant *c = g_partyCombatants[0];
+          for(auto x : g_partyCombatants) {
+            if(x->baseSkill > c->baseSkill) {
+              c = x;
+            }
+          }
+          useItem(g_combatInventory[combatUIManager->currentInventoryOption], combatUIManager->currentTarget, c);
+          g_combatInventory.erase(g_combatInventory.begin() + combatUIManager->currentInventoryOption);
+          combatUIManager->currentInventoryOption = clamp(combatUIManager->currentInventoryOption, 0, g_combatInventory.size()-1);
+          g_amState = amState::ITEM;
+        }
         break;
       }
       case amState::STATUS:
@@ -621,6 +751,136 @@ void ExplorationLoop() {
 
         break;
       }
+      case amState::SPIRIT:
+      {
+        if(input[8] && !oldinput[8]) {
+          g_amState = amState::MAJOR;
+          combatUIManager->partyText->show = 0;
+          combatUIManager->partyMiniText->show = 0;
+        }
+
+        if(input[2] && !oldinput[2]) {
+          curCombatantIndex--;
+        }
+        if(input[3] && !oldinput[3]) {
+          curCombatantIndex++;
+        }
+        if(curCombatantIndex < 0) curCombatantIndex = 0;
+        if(curCombatantIndex >= g_partyCombatants.size()) curCombatantIndex = g_partyCombatants.size()-1;
+
+        if(input[11] && !oldinput[11]) {
+          g_amState = amState::SPIRITSELECT;
+          combatUIManager->spiritPanel->show = 1;
+          combatUIManager->spiritText->show = 1;
+          combatUIManager->menuPicker->show = 1;
+          combatUIManager->menuPicker->x = 10;
+          combatUIManager->currentInventoryOption = 0;
+
+
+        }
+
+        break;
+      }
+      case amState::SPIRITSELECT:
+      {
+        if(protag_is_talking) {
+          combatUIManager->partyText->show = 0;
+          combatUIManager->partyMiniText->show = 0;
+        } else {
+          combatUIManager->partyText->show = 1;
+          combatUIManager->partyMiniText->show = 1;
+        }
+        if(input[8] && !oldinput[8] && !protag_is_talking) {
+          g_amState = amState::SPIRIT;
+          combatUIManager->spiritPanel->show = 0;
+          combatUIManager->spiritText->show = 0;
+          combatUIManager->menuPicker->show = 0;
+        }
+        if(input[0] && !oldinput[0] && !protag_is_talking) {
+          combatUIManager->currentInventoryOption--;
+        }
+        if(input[1] && !oldinput[1] && !protag_is_talking) {
+          combatUIManager->currentInventoryOption++;
+        }
+        if(combatUIManager->currentInventoryOption < 0) {
+          combatUIManager->currentInventoryOption = 0;
+        }
+        if(combatUIManager->currentInventoryOption >= g_partyCombatants[curCombatantIndex]->spiritMoves.size()) {
+          combatUIManager->currentInventoryOption = g_partyCombatants[curCombatantIndex]->spiritMoves.size()-1;
+        }
+        if(input[11] && !oldinput[11] && !protag_is_talking) {
+          int spiritIndex = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
+          int targeting = spiritTable[spiritIndex].targeting;
+          if(targeting == 1) {
+            combatUIManager->currentTarget = 0;
+            g_amState = amState::STARGETING;
+          } else {
+            vector<string> spiritScript = {};
+            adventureUIManager->talker = narrarator;
+            spiritScript.push_back(getLanguageData("SpiritError"));
+            spiritScript.push_back("#");
+
+            adventureUIManager->ownScript = spiritScript;
+            adventureUIManager->dialogue_index = -1;
+            adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
+            adventureUIManager->sleepingMS = 0;
+            protag_is_talking = 1;
+            g_keyItemFlavorDisplay = 1; //really just means make sure we dont use the input from the dialog ending to start another one
+            g_forceEndDialogue = 0;
+            adventureUIManager->continueDialogue();
+          }
+
+        }
+
+        break;
+      }
+      case amState::STARGETING:
+      {
+        if(protag_is_talking) {
+          combatUIManager->partyText->show = 0;
+          combatUIManager->partyMiniText->show = 0;
+        } else {
+          combatUIManager->partyText->show = 1;
+          combatUIManager->partyMiniText->show = 1;
+        }
+        if(input[8] && !oldinput[8] && !protag_is_talking ) {
+          g_amState = amState::SPIRITSELECT;
+          combatUIManager->menuPicker->x = 10;
+        }
+        if(input[2] && !oldinput[2] && !protag_is_talking) {
+          combatUIManager->currentTarget--;
+        }
+        if(input[3] && !oldinput[3] && !protag_is_talking) {
+          combatUIManager->currentTarget++;
+        }
+        if(input[11] && !oldinput[11] && !protag_is_talking) {
+          //move must be ally-targeted
+          int spiritIndex = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
+          //int targeting = spiritTable[spiritIndex].targeting;
+          int cost = spiritTable[spiritIndex].cost;
+
+          if(g_partyCombatants[curCombatantIndex]->sp >= cost) {
+            useSpiritMove(spiritIndex, combatUIManager->currentTarget, g_partyCombatants[curCombatantIndex]);
+//            vector<string> spiritScript = {};
+//            adventureUIManager->talker = narrarator;
+//            spiritScript.push_back(combatUIManager->finalText);
+//            spiritScript.push_back("#");
+//
+//            adventureUIManager->ownScript = spiritScript;
+//            adventureUIManager->dialogue_index = -1;
+//            adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
+//            adventureUIManager->sleepingMS = 0;
+//            protag_is_talking = 1;
+//            g_keyItemFlavorDisplay = 1; //really just means make sure we dont use the input from the dialog ending to start another one
+//            g_forceEndDialogue = 0;
+//            adventureUIManager->continueDialogue();
+
+          }
+        }
+        if(combatUIManager->currentTarget < 0) combatUIManager->currentTarget = 0;
+        if(combatUIManager->currentTarget >= g_partyCombatants.size()) combatUIManager->currentTarget = g_partyCombatants.size()-1;
+        break;
+      }
     }
   }
 
@@ -709,7 +969,7 @@ void ExplorationLoop() {
   }
 
   // spring
-  if ((input[8] && !oldinput[8] && protag->grounded && protag_can_move) || (input[8] && storedJump && protag->grounded && protag_can_move))
+  if ((input[8] && !oldinput[8] && protag->grounded && protag_can_move && g_amState == amState::CLOSED) || (input[8] && storedJump && protag->grounded && protag_can_move && g_amState == amState::CLOSED))
   {
     protagMakesNoise();
     g_hasBeenHoldingJump = 1;
@@ -967,7 +1227,7 @@ void ExplorationLoop() {
               g_sc[i][j] = 0;
             }
             else if (g_fog_relevent[i][j] == 1 && 
-                LineTrace(functionalX, functionalY, xpos, ypos, 0, 35, g_focus->stableLayer, 7, 1, 1) 
+                LineTrace(functionalX, functionalY, xpos, ypos, 0, 35, g_focus->stableLayer + 1, 7, 1, 1) 
                 &&
                 !g_transferingByBoardable
 
@@ -1335,7 +1595,8 @@ void ExplorationLoop() {
     {
       g_fogslates[i]->x = (int)g_focus->getOriginX() + px - 657;										   // 658
       g_fogslates[i]->y = (int)g_focus->getOriginY() - ((int)g_focus->getOriginY() % 55) + 55 * i - 453; // 449
-      g_fogslates[i]->z = g_focus->stableLayer * 64;
+      //g_fogslates[i]->z = g_focus->stableLayer * 64;
+      g_fogslates[i]->z = 0;
     }
 
     // do it for z = 64
@@ -1350,7 +1611,8 @@ void ExplorationLoop() {
     {
       g_fogslatesA[i]->x = (int)g_focus->getOriginX() + px - 658;											// 655
       g_fogslatesA[i]->y = (int)g_focus->getOriginY() - ((int)g_focus->getOriginY() % 55) + 55 * i - 453; // 449
-      g_fogslatesA[i]->z = g_focus->stableLayer * 64 + 64;
+      //g_fogslatesA[i]->z = g_focus->stableLayer * 64 + 64;
+      g_fogslatesA[i]->z = 64;
     }
 
     addTextures(renderer, g_sc, canvas, light, 500, 500, 250, 250, 1); //g_sc is normal
@@ -1360,7 +1622,8 @@ void ExplorationLoop() {
     for (auto x : g_fogslatesB)
     {
       x->texture = TextureB;
-      x->z = g_focus->stableLayer * 64 + 128;
+      //x->z = g_focus->stableLayer * 64 + 128;
+      x->z = 128;
     }
 
     for (size_t i = 0; i < g_fogslates.size(); i++)
@@ -2020,18 +2283,22 @@ void ExplorationLoop() {
 
     }
 
-    for(auto x : g_boxs[0]) {
-      SDL_FRect obj;
-      obj.x = (x->bounds.x -g_camera.x)* g_camera.zoom;
-      obj.y = (x->bounds.y -g_camera.y - height) * g_camera.zoom;
-      obj.w = x->bounds.width * g_camera.zoom;
-      obj.h = x->bounds.height * g_camera.zoom;
-
-      if(RectOverlap(obj, cam))
-      {
-        g_lt_collisions.push_back(x);
+    //could foreseeably cause issues if ents try pathfinding around
+    //layer 1 blocks and don't "see" layer 0 blocks
+    if(g_focus->stableLayer+1 < g_boxs.size()) {
+      for(auto x : g_boxs[g_focus->stableLayer+1]) {
+        SDL_FRect obj;
+        obj.x = (x->bounds.x -g_camera.x)* g_camera.zoom;
+        obj.y = (x->bounds.y -g_camera.y - height) * g_camera.zoom;
+        obj.w = x->bounds.width * g_camera.zoom;
+        obj.h = x->bounds.height * g_camera.zoom;
+  
+        if(RectOverlap(obj, cam))
+        {
+          g_lt_collisions.push_back(x);
+        }
+  
       }
-
     }
 
   }
@@ -2465,23 +2732,23 @@ void ExplorationLoop() {
   B("Inventory ui");
 
   // sines for item bouncing
-  //g_elapsed_accumulator += elapsed;
-  //    g_itemsines[0] = ( sin(g_elapsed_accumulator / 300) * 10 + 30);
-  //    g_itemsines[1] = ( sin((g_elapsed_accumulator + (235 * 1) ) / 300) * 10 + 30);
-  //    g_itemsines[2] = ( sin((g_elapsed_accumulator + (235 * 2) ) / 300) * 10 + 30);
-  //    g_itemsines[3] = ( sin((g_elapsed_accumulator + (235 * 3) ) / 300) * 10 + 30);
-  //    g_itemsines[4] = ( sin((g_elapsed_accumulator + (235 * 4) ) / 300) * 10 + 30);
-  //    g_itemsines[5] = ( sin((g_elapsed_accumulator + (235 * 5) ) / 300) * 10 + 30);
-  //    g_itemsines[6] = ( sin((g_elapsed_accumulator + (235 * 6) ) / 300) * 10 + 30);
-  //    g_itemsines[7] = ( sin((g_elapsed_accumulator + (235 * 7) ) / 300) * 10 + 30);
-  //    B("Itemsines");
-  //
-  //
-  //    if (g_elapsed_accumulator > 1800 * M_PI)
-  //    {
-  //      g_elapsed_accumulator -= 1800* M_PI;
-  //    }
-  //
+  g_elapsed_accumulator += elapsed;
+  g_itemsines[0] = ( sin(g_elapsed_accumulator / 300) * 10 + 30);
+  g_itemsines[1] = ( sin((g_elapsed_accumulator + (235 * 1) ) / 300) * 10 + 30);
+  g_itemsines[2] = ( sin((g_elapsed_accumulator + (235 * 2) ) / 300) * 10 + 30);
+  g_itemsines[3] = ( sin((g_elapsed_accumulator + (235 * 3) ) / 300) * 10 + 30);
+  g_itemsines[4] = ( sin((g_elapsed_accumulator + (235 * 4) ) / 300) * 10 + 30);
+  g_itemsines[5] = ( sin((g_elapsed_accumulator + (235 * 5) ) / 300) * 10 + 30);
+  g_itemsines[6] = ( sin((g_elapsed_accumulator + (235 * 6) ) / 300) * 10 + 30);
+  g_itemsines[7] = ( sin((g_elapsed_accumulator + (235 * 7) ) / 300) * 10 + 30);
+  B("Itemsines");
+  
+  
+  if (g_elapsed_accumulator > 1800 * M_PI)
+  {
+    g_elapsed_accumulator -= 1800* M_PI;
+  }
+  
 
   if(g_waterAllocated && g_waterOnscreen) {
     g_wAcc+= 0.1;
@@ -2708,14 +2975,14 @@ if (1)
 {
   for (long long unsigned int i = 0; i < g_entities.size(); i++)
   {
-    if (g_entities[i]->isWorlditem || g_entities[i]->identity == 1)
+    if (g_entities[i]->isWorlditem || (g_entities[i]->identity == 35&& g_entities[i]->usingTimeToLive == 0))
     {
       // make it bounce
       int index = g_entities[i]->bounceindex;
       g_entities[i]->floatheight = g_itemsines[index];
     }
     door* taken = nullptr;
-    if( (protag_is_talking == 0 && g_amState == amState::CLOSED && inPauseMenu == 0) || adventureUIManager->talker == g_entities[i]) {
+    if( (protag_is_talking == 0 && g_amState == amState::CLOSED && inPauseMenu == 0)) {
       taken = g_entities[i]->update(g_doors, elapsed);
     }
 
@@ -2725,6 +2992,22 @@ if (1)
     if (taken != nullptr && !transition)
     {
       // player took this door
+      {
+        g_wayOffsetX = 0;
+        g_wayOffsetY = 0;
+        M("Set old door vals");
+        g_oldDoorWidth = taken->width;
+        g_oldDoorHeight = taken->height;
+
+        if(taken->width > taken->height) {
+          g_wayOffsetX = protag->getOriginX() - (taken->x + (taken->width)/2);
+          g_useOffset = 1;
+        } else {
+          g_wayOffsetY = protag->getOriginY() - (taken->y + (taken->height)/2);
+          g_useOffset = 2;
+        }
+      }
+
       // clear level
 
       // we will now clear the map, so we will save the door's destination map as a string
@@ -3829,14 +4112,14 @@ int WinMain()
   inventoryText->show = 0;
   inventoryText->align = 1;
 
-  //  g_itemsines.push_back( sin(g_elapsed_accumulator / 300) * 10 + 30);
-  //  g_itemsines.push_back( sin((g_elapsed_accumulator - 1400) / 300) * 10 + 30);
-  //  g_itemsines.push_back( sin((g_elapsed_accumulator + 925) / 300) * 10 + 30);
-  //  g_itemsines.push_back( sin((g_elapsed_accumulator + 500) / 300) * 10 + 30);
-  //  g_itemsines.push_back( sin((g_elapsed_accumulator + 600) / 300) * 10 + 30);
-  //  g_itemsines.push_back( sin((g_elapsed_accumulator + 630) / 300) * 10 + 30);
-  //  g_itemsines.push_back( sin((g_elapsed_accumulator + 970) / 300) * 10 + 30);
-  //  g_itemsines.push_back( sin((g_elapsed_accumulator + 1020) / 300) * 10 + 30);
+    g_itemsines.push_back( sin(g_elapsed_accumulator / 300) * 10 + 30);
+    g_itemsines.push_back( sin((g_elapsed_accumulator - 1400) / 300) * 10 + 30);
+    g_itemsines.push_back( sin((g_elapsed_accumulator + 925) / 300) * 10 + 30);
+    g_itemsines.push_back( sin((g_elapsed_accumulator + 500) / 300) * 10 + 30);
+    g_itemsines.push_back( sin((g_elapsed_accumulator + 600) / 300) * 10 + 30);
+    g_itemsines.push_back( sin((g_elapsed_accumulator + 630) / 300) * 10 + 30);
+    g_itemsines.push_back( sin((g_elapsed_accumulator + 970) / 300) * 10 + 30);
+    g_itemsines.push_back( sin((g_elapsed_accumulator + 1020) / 300) * 10 + 30);
 
 
   // This stuff is for the FoW mechanic
@@ -6331,7 +6614,6 @@ void toggleDevmode() {
   }
   else
   {
-    M("hid floortex");
     floortexDisplay->show = 0;
     captexDisplay->show = 0;
     walltexDisplay->show = 0;

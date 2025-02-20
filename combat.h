@@ -168,7 +168,7 @@ public:
 
   int itemToUse = -1;
 
-  vector<int> spiritMoves;
+  vector<int> spiritMoves = {};
 
   vector<pair<int, int>> spiritTree;
 
@@ -217,6 +217,8 @@ extern unordered_map<string, type> c_stringToTypeMap;
 
 extern vector<string> pronounTable;
 
+void useSpiritMove(int spiritNumber, int target, combatant* user);
+
 void spawnBullets(int pattern, int& accumulator);
 
 void initTables();
@@ -241,6 +243,7 @@ type stringToType(const std::string& str);
 
 //for handing menuing in turn based combat code
 enum class submode {
+  BEFORE,
   INWIPE,
   OUTWIPE,
   TEXT, //entry text box
@@ -375,6 +378,8 @@ public:
   SDL_Surface* db1 = 0;
   SDL_Texture* tb1 = 0;
 
+  
+
   SDL_Texture* scene = 0;
 
   float time = 0.0f;
@@ -399,6 +404,10 @@ public:
 
   void hideAll();
 };
+
+void renderSpiritPanel();
+
+void renderInventoryPanel();
 
 void drawCombatants();
 

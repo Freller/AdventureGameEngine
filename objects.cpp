@@ -215,6 +215,37 @@ Uint32 heightmap::getpixel(SDL_Surface *surface, int x, int y) {
   }
 }
 
+Uint32 getpixel(SDL_Surface *surface, int x, int y) {
+  int bpp = surface->format->BytesPerPixel;
+  /* Here p is the address to the pixel we want to retrieve */
+  Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
+
+  switch (bpp)
+  {
+    case 1:
+      return *p;
+      //break;
+
+    case 2:
+      return *(Uint16 *)p;
+      //break;
+
+    case 3:
+      if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
+        return p[0] << 16 | p[1] << 8 | p[2];
+      else
+        return p[0] | p[1] << 8 | p[2] << 16;
+      //break;
+
+    case 4:
+      return *(Uint32 *)p;
+      //break;
+
+    default:
+      return 0;
+  }
+}
+
 
 navNode::navNode(int fx, int fy, int fz) {
   //M("navNode()" );
@@ -2399,7 +2430,7 @@ void fancybox::arrange(string fcontent) {
   int runningIndex = 0;
   int color = 0;
   char movement = 0;
-  for(int i = 1; i < fcontent.size(); i++) {
+  for(int i = 0; i < fcontent.size(); i++) {
     runningIndex++;
 
     if(fcontent[i] == '\\') {
@@ -2575,7 +2606,7 @@ int fancybox::reveal() {
     playSound(6, adventureUIManager->blip, 0);
   }
 
-  if(wordProgress < words.size()) {
+  if((int)wordProgress < (int)words.size()) {
     if(letterProgress < words[wordProgress].chars.size()) {
       words[wordProgress].chars[letterProgress].show = 1;
     }
@@ -2587,10 +2618,12 @@ int fancybox::reveal() {
   } else {
     //all done!
     if(adventureUIManager->dialogProceedIndicator->show == 0) {
-      adventureUIManager->dialogProceedIndicator->show = 1;
-      adventureUIManager->dialogProceedIndicator->y = 0.9;
-      adventureUIManager->c_dpiDesendMs = 0;
-      adventureUIManager->c_dpiAsending = 0;
+      if(!adventureUIManager->keyPrompting) {
+        adventureUIManager->dialogProceedIndicator->show = 1;
+        adventureUIManager->dialogProceedIndicator->y = 0.9;
+        adventureUIManager->c_dpiDesendMs = 0;
+        adventureUIManager->c_dpiAsending = 0;
+      }
       adventureUIManager->typing = 0;
     }
     return -1;
@@ -3487,6 +3520,8 @@ entity::entity(SDL_Renderer* renderer, entity* a) {
   this->height = a->height;
   this->curwidth = a->curwidth;
   this->curheight = a->curheight;
+  this->originalWidth = a->originalWidth;
+  this->originalHeight = a->originalHeight;
   this->zeight = a->zeight;
   this->sortingOffset = a->sortingOffset;
   this->bounds = a->bounds;
@@ -3569,6 +3604,10 @@ entity::~entity() {
 
   for(auto x : this->children) {
     x->tangible = 0;
+  }
+
+  if(eheightmap != nullptr) {
+    SDL_FreeSurface(eheightmap);
   }
 
   g_entities.erase(remove(g_entities.begin(), g_entities.end(), this), g_entities.end());
@@ -4062,10 +4101,25 @@ door* entity::update(vector<door*> doors, float elapsed) {
     fangle += (float)orbitOffset * (M_PI/4);
     fangle = fmod(fangle , (2* M_PI));
 
-    this->setOriginX(parent->getOriginX() - cos(fangle) * orbitRange);
-    this->setOriginY(parent->getOriginY() - sin(fangle) * orbitRange);
+    if(identity == 35) {
+      float x1 = parent->getOriginX();
+      float y1 = parent->getOriginY();
+      float x2 = getOriginX();
+      float y2 = getOriginY();
+      float factor = 2000 - timeToLiveMs;
+      factor /= 400;
+      if(factor > 1) factor = 1;
 
-    if(this->dynamic) {
+      float xpos = (x1*factor + x2*(1-factor));
+      float ypos = (y1*factor + y2*(1-factor));
+      this->setOriginX(xpos);
+      this->setOriginY(ypos);
+    } else {
+      this->setOriginX(parent->getOriginX() - cos(fangle) * orbitRange);
+      this->setOriginY(parent->getOriginY() - sin(fangle) * orbitRange);
+    }
+
+    if(this->dynamic && this->identity != 35) {
       this->sortingOffset = baseSortingOffset + sin(fangle) * 21 + 10 + (parent->height - parent->curheight);
     }
 
@@ -4645,6 +4699,57 @@ door* entity::update(vector<door*> doors, float elapsed) {
         }
       }
     }
+
+    if(layer < g_layers) {
+        for(auto r : g_ramps[this->layer]) {
+            rect a = rect(r->x, r->y, 64, 55);
+            rect movedBounds = rect(bounds.x + x + xvel * ((double) elapsed / 256.0), bounds.y + y + yvel * ((double) elapsed / 256.0), bounds.width, bounds.height);
+            
+            if(RectOverlap(movedBounds, a)) {
+                bool aboveRamp = false;
+    
+                switch(r->type) {
+                    case 0: // North-facing ramp
+                        aboveRamp = z > r->layer * 64 + 20;
+                        if (!aboveRamp && (movedBounds.x + movedBounds.width <= r->x + 10 || movedBounds.x >= r->x + 54)) {
+                            xcollide = true;
+                        } else if (!aboveRamp && movedBounds.y <= r->y + 10) {
+                            ycollide = true;
+                        }
+                        break;
+    
+                    case 1: // East-facing ramp
+                        aboveRamp = z > r->layer * 64 + 20;
+                        if (!aboveRamp && (movedBounds.y + movedBounds.height <= r->y + 10 || movedBounds.y >= r->y + 45)) {
+                            ycollide = true;
+                        } else if (!aboveRamp && movedBounds.x + movedBounds.width >= r->x + 54) {
+                            xcollide = true;
+                        }
+                        break;
+    
+                    case 2: // South-facing ramp
+                        aboveRamp = z > r->layer * 64 + 20;
+                        if (!aboveRamp && (movedBounds.x + movedBounds.width <= r->x + 10 || movedBounds.x >= r->x + 54)) {
+                            xcollide = true;
+                        } else if (!aboveRamp && movedBounds.y + movedBounds.height >= r->y + 45) {
+                            ycollide = true;
+                        }
+                        break;
+    
+                    case 3: // West-facing ramp
+                        aboveRamp = z > r->layer * 64 + 20;
+                        if (!aboveRamp && (movedBounds.y + movedBounds.height <= r->y + 10 || movedBounds.y >= r->y + 45)) {
+                            ycollide = true;
+                        } else if (!aboveRamp && movedBounds.x <= r->x + 10) {
+                            xcollide = true;
+                        }
+                        break;
+                }
+            }
+        }
+    }
+
+
     groundedByEntity = 0;
     for (auto n : g_solid_entities) {
       if(this->ignoreSolids) {break;}
@@ -5105,6 +5210,50 @@ door* entity::update(vector<door*> doors, float elapsed) {
     xvel += xpush;
   }
 
+  for (auto& e : g_eheightmaps) {
+      rect movedbounds = rect(bounds.x + x, bounds.y + y, bounds.width, bounds.height);
+      rect ehb = e->getMovedBounds();
+      if (RectOverlap(movedbounds, ehb)) {
+          // Calculate heightmap pixel coordinates based on protag bounds overlap
+          int protagTopLeftX = ((movedbounds.x - ehb.x) /ehb.width) * e->eheightmap->w;
+          int protagTopLeftY = ((movedbounds.y - ehb.y) /ehb.height) * e->eheightmap->h;
+          int protagTopRightX = movedbounds.x + movedbounds.width - ehb.x;
+          int protagTopRightY = movedbounds.y - ehb.y;
+          int protagBottomLeftX = movedbounds.x - ehb.x;
+          int protagBottomLeftY = movedbounds.y + movedbounds.height - ehb.y;
+          int protagBottomRightX = movedbounds.x + movedbounds.width - ehb.x;
+          int protagBottomRightY = movedbounds.y + movedbounds.height - ehb.y;
+
+          SDL_Color rgb = {0,0,0};
+          Uint32 data;
+
+          int topLeft = 0;
+          if(protagTopLeftX >= 0 && protagTopLeftX < e->eheightmap->w && protagTopLeftY >= 0 && protagTopLeftY < e->eheightmap->h) {
+            data = getpixel(e->eheightmap, protagTopLeftX, protagTopLeftY);
+            SDL_GetRGB(data, e->eheightmap->format, &rgb.r, &rgb.g, &rgb.b);
+            topLeft = rgb.r;
+          }
+//          data = getpixel(e->eheightmap, protagTopRightX, protagTopRightY);
+//          SDL_GetRGB(data, e->eheightmap->format, &rgb.r, &rgb.g, &rgb.b);
+//          int topRight = rgb.r;
+//          data = getpixel(e->eheightmap, protagBottomLeftX, protagBottomLeftY);
+//          SDL_GetRGB(data, e->eheightmap->format, &rgb.r, &rgb.g, &rgb.b);
+//          int botLeft = rgb.r;
+//          data = getpixel(e->eheightmap, protagBottomRightX, protagBottomRightY);
+//          SDL_GetRGB(data, e->eheightmap->format, &rgb.r, &rgb.g, &rgb.b);
+//          int botRight = rgb.r;
+
+          int threshhold = 6;
+          
+//          if (topLeftPixel > threshold || topRightPixel > threshold ||
+//              bottomLeftPixel > threshold || bottomRightPixel > threshold) {
+//              xcollide = 1;
+//              ycollide = 1;
+//          }
+      }
+  }
+
+
   if(g_entityBenchmarking) {
     g_eu_timer -= SDL_GetTicks();
     g_eu_d -= g_eu_timer;
@@ -5112,11 +5261,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
   }
 
 
-  //        if(name == "common/neheten") {
-  //          D(xcollide);
-  //          D(ycollide);
-  //          D(( pow( pow(oxvel,2) + pow(oyvel, 2), 0.5) ));
-  //        }
+
   if(((xcollide || ycollide )) && ( pow( pow(oxvel,2) + pow(oyvel, 2), 0.5) > 2 )) {
     if(fragileMovement) {
       timeToLiveMs = -1;
@@ -5412,6 +5557,34 @@ door* entity::update(vector<door*> doors, float elapsed) {
     }
   }
 
+  //use entities with heightmaps (identity 35)
+  for (auto& e : g_eheightmaps) {
+      rect movedbounds = rect(bounds.x + x, bounds.y + y, bounds.width, bounds.height);
+      rect ehb = e->getMovedBounds();
+      if (RectOverlap(movedbounds, ehb)) {
+          float protagTopLeftX = ((getOriginX() - (float)ehb.x) /(float)ehb.width) * (float)e->eheightmap->w;
+          float protagTopLeftY = ((getOriginY() - (float)ehb.y) /(float)ehb.height) * (float)e->eheightmap->h;
+
+          SDL_Color rgb = {0,0,0};
+          Uint32 data;
+
+          int topLeft = -1;
+          if(protagTopLeftX >= 0 && protagTopLeftX < e->eheightmap->w && protagTopLeftY >= 0 && protagTopLeftY < e->eheightmap->h) {
+            data = getpixel(e->eheightmap, protagTopLeftX, protagTopLeftY);
+            SDL_GetRGB(data, e->eheightmap->format, &rgb.r, &rgb.g, &rgb.b);
+            topLeft = rgb.r;
+          }
+
+          if(topLeft >= 0) {
+          
+            floor = topLeft;
+            if(abs(z - (floor + 1)) < 2) {
+              z = floor + 1;
+            }
+            this->shadow->z = floor+1;
+          }
+      }
+  }
 
   if(z > floor + 1) {
     if(useGravity) {
@@ -5496,7 +5669,9 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
       //play landing sound
       //playSound(-1, g_land, 0);
-      playSound(-1, g_staticSounds[3], 0);
+      if( abs(zvel) > 120) {
+        playSound(-1, g_staticSounds[3], 0);
+      }
 
       if(!storedJump) {
         //penalize the player for not bhopping
@@ -6890,6 +7065,18 @@ int loadSave() {
     }
 
   }
+  
+  for(auto x : g_partyCombatants) {
+    x->statuses.clear();
+    x->curStrength = x->baseStrength;
+    x->curMind = x->baseMind;
+    x->curAttack = x->baseAttack;
+    x->curDefense = x->baseDefense;
+    x->curSoul = x->baseSoul;
+    x->curSkill = x->baseSkill;
+    x->curCritical = x->baseCritical;
+    x->curRecovery = x->baseSoul;
+  }
 
   if(setMainProtag) {
     protag = mainProtag;
@@ -7337,7 +7524,10 @@ void textbox::render(SDL_Renderer* renderer, int winwidth, int winheight) {
 
     if(align == 1) {
       //right
-      SDL_FRect dstrect = {(boxX+width-thisrect.w) * winwidth, boxY * winheight, (float)width,  (float)thisrect.h};
+      
+      //thisrect.w is not meant to be multiplied by winwidth
+      //if you change this, it will break textboxes that align themselves at the end of their boxX/Y/Width/Height region
+      SDL_FRect dstrect = {(boxX) * winwidth - thisrect.w, boxY * winheight, (float)width,  (float)thisrect.h};
       dstrect.x /= g_zoom_mod;
       dstrect.y /= g_zoom_mod;
       dstrect.w /= g_zoom_mod;
@@ -7984,6 +8174,7 @@ void escapeUI::uiSelecting() {
 //clear map
 //CLEAR MAP
 void clear_map(camera& cameraToReset) {
+  g_eheightmaps.clear();
   g_poweredDoors.clear();
   g_poweredLevers.clear();
   g_budget = 0;
@@ -9079,7 +9270,7 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
       a->boxY = curY;
       kiTextboxes.push_back(a);
 
-      ui* b = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", x+0.28, curY+0.008, 0.03, 1, 1);
+      ui* b = new ui(renderer, "resources/static/ui/menu9patchblack.qoi", x+0.27, curY - 0.005, 0.04, 1, 1);
       b->heightFromWidthFactor = 1;
       b->persistent = true;
       b->show = 0;
@@ -9123,7 +9314,6 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     stTextbox->dropshadow = 1;
 
     stTextbox2 = new textbox(renderer, "", 1, 0, 0, 0.9);
-    stTextbox2->align = 1;
     stTextbox2->boxWidth = 0.8;
     stTextbox2->width = 0.8;
     stTextbox2->boxHeight = 0.8;
@@ -9132,7 +9322,6 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     stTextbox2->dropshadow = 1;
 
     stTextbox3 = new textbox(renderer, "", 1, 0, 0, 0.9);
-    stTextbox3->align = 1;
     stTextbox3->boxWidth = 0.8;
     stTextbox3->width = 0.8;
     stTextbox3->boxHeight = 0.8;
@@ -9141,7 +9330,6 @@ adventureUI::adventureUI(SDL_Renderer *renderer, bool plight) //a bit strange, b
     stTextbox3->dropshadow = 1;
 
     stTextbox4 = new textbox(renderer, "", 1, 0, 0, 0.9);
-    stTextbox4->align = 1;
     stTextbox4->boxWidth = 0.8;
     stTextbox4->width = 0.8;
     stTextbox4->boxHeight = 0.8;
@@ -9248,6 +9436,13 @@ void adventureUI::pushFancyText(entity * ftalker)
 
   g_talker = ftalker;
   string arrangeText = scriptToUse->at(dialogue_index);
+
+  if(arrangeText.substr(0,10) == "/keyprompt") {
+    arrangeText = arrangeText.substr(10);
+  }
+
+
+
   //parse arrangeText for variables within $$, e.g. $$playername$$
   int position = arrangeText.find("$$");  
   if(position != string::npos) {
@@ -9347,7 +9542,9 @@ void adventureUI::pushText(string text)
 void adventureUI::updateText()
 {
   talkingText->updateText(curText, -1, 0.85, currentTextcolor, currentFontStr);
-  g_fancybox->reveal();
+  if(typing) {
+    g_fancybox->reveal();
+  }
 
   //used to be code here for unsleeping the player's ui
 
@@ -9408,7 +9605,7 @@ void adventureUI::updateText()
     if(!g_fancybox->show) {
       typing = false;
     }
-    if(!askingQuestion && this == adventureUIManager && executingScript && (curText != "") && !g_fancybox->show) {
+    if(!askingQuestion && this == adventureUIManager && executingScript && (curText != "") && !g_fancybox->show && !keyPrompting) {
       if(dialogProceedIndicator->show == 0) {
         dialogProceedIndicator->show = 1;
         dialogProceedIndicator->y = 0.9;
@@ -9420,13 +9617,16 @@ void adventureUI::updateText()
 }
 
 void adventureUI::skipText() {
-  g_fancybox->revealAll();
-  if(pushedText != "") {
-    curText = pushedText;
-    Mix_HaltChannel(6);
-    Mix_VolumeChunk(blip, 20);
+  if(adventureUIManager->typing) {
+    oldinput[8] = 1;
+    g_fancybox->revealAll();
+    if(pushedText != "") {
+      curText = pushedText;
+      Mix_HaltChannel(6);
+      Mix_VolumeChunk(blip, 20);
+    }
+    playSound(6, blip, 0);
   }
-  playSound(6, blip, 0);
 }
 
 //for resetting text color
@@ -9448,6 +9648,7 @@ void adventureUI::continueDialogue()
   {
     g_forceEndDialogue = 0;
     protag_is_talking = 2;
+    talker = narrarator;
     adventureUIManager->hideTalkingUI();
     M("Ret A");
     return;
@@ -9488,6 +9689,9 @@ void adventureUI::continueDialogue()
     //absorb this Z press
     if(playersUI) {
       protag_is_talking = 2;
+      //don't reset talker
+      //other code will end dialog soon
+      //and reset talker
     }
     executingScript = 0;
     mobilize = 0;
@@ -9509,11 +9713,12 @@ void adventureUI::continueDialogue()
 
 
 
-  if (scriptToUse->size() <= dialogue_index + 2 || scriptToUse->at(dialogue_index + 1) == "#")
+  if ((int)scriptToUse->size() <= dialogue_index + 2 || scriptToUse->at(dialogue_index + 1) == "#")
   {
     if (playersUI)
     {
       protag_is_talking = 2;
+      talker = narrarator;
     }
     executingScript = 0;
 
@@ -9585,7 +9790,9 @@ void adventureUI::continueDialogue()
   if(scriptToUse->at(dialogue_index + 1).substr(0,10) == "/keyprompt") {
    
     dialogue_index++;
-    pushText(talker);
+    g_fancybox->show = 1;
+    g_fancybox->clear();
+    pushFancyText(talker);
     int j = 1;
     string res = scriptToUse->at(dialogue_index + j).substr(1);
     keyPromptMap.clear();
@@ -9637,7 +9844,6 @@ void adventureUI::continueDialogue()
     vector<string> x = splitString(s, ' ');
 
     int giveIndex = stoi(x[1]);
-    M("New keyitem from script");
     keyItemInfo* k = new keyItemInfo(giveIndex);
 
     dialogue_index++;
@@ -9711,7 +9917,7 @@ void adventureUI::continueDialogue()
   if (scriptToUse->at(dialogue_index + 1).substr(0,7) == "/combat")
   {
     g_gamemode = gamemode::COMBAT;
-    g_submode = submode::INWIPE;
+    g_submode = submode::BEFORE;
     writeSave();
     transitionDelta = transitionImageHeight;
     g_combatEntryType = 0;
@@ -11477,6 +11683,7 @@ void adventureUI::continueDialogue()
 
     if(playersUI) {
       protag_is_talking = 2;
+      talker = narrarator;
     }
     executingScript = 0;
     adventureUIManager->showHUD();
@@ -11612,6 +11819,7 @@ void adventureUI::continueDialogue()
     if (playersUI)
     {
       protag_is_talking = 2;
+      talker = narrarator;
     }
     executingScript = 0;
 
@@ -12059,6 +12267,7 @@ void adventureUI::continueDialogue()
     quit = 1;
     if(playersUI) {
       protag_is_talking = 2;
+      talker = narrarator;
     }
     return;
   }
@@ -12129,14 +12338,14 @@ void adventureUI::continueDialogue()
   }
 
   //display fancytext
-  if (scriptToUse->at(dialogue_index + 1).substr(0, 1) == "`")
-  {
-    dialogue_index++;
-    g_fancybox->show = 1;
-    g_fancybox->clear();
-    pushFancyText(talker);
-    return;
-  }
+//  if (scriptToUse->at(dialogue_index + 1).substr(0, 1) == "`")
+//  {
+//    dialogue_index++;
+//    g_fancybox->show = 1;
+//    g_fancybox->clear();
+//    pushFancyText(talker);
+//    return;
+//  }
 
   //give the player a new usable, which will later be written to their save file
   // /unlockusable cicada
@@ -12160,7 +12369,13 @@ void adventureUI::continueDialogue()
 
   // default - keep talking
   dialogue_index++;
-  pushText(talker);
+  if(0) { //the end of an era!
+    pushText(talker);
+  } else {
+    g_fancybox->show = 1;
+    g_fancybox->clear();
+    pushFancyText(talker);
+  }
 }
 
 //position UI elements for keyboard
@@ -12286,18 +12501,17 @@ keyItemInfo::keyItemInfo(int findex) {
   string addr = "resources/static/key-items/"+to_string(findex) + ".qoi";
   if(PHYSFS_exists(addr.c_str())) {
     texture = loadTexture(renderer, addr);
-    M("Loaded a KI texture");
   } else {
     texture = 0;
   }
   name = getLanguageData("KeyItem"+to_string(findex) + "Name");
-  g_keyItems.push_back(this);
+  g_keyItems.insert(g_keyItems.begin(), this);
+  //g_keyItems.push_back(this);
 }
 
 keyItemInfo::~keyItemInfo() {
   if(texture != 0) {
     SDL_DestroyTexture(texture);
-    M("Destroyed a KI texture");
   }
   g_keyItems.erase(remove(g_keyItems.begin(), g_keyItems.end(), this), g_keyItems.end());
 }

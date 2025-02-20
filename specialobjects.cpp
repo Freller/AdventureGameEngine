@@ -363,6 +363,18 @@ void specialObjectsInit(entity* a) {
     {
       //key item found in overworld
       //use faction parameter to represent which key item it is
+      a->bounceindex = rand() % 8;
+
+      break;
+    }
+    case 36:
+    {
+      //landmass with faction set to the loaded eheightmap
+      string addr = "resources/static/eheightmaps/" + a->name + ".qoi";
+      D(addr);
+      SDL_Surface* eh = loadSurface(addr);
+      a->eheightmap = eh;
+      g_eheightmaps.push_back(a);
 
       break;
     }
@@ -1449,7 +1461,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
 
         {
           g_gamemode = gamemode::COMBAT;
-          g_submode = submode::INWIPE;
+          g_submode = submode::BEFORE;
           writeSave();
           transitionDelta = transitionImageHeight;
           g_combatEntryType = 1;
@@ -1646,13 +1658,15 @@ void specialObjectsUpdate(entity* a, float elapsed) {
     {
       if(RectOverlap(protag->getMovedBounds(), a->getMovedBounds())) {
         if(a->faction >= 0) {
-          M("New keyitem from special entity");
           keyItemInfo* k = new keyItemInfo(a->faction); //automatically pushed back
           a->faction = -1;
           a->parent = protag;
           a->isOrbital = true;
+          a->bounds.y = 0;
+          a->shadow->visible = 0;
           a->usingTimeToLive = 1;
-          a->timeToLiveMs = 1000;
+          a->sortingOffset = 100;
+          a->timeToLiveMs = 2000;
         }
       }
       break;

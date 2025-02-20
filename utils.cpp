@@ -458,7 +458,7 @@ std::string stringMultiInject(const std::string &templateStr, const std::vector<
         break;
       }
       result.replace(pos, endPos - pos + 1, values[valueIndex]);
-      pos = endPos + values[valueIndex].length();
+      pos = pos + values[valueIndex].length();
     } else {
       break;
     }
