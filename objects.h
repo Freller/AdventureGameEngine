@@ -1278,7 +1278,9 @@ public:
 
 class entity:public actor {
   public:
-    SDL_Surface* eheightmap;
+    float inRangeSlowdownFactor = 0;
+    combatant* hisCombatant = nullptr;
+    SDL_Surface* eheightmap = nullptr;
     string displayName = "";
     int ignoreSolids = 0;
     float widthmodifier;
@@ -1292,8 +1294,8 @@ class entity:public actor {
     //int dialogue_index = 0; //we really don't want to use a dialogue_index in 2023
 
     //"cache" values for originX and originY to save time
-    int cachedOriginX = 0;
-    int cachedOriginY = 0;
+    float cachedOriginX = 0;
+    float cachedOriginY = 0;
 
     bool specialAngleOverride = 0;
 
@@ -1742,9 +1744,9 @@ class entity:public actor {
     ~entity(); 
 
 
-    int getOriginX(); 
+    float getOriginX(); 
   
-    int getOriginY(); 
+    float getOriginY(); 
 
     void setOriginX(float fx); 
   

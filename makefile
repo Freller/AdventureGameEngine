@@ -1,7 +1,7 @@
 physfsobjects = physfs.o physfs_archiver_7z.o physfs_archiver_dir.o physfs_archiver_grp.o physfs_archiver_hog.o physfs_archiver_iso9660.o physfs_archiver_mvl.o physfs_archiver_qpak.o physfs_archiver_slb.o physfs_archiver_unpacked.o physfs_archiver_vdf.o physfs_archiver_wad.o physfs_archiver_zip.o physfs_byteorder.o physfs_platform_android.o physfs_platform_os2.o physfs_platform_posix.o physfs_platform_qnx.o physfs_platform_unix.o physfs_platform_windows.o physfs_unicode.o
 
-all: globals.o lightcookies.o main.o map_editor.o objects.o specialobjects.o utils.o combat.o title.o loss.o $(physfsobjects)
-	g++ main.o objects.o map_editor.o specialobjects.o lightcookies.o globals.o utils.o combat.o title.o loss.o $(physfsobjects) -std=c++17 -ggdb -o out.exe -Wno-narrowing -LC:\Users\Vrickt\OneDrive\Documents\dev\lib\x64\SDL2 -IC:\Users\Vrickt\OneDrive\Documents\dev\include -O0  -lSDL2 -lSDL2_mixer -lSDL2_image -lSDL2_ttf -fmax-errors=1 -g
+all: globals.o lightcookies.o main.o map_editor.o objects.o specialobjects.o utils.o combat.o title.o loss.o mesh.o $(physfsobjects)
+	g++ main.o objects.o map_editor.o specialobjects.o lightcookies.o globals.o utils.o combat.o title.o loss.o mesh.o $(physfsobjects) -std=c++17 -ggdb -o out.exe -Wno-narrowing -LC:\Users\Vrickt\OneDrive\Documents\dev\lib\x64\SDL2 -IC:\Users\Vrickt\OneDrive\Documents\dev\include -O0  -lSDL2 -lSDL2_mixer -lSDL2_image -lSDL2_ttf -fmax-errors=1 -g
 
 globals.o: globals.cpp
 	g++ globals.cpp -flto -std=c++17  -ggdb -c -Wno-narrowing -LC:\Users\Vrickt\OneDrive\Documents\dev\lib\x64\SDL2 -IC:\Users\Vrickt\OneDrive\Documents\dev\include -O0  -lSDL2 -lSDL2_mixer -lSDL2_image -lSDL2_ttf -g -fmax-errors=1
@@ -33,5 +33,10 @@ title.o: title.cpp
 loss.o: loss.cpp
 	g++ loss.cpp -flto -std=c++17  -ggdb -c -Wno-narrowing -LC:\Users\Vrickt\OneDrive\Documents\dev\lib\x64\SDL2 -IC:\Users\Vrickt\OneDrive\Documents\dev\include -O0  -lSDL2 -lSDL2_mixer -lSDL2_image -lSDL2_ttf -g -fmax-errors=1
 
+mesh.o: mesh.cpp
+	g++ mesh.cpp -std=c++17  -ggdb -c -Wno-narrowing -LC:\Users\Vrickt\OneDrive\Documents\dev\lib\x64\SDL2 -IC:\Users\Vrickt\OneDrive\Documents\dev\include -O0  -lSDL2 -lSDL2_mixer -lSDL2_image -lSDL2_ttf -g -fmax-errors=1
+
 clean:
 	del globals.o lightcookies.o main.o map_editor.o objects.o specialobjects.o utils.o combat.o title.o loss.o
+
+# compile the physfs objects with something like g++ *.c idk maybe there were some flags

@@ -429,6 +429,7 @@ void LossLoop() {
         if(lossUIManager->option == 0) {
           //Yes
           //Load the player's save and go to exploration mode
+          resetUnremarkableData();
           g_gamemode = gamemode::EXPLORATION;
 
 

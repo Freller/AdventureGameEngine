@@ -23,6 +23,7 @@
 #include "globals.h"
 
 #include "objects.h"
+#include "utils.h"
 
 #undef M_PI
 #define M_PI 3.14159265358979323846
@@ -138,6 +139,8 @@ vector<tallGrass*> g_tallGrasses;
 vector<camBlocker*> g_camBlockers;
 
 vector<gradient*> g_gradients;
+
+vector<mesh*> g_meshes;
 
 SDL_Texture* g_gradient_a = 0;
 SDL_Texture* g_gradient_b = 0;
@@ -347,7 +350,7 @@ navNode* precedeProtagNode = nullptr; //set in main loop, used by some monsters.
 bool g_loadingATM = 0; // are we loading a new map atm?
 SDL_Texture *g_shadowTexture;
 SDL_Texture *g_shadowTextureAlternate;
-int g_flashtime = 300;		 // ms to flash red after taking damage
+int g_flashtime = 500;		 // ms to flash red after taking damage
 float g_whiteFlashtime = 300; 
 float g_cameraShove = 150; // factor of the screen to move the camera when shooting.
 float g_cameraAimingOffsetX = 0;
@@ -635,7 +638,7 @@ SDL_Window *window;
 SDL_DisplayMode DM;
 bool g_fullscreen = false;
 camera g_camera(0, 0);
-entity *protag;
+entity *protag = nullptr;
 entity *mainProtag; // for letting other entities use this ones inventory; game ends when this one dies
 entity * g_hog=0;
 entity* g_behemoth0=0;
@@ -807,7 +810,7 @@ string g_keyboardSaveToField = ""; //the save-field to write keyboard input to, 
 SDL_Color g_textcolor = { 155, 115, 115 };
 SDL_Color g_goldcolor = { 156, 127, 11 };
 SDL_Color g_healthtextcolor = { 220, 203, 25 };
-SDL_Color g_healthtextlowcolor = { 130, 24, 48 };
+SDL_Color g_healthtextlowcolor = { 100, 100, 100 };
 
 string g_levelSequenceName = "default"; //use the default level sequence for the base game by default
 levelSequence* g_levelSequence;
@@ -855,14 +858,14 @@ std::map<string, int> g_save = {};
 std::map<string, string> g_saveStrings = {};
 
 // movement
-float g_bhoppingBoost = 0; // the factor applied to friction whilst airborn
+float g_bhoppingBoost = 1; // the factor applied to friction whilst airborn
 float g_defaultBhoppingBoost = 1;
 float g_maxBhoppingBoost = 1;
 float g_deltaBhopBoost = 1;
 int protagConsecutiveBhops = 0; //increased for every successive bhop
 
-float g_jump_afterslow = 0;
-float g_jump_afterslow_seconds = 0; //make it so that the longer you bhop the longer you are slowed
+float g_jump_afterslow = 1;
+float g_jump_afterslow_seconds = 1; //make it so that the longer you bhop the longer you are slowed
 
 int g_protagBonusSpeedMS = 0;
 int g_protagMsToStunned = 0;
@@ -1067,6 +1070,8 @@ gamemode g_gamemode = gamemode::TITLE; //exploration, combat, gameover
 turn g_turn = turn::PLAYER;
 
 submode g_submode = submode::TEXT;
+
+int g_breakFromPrimarySwitch = 0;
 
 combatUI* combatUIManager;
 
@@ -1480,7 +1485,33 @@ float clamp(float value, float min, float max) {
 }
 
 void hurtProtag(int dmg) {
-  
+  if(protag->invincibleMS > 0) {return;}
+  vector<entity*> validParty = {};
+  for(auto &x : party) {
+    if(x->hisCombatant->health > 0) validParty.push_back(x);
+  }
+  if(validParty.size() > 0) {
+    int rand = rng(0, validParty.size()-1);
+    validParty[rand]->flashingMS = g_flashtime;
+    validParty[rand]->hisCombatant->health -= dmg;
+    if(validParty[rand]->hisCombatant->health <0) {validParty[rand]->hisCombatant->health = 0;}
+    protag->invincibleMS = 2000;
+    g_spin_entity->invincibleMS = 2000;
+  }
+
+  validParty.clear();
+  for(auto &x : party) {
+    if(x->hisCombatant->health > 0) validParty.push_back(x);
+  }
+
+  if(validParty.size() == 0) {   
+    Mix_FadeOutMusic(1000);
+    clear_map(g_camera);
+    g_lossSub = lossSub::INWIPE;
+    transitionDelta = transitionImageHeight;
+    g_gamemode = gamemode::LOSS;
+    g_breakFromPrimarySwitch = 1;
+  }
 }
 
 /* Restart dungeon floor upon taking damage

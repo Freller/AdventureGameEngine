@@ -2211,9 +2211,20 @@ void drawCombatants() {
         || g_amState == amState::STARGETING
         || g_amState == amState::ITARGETING) {
       if(i == combatUIManager->currentTarget) {
-        combatUIManager->partyText->textcolor = { 108, 80, 80};
+        if(combatant->health <= 0) {
+          combatUIManager->partyText->textcolor = g_healthtextlowcolor;
+          combatUIManager->partyText->textcolor.r -= 45;
+          combatUIManager->partyText->textcolor.g -= 45;
+          combatUIManager->partyText->textcolor.b -= 45;
+        } else {
+          combatUIManager->partyText->textcolor = { 108, 80, 80};
+        }
       } else {
-        combatUIManager->partyText->textcolor = { 155, 115, 115};
+        if(combatant->health <= 0) {
+          combatUIManager->partyText->textcolor = g_healthtextlowcolor;
+        } else {
+          combatUIManager->partyText->textcolor = { 155, 115, 115};
+        }
       }
     }
 
@@ -2630,6 +2641,8 @@ void CombatLoop() {
         protag_is_talking = 2;
 
         g_gamemode = gamemode::LOSS;
+        g_lossSub = lossSub::INWIPE;
+        transitionDelta = transitionImageHeight;
         //lossUIManager->redness = 255;
         transition = 1;
         transitionDelta = transitionImageHeight;

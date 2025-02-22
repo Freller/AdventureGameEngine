@@ -120,6 +120,39 @@ void parseScriptForLabels(vector<string> &sayings) {
 
 }
 
+// Function to calculate barycentric coordinates
+std::array<float, 3> getBarycentricCoords(vertex3d p, vertex3d a, vertex3d b, vertex3d c) {
+    std::array<float, 3> bary;
+    float denom = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+    bary[0] = ((b.y - c.y) * (p.x - c.x) + (c.x - b.x) * (p.y - c.y)) / denom;
+    bary[1] = ((c.y - a.y) * (p.x - c.x) + (a.x - c.x) * (p.y - c.y)) / denom;
+    bary[2] = 1 - bary[0] - bary[1];
+    return bary;
+}
+
+// Function to calculate normal of a face
+std::array<float, 3> calculateNormal(vertex3d vA, vertex3d vB, vertex3d vC) {
+    std::array<float, 3> normal;
+    float x1 = vB.x - vA.x;
+    float y1 = vB.y - vA.y;
+    float z1 = vB.z - vA.z;
+    float x2 = vC.x - vA.x;
+    float y2 = vC.y - vA.y;
+    float z2 = vC.z - vA.z;
+    normal[0] = y1 * z2 - z1 * y2;
+    normal[1] = z1 * x2 - x1 * z2;
+    normal[2] = x1 * y2 - y1 * x2;
+
+    // Normalize the normal vector
+    float length = sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+    if (length != 0) {
+        normal[0] /= length;
+        normal[1] /= length;
+        normal[2] /= length;
+    }
+    return normal;
+}
+
 //this seems to work
 void parseWScriptForDialogHooks(vector<wstring> &sayings) {
   for(auto &x : sayings) {
@@ -3608,6 +3641,7 @@ entity::~entity() {
 
   if(eheightmap != nullptr) {
     SDL_FreeSurface(eheightmap);
+    M("Freed eheightmap");
   }
 
   g_entities.erase(remove(g_entities.begin(), g_entities.end(), this), g_entities.end());
@@ -3615,7 +3649,7 @@ entity::~entity() {
 }
 
 
-int entity::getOriginX() {
+float entity::getOriginX() {
   if(!cachedOriginValsAreGood) {
     cachedOriginX = x + bounds.x + bounds.width/2;
     cachedOriginY = y + bounds.y + bounds.height/2;
@@ -3625,7 +3659,7 @@ int entity::getOriginX() {
   //return  x + bounds.x + bounds.width/2;
 }
 
-int entity::getOriginY() {
+float entity::getOriginY() {
   if(!cachedOriginValsAreGood ) {
     cachedOriginX = x + bounds.x + bounds.width/2;
     cachedOriginY = y + bounds.y + bounds.height/2;
@@ -3674,11 +3708,17 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
 
   }
 
+
   if(opacity < 0) {
     SDL_SetTextureAlphaMod(texture, 0);
   } else {
     SDL_SetTextureAlphaMod(texture, opacity);
   }
+
+  if(invincibleMS > 0) {
+    SDL_SetTextureAlphaMod(texture, 128);
+  }
+
 
   if(!tangible) {return;}
   if(!visible) {return;}
@@ -3755,7 +3795,6 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
 
 
   if(RectOverlap(obj, cam)) {
-
     if(directionUpdateCooldownMs < 0) {
 
       //set visual direction
@@ -3897,6 +3936,9 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
       }
 
       if(texture != NULL) {
+        if(this == protag) {
+          D(dstrect.x);
+        }
         SDL_RenderCopyF(renderer, texture, NULL, &dstrect);
       }
       //      if(flashingMS > 0) {
@@ -3956,6 +3998,7 @@ void entity::stop_hori() {
 void entity::move_right() {
   if(stunned) {return;}
   forwardsVelocity = (xagil * (100 - statusSlownPercent));
+
   //x+=xagil;
   //xaccel = (xagil * (100 - statusSlownPercent));
   if(shooting) { return;}
@@ -4106,8 +4149,8 @@ door* entity::update(vector<door*> doors, float elapsed) {
       float y1 = parent->getOriginY();
       float x2 = getOriginX();
       float y2 = getOriginY();
-      float factor = 2000 - timeToLiveMs;
-      factor /= 400;
+      float factor = 2500 - timeToLiveMs;
+      factor /= 600;
       if(factor > 1) factor = 1;
 
       float xpos = (x1*factor + x2*(1-factor));
@@ -4329,15 +4372,8 @@ door* entity::update(vector<door*> doors, float elapsed) {
   float thisSA = steeringAngle;
   float angularDiff = abs(thisTA - thisSA);
   if( angularDiff > M_PI/2) {
-    //could it be a case of angle wrap causing problems?
-    if(thisTA == 0) {
-      thisTA = 2 * M_PI;
-    }
-    if(thisSA == 0) {
-      thisSA = 2 * M_PI;
-    }
-    angularDiff = abs(thisTA - thisSA);
-    if(angularDiff > M_PI/2) {
+    angularDiff = abs(angleDiff(thisTA, thisSA));
+    if(angularDiff >= M_PI/2) {
       forwardsVelocity = 0;
     }
   }
@@ -4347,7 +4383,9 @@ door* entity::update(vector<door*> doors, float elapsed) {
     forwardsPushVelocity = 0;
   }
 
-  if(stunned) {forwardsVelocity = 0;}
+  if(stunned) {
+    forwardsVelocity = 0;
+  }
 
   //set xaccel and yaccel from forwardsVelocity
   xaccel = cos(steeringAngle) * forwardsVelocity;
@@ -4357,10 +4395,15 @@ door* entity::update(vector<door*> doors, float elapsed) {
   if(this->wasPellet && this->usingTimeToLive) {
     this->steeringAngle = wrapAngle(atan2(protag->getOriginX() - this->getOriginX(), protag->getOriginY() - this->getOriginY()) - M_PI/2);
     this->targetSteeringAngle = this->steeringAngle;
-  } else {
-    forwardsVelocity = 0;
   }
 
+  if(this == protag) {
+    if(!up && !down && !left && !right) {
+      forwardsVelocity = 0;
+    } else {
+      forceAngularUpdate = 1;
+    }
+  }
 
   if(this == protag) {
     if(up) {
@@ -5210,50 +5253,6 @@ door* entity::update(vector<door*> doors, float elapsed) {
     xvel += xpush;
   }
 
-  for (auto& e : g_eheightmaps) {
-      rect movedbounds = rect(bounds.x + x, bounds.y + y, bounds.width, bounds.height);
-      rect ehb = e->getMovedBounds();
-      if (RectOverlap(movedbounds, ehb)) {
-          // Calculate heightmap pixel coordinates based on protag bounds overlap
-          int protagTopLeftX = ((movedbounds.x - ehb.x) /ehb.width) * e->eheightmap->w;
-          int protagTopLeftY = ((movedbounds.y - ehb.y) /ehb.height) * e->eheightmap->h;
-          int protagTopRightX = movedbounds.x + movedbounds.width - ehb.x;
-          int protagTopRightY = movedbounds.y - ehb.y;
-          int protagBottomLeftX = movedbounds.x - ehb.x;
-          int protagBottomLeftY = movedbounds.y + movedbounds.height - ehb.y;
-          int protagBottomRightX = movedbounds.x + movedbounds.width - ehb.x;
-          int protagBottomRightY = movedbounds.y + movedbounds.height - ehb.y;
-
-          SDL_Color rgb = {0,0,0};
-          Uint32 data;
-
-          int topLeft = 0;
-          if(protagTopLeftX >= 0 && protagTopLeftX < e->eheightmap->w && protagTopLeftY >= 0 && protagTopLeftY < e->eheightmap->h) {
-            data = getpixel(e->eheightmap, protagTopLeftX, protagTopLeftY);
-            SDL_GetRGB(data, e->eheightmap->format, &rgb.r, &rgb.g, &rgb.b);
-            topLeft = rgb.r;
-          }
-//          data = getpixel(e->eheightmap, protagTopRightX, protagTopRightY);
-//          SDL_GetRGB(data, e->eheightmap->format, &rgb.r, &rgb.g, &rgb.b);
-//          int topRight = rgb.r;
-//          data = getpixel(e->eheightmap, protagBottomLeftX, protagBottomLeftY);
-//          SDL_GetRGB(data, e->eheightmap->format, &rgb.r, &rgb.g, &rgb.b);
-//          int botLeft = rgb.r;
-//          data = getpixel(e->eheightmap, protagBottomRightX, protagBottomRightY);
-//          SDL_GetRGB(data, e->eheightmap->format, &rgb.r, &rgb.g, &rgb.b);
-//          int botRight = rgb.r;
-
-          int threshhold = 6;
-          
-//          if (topLeftPixel > threshold || topRightPixel > threshold ||
-//              bottomLeftPixel > threshold || bottomRightPixel > threshold) {
-//              xcollide = 1;
-//              ycollide = 1;
-//          }
-      }
-  }
-
-
   if(g_entityBenchmarking) {
     g_eu_timer -= SDL_GetTicks();
     g_eu_d -= g_eu_timer;
@@ -5586,6 +5585,52 @@ door* entity::update(vector<door*> doors, float elapsed) {
       }
   }
 
+  //for meshes
+  for(auto m : g_meshes) {
+    if(XYWorldDistance(m->origin.x, m->origin.y, getOriginX(), getOriginY()) < m->sleepRadius -(bounds.width + bounds.height) || this == protag) {
+      for (const auto& f : m->faces) {
+        // Get vertices of the face
+        vertex3d vA = m->vertices[f.a];
+        vertex3d vB = m->vertices[f.b];
+        vertex3d vC = m->vertices[f.c];
+
+        // Get barycentric coordinates
+        vertex3d playerPos = { getOriginX() -m->origin.x, getOriginY()-m->origin.y, 0 };
+        auto baryCoords = getBarycentricCoords(playerPos, vA, vB, vC);
+
+        // Check if player is within the triangle
+        if (baryCoords[0] >= 0 && baryCoords[1] >= 0 && baryCoords[2] >= 0) {
+          // Calculate interpolated z value (floor)
+          float interpolatedZ = vA.z * baryCoords[0] + vB.z * baryCoords[1] + vC.z * baryCoords[2];
+          floor = interpolatedZ;
+          if(floor < 0) floor = 0;
+          if (abs(z - (floor + 1)) < 2) {
+            z = floor + 1;
+          } else if(grounded && abs(z - (floor+1) < 10) && zvel <= 0) {
+            z = floor + 1;
+          }
+          this->shadow->z = floor + 1;
+
+          // Calculate normal of the face
+                auto normal = calculateNormal(vA, vB, vC);
+                float slope = sqrt(normal[0] * normal[0] + normal[1] * normal[1]);
+                float slopeFactor = 1 - slope; // Slope factor decreases with increasing slope
+
+                D(slopeFactor);
+                slopeFactor += (1-slopeFactor) * 0.9;
+                if(slopeFactor < 1) {
+  
+                  // Adjust velocities based on the slope
+                  xvel *= slopeFactor;
+                  yvel *= slopeFactor;
+                }
+
+          break;
+        }
+      }
+    }
+  }
+
   if(z > floor + 1) {
     if(useGravity) {
       zaccel -= g_gravity * ((double) elapsed / 256.0);
@@ -5669,6 +5714,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
 
       //play landing sound
       //playSound(-1, g_land, 0);
+      
       if( abs(zvel) > 120) {
         playSound(-1, g_staticSounds[3], 0);
       }
@@ -6408,6 +6454,7 @@ door* entity::update(vector<door*> doors, float elapsed) {
   float dist = XYWorldDistanceSquared(this->getOriginX(), this->getOriginY(), protag->getOriginX(), protag->getOriginY());
   if(dist < g_entitySleepDistance || this->isAI) {
     specialObjectsUpdate(this, elapsed);
+    if(g_breakFromPrimarySwitch) {return nullptr;} //last protag died
   }
 
   if(this->missile) {
@@ -6975,6 +7022,7 @@ int loadSave() {
   for(int i = 0; i < g_partyCombatants.size(); i++) {
     delete g_partyCombatants[i];
   }
+  protag = nullptr;
   g_partyCombatants.clear();
 
   bool setMainProtag = 0;
@@ -7058,6 +7106,7 @@ int loadSave() {
       b->dmgTakenOverFight = 0;
     }
     g_partyCombatants.push_back(b);
+    a->hisCombatant = b;
 
     if(a->essential) {
       mainProtag = a;
@@ -8174,6 +8223,7 @@ void escapeUI::uiSelecting() {
 //clear map
 //CLEAR MAP
 void clear_map(camera& cameraToReset) {
+  resetUnremarkableData();
   g_eheightmaps.clear();
   g_poweredDoors.clear();
   g_poweredLevers.clear();
@@ -8325,7 +8375,6 @@ void clear_map(camera& cameraToReset) {
       }
     }
 
-    D(g_dungeonDarkEffect);
     SDL_SetTextureAlphaMod(g_shade, g_dungeonDarkEffect);
     SDL_RenderCopy(renderer, g_shade, NULL, NULL);
     SDL_SetRenderTarget(renderer, NULL);
@@ -8477,7 +8526,6 @@ void clear_map(camera& cameraToReset) {
   }
 
   //push back any entities that were in the party
-  D(g_actors.size());
   for (long long unsigned int i = 0; i < party.size(); i++) {
     g_entities.push_back(party[i]);
     g_actors.push_back(party[i]);
@@ -9648,6 +9696,7 @@ void adventureUI::continueDialogue()
   {
     g_forceEndDialogue = 0;
     protag_is_talking = 2;
+    resetUnremarkableData();
     talker = narrarator;
     adventureUIManager->hideTalkingUI();
     M("Ret A");
@@ -9689,6 +9738,7 @@ void adventureUI::continueDialogue()
     //absorb this Z press
     if(playersUI) {
       protag_is_talking = 2;
+      resetUnremarkableData();
       //don't reset talker
       //other code will end dialog soon
       //and reset talker
@@ -9718,6 +9768,7 @@ void adventureUI::continueDialogue()
     if (playersUI)
     {
       protag_is_talking = 2;
+      resetUnremarkableData();
       talker = narrarator;
     }
     executingScript = 0;
@@ -11819,6 +11870,7 @@ void adventureUI::continueDialogue()
     if (playersUI)
     {
       protag_is_talking = 2;
+      resetUnremarkableData();
       talker = narrarator;
     }
     executingScript = 0;
@@ -12267,6 +12319,7 @@ void adventureUI::continueDialogue()
     quit = 1;
     if(playersUI) {
       protag_is_talking = 2;
+      resetUnremarkableData();
       talker = narrarator;
     }
     return;
@@ -12394,7 +12447,6 @@ void adventureUI::positionInventory() {
   escText->boxY = 0.83; //now holds prompt
   inventoryB->y = 0.76;
   inventoryA->y = 0.01;
-
 }
 
 //hide heart and other stuff if the player is in the menus

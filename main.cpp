@@ -37,6 +37,20 @@ void protagMakesNoise();
 
 void dungeonFlash();
 
+void resetUnremarkableData() {
+  if(protag != nullptr) {
+    protag->xvel = 0;
+    protag->yvel = 0;
+    protag->xaccel = 0;
+    protag->yaccel = 0;
+  
+    g_spin_cooldown = 0;
+    g_spinning_duration = 0;
+    g_afterspin_duration = 0;
+  }
+
+}
+
 void drawUI() {
 
   adventureUIManager->dialogpointer->render(renderer, g_camera);
@@ -136,6 +150,9 @@ void updateWindowResolution() {
 }
 
 void ExplorationLoop() {
+
+  D(protag->zvel);
+
   // cooldowns
   if(g_dungeonSystemOn) {g_dungeonMs += elapsed;}
   halfsecondtimer += elapsed;
@@ -235,137 +252,96 @@ void ExplorationLoop() {
           adventureUIManager->showAm();
           adventureUIManager->amIndex = 0;
         }
-//        else if(g_amState == amState::MAJOR) {
-//          g_amState = amState::CLOSED;
-//          adventureUIManager->hideAm();
-//        }
+        //        else if(g_amState == amState::MAJOR) {
+        //          g_amState = amState::CLOSED;
+        //          adventureUIManager->hideAm();
+        //        }
       }
     }
-    
+
     adventureUIManager->hideKi();
     adventureUIManager->hideSt();
     switch(g_amState) {
       case amState::MAJOR:
-      {
-        if(input[8] && !oldinput[8] && !protag_is_talking) {
-          g_amState = amState::CLOSED;
-          adventureUIManager->hideAm();
-          oldinput[8] = 1;
-          break;
-        }
-        if(input[0] && !oldinput[0] && !protag_is_talking) {
-          if(adventureUIManager->amIndex == 1
-             || adventureUIManager->amIndex == 3
-             || adventureUIManager->amIndex == 5) {
-            adventureUIManager->amIndex -= 1;
+        {
+          if(input[8] && !oldinput[8] && !protag_is_talking) {
+            g_amState = amState::CLOSED;
+            adventureUIManager->hideAm();
+            oldinput[8] = 1;
+            break;
           }
-        }
-        if(input[1] && !oldinput[1] && !protag_is_talking) {
-          if(adventureUIManager->amIndex == 0
-             || adventureUIManager->amIndex == 2
-             || adventureUIManager->amIndex == 4) {
-            adventureUIManager->amIndex += 1;
+          if(input[0] && !oldinput[0] && !protag_is_talking) {
+            if(adventureUIManager->amIndex == 1
+                || adventureUIManager->amIndex == 3
+                || adventureUIManager->amIndex == 5) {
+              adventureUIManager->amIndex -= 1;
+            }
           }
-        }
-        if(input[2] && !oldinput[2] && !protag_is_talking) {
-          if(adventureUIManager->amIndex - 2 >= 0) {
-            adventureUIManager->amIndex -= 2;
+          if(input[1] && !oldinput[1] && !protag_is_talking) {
+            if(adventureUIManager->amIndex == 0
+                || adventureUIManager->amIndex == 2
+                || adventureUIManager->amIndex == 4) {
+              adventureUIManager->amIndex += 1;
+            }
           }
-        }
-        if(input[3] && !oldinput[3] && !protag_is_talking) {
-          if(adventureUIManager->amIndex + 2 <= 5) {
-            adventureUIManager->amIndex += 2;
+          if(input[2] && !oldinput[2] && !protag_is_talking) {
+            if(adventureUIManager->amIndex - 2 >= 0) {
+              adventureUIManager->amIndex -= 2;
+            }
           }
-        }
-        adventureUIManager->amPicker->x = adventureUIManager->amTexPos[adventureUIManager->amIndex].first - 0.028;
-        adventureUIManager->amPicker->y = adventureUIManager->amTexPos[adventureUIManager->amIndex].second + 0.007;
-        if(input[11] && !oldinput[11] && !protag_is_talking) {
-          switch(adventureUIManager->amIndex) {
-            case 0:
-              {
-                g_amState = amState::KEYITEM;
-                adventureUIManager->kiIndex = 0;
-                adventureUIManager->kiOffset = 0;
-                break;
-              }
-            case 1:
-              {
-                g_amState = amState::ITEM;
-                combatUIManager->inventoryPanel->show = 1;
-                combatUIManager->inventoryText->show = 1;
-                combatUIManager->currentInventoryOption = 0;
-                combatUIManager->menuPicker->show = 1;
-                combatUIManager->menuPicker->x = 10;
-                combatUIManager->partyText->show = 1;
-                combatUIManager->partyMiniText->show = 1;
-                break;
-              }
-            case 2:
-              {
-                g_amState = amState::STATUS;
-                adventureUIManager->stIndex = 0;
-                break;
-              }
-            case 3:
-              {
-                g_amState = amState::SPIRIT;
-                combatUIManager->partyText->show = 1;
-                combatUIManager->partyMiniText->show = 1;
-                oldinput[11] = 1;
-                curCombatantIndex = 0;
-                break;
-              }
-            case 4:
-              {
-                //help
-                vector<string> helpScript = {};
-                adventureUIManager->talker = narrarator;
-
-                //keep trying to get language data until it fails
-                int i = 0;
-                for(;;) {
-                  string arg = "Help" + to_string(i) + "-" + g_mapdir + "/" + g_map;
-                  string resp = getLanguageData(arg);
-                  if(resp == "") {break;}
-                  helpScript.push_back(resp);
-                  i++;
-                  if(i > 40) {
-                    E("Stuck trying to pull dialog for help");
-                    abort();
-                  }
-                  breakpoint();
+          if(input[3] && !oldinput[3] && !protag_is_talking) {
+            if(adventureUIManager->amIndex + 2 <= 5) {
+              adventureUIManager->amIndex += 2;
+            }
+          }
+          adventureUIManager->amPicker->x = adventureUIManager->amTexPos[adventureUIManager->amIndex].first - 0.028;
+          adventureUIManager->amPicker->y = adventureUIManager->amTexPos[adventureUIManager->amIndex].second + 0.007;
+          if(input[11] && !oldinput[11] && !protag_is_talking) {
+            switch(adventureUIManager->amIndex) {
+              case 0:
+                {
+                  g_amState = amState::KEYITEM;
+                  adventureUIManager->kiIndex = 0;
+                  adventureUIManager->kiOffset = 0;
+                  break;
                 }
-                if(helpScript.size() == 0) {
-                  helpScript.push_back(getLanguageData("NoHelp"));
+              case 1:
+                {
+                  g_amState = amState::ITEM;
+                  combatUIManager->inventoryPanel->show = 1;
+                  combatUIManager->inventoryText->show = 1;
+                  combatUIManager->currentInventoryOption = 0;
+                  combatUIManager->menuPicker->show = 1;
+                  combatUIManager->menuPicker->x = 10;
+                  combatUIManager->partyText->show = 1;
+                  combatUIManager->partyMiniText->show = 1;
+                  break;
                 }
-                helpScript.push_back("#");
-
-                adventureUIManager->ownScript = helpScript;
-                adventureUIManager->dialogue_index = -1;
-                adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
-                adventureUIManager->sleepingMS = 0;
-                protag_is_talking = 1;
-                g_forceEndDialogue = 0;
-                g_keyItemFlavorDisplay = 1;
-                adventureUIManager->continueDialogue();
-                
-                break;
-              }
-            case 5:
-              {
-                //I think that the text from wifechat will not vary by map,
-                //but based on story progression, so scripts will have some way
-                //of updating the wifechatindex, which will be used to pull text
-                if(party.size() > 1 && party[1]->name == "common/neheten") {
-                  //wife
+              case 2:
+                {
+                  g_amState = amState::STATUS;
+                  adventureUIManager->stIndex = 0;
+                  break;
+                }
+              case 3:
+                {
+                  g_amState = amState::SPIRIT;
+                  combatUIManager->partyText->show = 1;
+                  combatUIManager->partyMiniText->show = 1;
+                  oldinput[11] = 1;
+                  curCombatantIndex = 0;
+                  break;
+                }
+              case 4:
+                {
+                  //help
                   vector<string> helpScript = {};
-                  adventureUIManager->talker = party[1];
-  
+                  adventureUIManager->talker = narrarator;
+
                   //keep trying to get language data until it fails
                   int i = 0;
-                  int wifeValue = checkSaveField("wifeValue");
                   for(;;) {
-                    string arg = "Wife" + to_string(wifeValue) + "-" + to_string(i);
+                    string arg = "Help" + to_string(i) + "-" + g_mapdir + "/" + g_map;
                     string resp = getLanguageData(arg);
                     if(resp == "") {break;}
                     helpScript.push_back(resp);
@@ -377,12 +353,10 @@ void ExplorationLoop() {
                     breakpoint();
                   }
                   if(helpScript.size() == 0) {
-                    helpScript.push_back("");
-                    E("Couldn't find wifescript");
-                    abort();
+                    helpScript.push_back(getLanguageData("NoHelp"));
                   }
                   helpScript.push_back("#");
-  
+
                   adventureUIManager->ownScript = helpScript;
                   adventureUIManager->dialogue_index = -1;
                   adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
@@ -391,206 +365,478 @@ void ExplorationLoop() {
                   g_forceEndDialogue = 0;
                   g_keyItemFlavorDisplay = 1;
                   adventureUIManager->continueDialogue();
-                  
+
+                  break;
                 }
-                break;
+              case 5:
+                {
+                  //I think that the text from wifechat will not vary by map,
+                  //but based on story progression, so scripts will have some way
+                  //of updating the wifechatindex, which will be used to pull text
+                  if(party.size() > 1 && party[1]->name == "common/neheten") {
+                    //wife
+                    vector<string> helpScript = {};
+                    adventureUIManager->talker = party[1];
 
-              }
+                    //keep trying to get language data until it fails
+                    int i = 0;
+                    int wifeValue = checkSaveField("wifeValue");
+                    for(;;) {
+                      string arg = "Wife" + to_string(wifeValue) + "-" + to_string(i);
+                      string resp = getLanguageData(arg);
+                      if(resp == "") {break;}
+                      helpScript.push_back(resp);
+                      i++;
+                      if(i > 40) {
+                        E("Stuck trying to pull dialog for help");
+                        abort();
+                      }
+                      breakpoint();
+                    }
+                    if(helpScript.size() == 0) {
+                      helpScript.push_back("");
+                      E("Couldn't find wifescript");
+                      abort();
+                    }
+                    helpScript.push_back("#");
 
-          }
-        }
-        break;
-      }
-      case amState::KEYITEM:
-      {
+                    adventureUIManager->ownScript = helpScript;
+                    adventureUIManager->dialogue_index = -1;
+                    adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
+                    adventureUIManager->sleepingMS = 0;
+                    protag_is_talking = 1;
+                    g_forceEndDialogue = 0;
+                    g_keyItemFlavorDisplay = 1;
+                    adventureUIManager->continueDialogue();
 
-        adventureUIManager->showKi();
+                  }
+                  break;
 
+                }
 
-        if(input[8] && !oldinput[8] && !g_keyItemFlavorDisplay) {
-          if(adventureUIManager->keyPrompting) {
-            if(adventureUIManager->typing == 0) {
-              adventureUIManager->response_index = -1; //give nothing
-              adventureUIManager->keyPrompting = 2;
-              g_amState = amState::CLOSED;
-              adventureUIManager->hideKi();
-              adventureUIManager->continueDialogue();
-              break;
             }
-          } else {
-            g_amState = amState::MAJOR;
           }
+          break;
         }
-        if(input[11] && !oldinput[11] && !g_keyItemFlavorDisplay) {
-          if(adventureUIManager->keyPrompting) {
-            if(adventureUIManager->typing == 0) {
-              if(adventureUIManager->kiIndex >= 0 && adventureUIManager->kiIndex < (int)g_keyItems.size()) {
+      case amState::KEYITEM:
+        {
+
+          adventureUIManager->showKi();
+
+
+          if(input[8] && !oldinput[8] && !g_keyItemFlavorDisplay) {
+            if(adventureUIManager->keyPrompting) {
+              if(adventureUIManager->typing == 0) {
+                adventureUIManager->response_index = -1; //give nothing
+                adventureUIManager->keyPrompting = 2;
+                g_amState = amState::CLOSED;
+                adventureUIManager->hideKi();
+                adventureUIManager->continueDialogue();
+                break;
+              }
+            } else {
+              g_amState = amState::MAJOR;
+            }
+          }
+          if(input[11] && !oldinput[11] && !g_keyItemFlavorDisplay) {
+            if(adventureUIManager->keyPrompting) {
+              if(adventureUIManager->typing == 0) {
+                if(adventureUIManager->kiIndex >= 0 && adventureUIManager->kiIndex < (int)g_keyItems.size()) {
                   adventureUIManager->response_index = g_keyItems[adventureUIManager->kiIndex]->index;
                   adventureUIManager->keyPrompting = 2;
                   g_amState = amState::CLOSED;
                   adventureUIManager->hideKi();
                   adventureUIManager->continueDialogue();
-                break;
-  
-              } else {
-                adventureUIManager->response_index = -1; //give nothing
-                adventureUIManager->keyPrompting = 2;
-                g_amState = amState::CLOSED;
-                adventureUIManager->hideKi();
-                breakpoint();
-                adventureUIManager->continueDialogue();
-                break;
-  
+                  break;
+
+                } else {
+                  adventureUIManager->response_index = -1; //give nothing
+                  adventureUIManager->keyPrompting = 2;
+                  g_amState = amState::CLOSED;
+                  adventureUIManager->hideKi();
+                  breakpoint();
+                  adventureUIManager->continueDialogue();
+                  break;
+
+                }
               }
-            }
-          } else {
-            if(adventureUIManager->kiIndex < g_keyItems.size()) {
-              //show flavortext
-              adventureUIManager->talker = narrarator;
-              vector<string> flavorScript = {};
-              flavorScript.push_back(getLanguageData("KeyItem" + to_string(g_keyItems[adventureUIManager->kiIndex]->index) + "Flavor"));
-              flavorScript.push_back("#");
-              adventureUIManager->ownScript = flavorScript;
-              adventureUIManager->dialogue_index = -1;
-              adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
-              adventureUIManager->sleepingMS = 0;
-              g_forceEndDialogue = 0;
-              g_keyItemFlavorDisplay = 1;
-              adventureUIManager->continueDialogue();
-              oldinput[11] = 1;
-            }
-          }
-        }
-
-        if(input[0] && !g_keyItemFlavorDisplay) {
-          if(SoldUIUp <= 0) {
-            if(adventureUIManager->kiIndex -1 >= 0) {
-              adventureUIManager->kiIndex--;
-            }
-            SoldUIUp = (oldUIUp) ? g_inputDelayRepeatFrames : g_inputDelayFrames;
-          } else {
-            oldUIUp = 1;
-          }
-        } else {
-          oldUIUp = 0;
-          SoldUIUp = 0;
-        }
-
-        if(input[1] && !g_keyItemFlavorDisplay) {
-          if(SoldUIDown <= 0) {
-            if(adventureUIManager->kiIndex + 1< g_keyItems.size()) {
-              adventureUIManager->kiIndex++;
-            }
-            SoldUIDown = (oldUIDown) ? g_inputDelayRepeatFrames : g_inputDelayFrames;
-          } else {
-            oldUIDown = 1;
-          }
-        } else {
-          oldUIDown = 0;
-          SoldUIDown = 0;
-        }
-
-        if(adventureUIManager->kiIndex > adventureUIManager->kiOffset + 5) {
-          adventureUIManager->kiOffset++;
-        }
-        if(adventureUIManager->kiIndex < adventureUIManager->kiOffset) {
-          adventureUIManager->kiOffset--;
-        }
-
-        if(adventureUIManager->kiOffset > 0) {
-          adventureUIManager->kiPrecede->show = 1;
-        } else {
-          adventureUIManager->kiPrecede->show = 0;
-        }
-
-        int a = g_keyItems.size();
-        int b = 6 + adventureUIManager->kiOffset;
-        if(a > b) {
-          adventureUIManager->kiAdvance->show = 1;
-        } else {
-          adventureUIManager->kiAdvance->show = 0;
-        }
-
-        for(int i = 0; i < 6; i++) {
-          if(i < adventureUIManager->kiTextboxes.size()) {
-            int j = i + adventureUIManager->kiOffset;
-            if(j < g_keyItems.size()) {
-              if(j == adventureUIManager->kiIndex) {
-                adventureUIManager->kiPicker->y = adventureUIManager->kiTextboxes[i]->boxY + 0.0075;
-              }
-              adventureUIManager->kiTextboxes[i]->updateText(g_keyItems[j]->name);
-              adventureUIManager->kiIcons[i]->texture = g_keyItems[j]->texture;
-              if(adventureUIManager->kiIcons[i]->texture == 0) {
-                adventureUIManager->kiIcons[i]->show = 0;
-              }
-              adventureUIManager->kiIcons[i]->show = 1;
             } else {
-              adventureUIManager->kiTextboxes[i]->updateText("");
-              adventureUIManager->kiIcons[i]->show = 0;
-
+              if(adventureUIManager->kiIndex < g_keyItems.size()) {
+                //show flavortext
+                adventureUIManager->talker = narrarator;
+                vector<string> flavorScript = {};
+                flavorScript.push_back(getLanguageData("KeyItem" + to_string(g_keyItems[adventureUIManager->kiIndex]->index) + "Flavor"));
+                flavorScript.push_back("#");
+                adventureUIManager->ownScript = flavorScript;
+                adventureUIManager->dialogue_index = -1;
+                adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
+                adventureUIManager->sleepingMS = 0;
+                g_forceEndDialogue = 0;
+                g_keyItemFlavorDisplay = 1;
+                adventureUIManager->continueDialogue();
+                oldinput[11] = 1;
+              }
             }
           }
-        }
 
-        if(g_keyItems.size() == 0) {
-          adventureUIManager->kiPicker->show = 0;
+          if(input[0] && !g_keyItemFlavorDisplay) {
+            if(SoldUIUp <= 0) {
+              if(adventureUIManager->kiIndex -1 >= 0) {
+                adventureUIManager->kiIndex--;
+              }
+              SoldUIUp = (oldUIUp) ? g_inputDelayRepeatFrames : g_inputDelayFrames;
+            } else {
+              oldUIUp = 1;
+            }
+          } else {
+            oldUIUp = 0;
+            SoldUIUp = 0;
+          }
+
+          if(input[1] && !g_keyItemFlavorDisplay) {
+            if(SoldUIDown <= 0) {
+              if(adventureUIManager->kiIndex + 1< g_keyItems.size()) {
+                adventureUIManager->kiIndex++;
+              }
+              SoldUIDown = (oldUIDown) ? g_inputDelayRepeatFrames : g_inputDelayFrames;
+            } else {
+              oldUIDown = 1;
+            }
+          } else {
+            oldUIDown = 0;
+            SoldUIDown = 0;
+          }
+
+          if(adventureUIManager->kiIndex > adventureUIManager->kiOffset + 5) {
+            adventureUIManager->kiOffset++;
+          }
+          if(adventureUIManager->kiIndex < adventureUIManager->kiOffset) {
+            adventureUIManager->kiOffset--;
+          }
+
+          if(adventureUIManager->kiOffset > 0) {
+            adventureUIManager->kiPrecede->show = 1;
+          } else {
+            adventureUIManager->kiPrecede->show = 0;
+          }
+
+          int a = g_keyItems.size();
+          int b = 6 + adventureUIManager->kiOffset;
+          if(a > b) {
+            adventureUIManager->kiAdvance->show = 1;
+          } else {
+            adventureUIManager->kiAdvance->show = 0;
+          }
+
+          for(int i = 0; i < 6; i++) {
+            if(i < adventureUIManager->kiTextboxes.size()) {
+              int j = i + adventureUIManager->kiOffset;
+              if(j < g_keyItems.size()) {
+                if(j == adventureUIManager->kiIndex) {
+                  adventureUIManager->kiPicker->y = adventureUIManager->kiTextboxes[i]->boxY + 0.0075;
+                }
+                adventureUIManager->kiTextboxes[i]->updateText(g_keyItems[j]->name);
+                adventureUIManager->kiIcons[i]->texture = g_keyItems[j]->texture;
+                if(adventureUIManager->kiIcons[i]->texture == 0) {
+                  adventureUIManager->kiIcons[i]->show = 0;
+                }
+                adventureUIManager->kiIcons[i]->show = 1;
+              } else {
+                adventureUIManager->kiTextboxes[i]->updateText("");
+                adventureUIManager->kiIcons[i]->show = 0;
+
+              }
+            }
+          }
+
+          if(g_keyItems.size() == 0) {
+            adventureUIManager->kiPicker->show = 0;
+          }
+
+          break;
         }
-        
-        break;
-      }
       case amState::ITEM:
-      {
-        if(input[8] && !oldinput[8]&& !protag_is_talking) {
-          g_amState = amState::MAJOR;
-          combatUIManager->inventoryPanel->show = 0;
-          combatUIManager->inventoryText->show = 0;
-          combatUIManager->menuPicker->show = 0;
-          combatUIManager->partyText->show = 0;
-          combatUIManager->partyMiniText->show = 0;
-        }
-        if(input[0] && !oldinput[0]&& !protag_is_talking) {
-          if(combatUIManager->currentInventoryOption != 0 &&
-              combatUIManager->currentInventoryOption != 7) {
-            combatUIManager->currentInventoryOption --;
+        {
+          if(input[8] && !oldinput[8]&& !protag_is_talking) {
+            g_amState = amState::MAJOR;
+            combatUIManager->inventoryPanel->show = 0;
+            combatUIManager->inventoryText->show = 0;
+            combatUIManager->menuPicker->show = 0;
+            combatUIManager->partyText->show = 0;
+            combatUIManager->partyMiniText->show = 0;
           }
-        }
-
-        if(input[1] && !oldinput[1]&& !protag_is_talking) {
-          if(combatUIManager->currentInventoryOption != 6 &&
-              combatUIManager->currentInventoryOption != 13) {
-            if(combatUIManager->currentInventoryOption + 1 < g_combatInventory.size()) {
-              combatUIManager->currentInventoryOption ++;
+          if(input[0] && !oldinput[0]&& !protag_is_talking) {
+            if(combatUIManager->currentInventoryOption != 0 &&
+                combatUIManager->currentInventoryOption != 7) {
+              combatUIManager->currentInventoryOption --;
             }
           }
-        }
 
-        if(input[2] && !oldinput[2]&& !protag_is_talking) {
-          if(combatUIManager->currentInventoryOption >= 7) {
-            combatUIManager->currentInventoryOption -= 7;
+          if(input[1] && !oldinput[1]&& !protag_is_talking) {
+            if(combatUIManager->currentInventoryOption != 6 &&
+                combatUIManager->currentInventoryOption != 13) {
+              if(combatUIManager->currentInventoryOption + 1 < g_combatInventory.size()) {
+                combatUIManager->currentInventoryOption ++;
+              }
+            }
           }
-        }
 
-        if(input[3] && !oldinput[3]&& !protag_is_talking) {
-          if(combatUIManager->currentInventoryOption <= 6) {
-            combatUIManager->currentInventoryOption += 7;
+          if(input[2] && !oldinput[2]&& !protag_is_talking) {
+            if(combatUIManager->currentInventoryOption >= 7) {
+              combatUIManager->currentInventoryOption -= 7;
+            }
           }
+
+          if(input[3] && !oldinput[3]&& !protag_is_talking) {
+            if(combatUIManager->currentInventoryOption <= 6) {
+              combatUIManager->currentInventoryOption += 7;
+            }
+          }
+          combatUIManager->currentInventoryOption = clamp(combatUIManager->currentInventoryOption, 0, g_combatInventory.size()-1);
+          if(input[11] &&!oldinput[11]&& !protag_is_talking) {
+            if(combatUIManager->currentInventoryOption >= 0 && combatUIManager->currentInventoryOption < g_combatInventory.size()) {
+              if(itemsTable[g_combatInventory[combatUIManager->currentInventoryOption]].targeting == 1) {
+                g_amState = amState::ITARGETING;
+                combatUIManager->currentTarget = 0;
+                combatUIManager->partyText->show = 1;
+                combatUIManager->partyMiniText->show = 1;
+
+                break;
+              } else {
+                vector<string> spiritScript = {};
+                adventureUIManager->talker = narrarator;
+                spiritScript.push_back(getLanguageData("ItemError"));
+                spiritScript.push_back("#");
+
+                adventureUIManager->ownScript = spiritScript;
+                adventureUIManager->dialogue_index = -1;
+                adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
+                adventureUIManager->sleepingMS = 0;
+                protag_is_talking = 1;
+                g_keyItemFlavorDisplay = 1; //really just means make sure we dont use the input from the dialog ending to start another one
+                g_forceEndDialogue = 0;
+                adventureUIManager->continueDialogue();
+
+              }
+            }
+          }
+          break;
         }
-        combatUIManager->currentInventoryOption = clamp(combatUIManager->currentInventoryOption, 0, g_combatInventory.size()-1);
-        if(input[11] &&!oldinput[11]&& !protag_is_talking) {
-          if(combatUIManager->currentInventoryOption >= 0 && combatUIManager->currentInventoryOption < g_combatInventory.size()) {
-            if(itemsTable[g_combatInventory[combatUIManager->currentInventoryOption]].targeting == 1) {
-              g_amState = amState::ITARGETING;
+      case amState::ITARGETING:
+        {
+          if(input[8] && !oldinput[8]) {
+            g_amState = amState::ITEM;
+          }
+          if(input[2] && !oldinput[2] && !protag_is_talking) {
+            combatUIManager->currentTarget--;
+          }
+          if(input[3] && !oldinput[3] && !protag_is_talking) {
+            combatUIManager->currentTarget++;
+          }
+          combatUIManager->currentTarget = clamp(combatUIManager->currentTarget, 0, g_partyCombatants.size()-1);
+          if(input[11] && !oldinput[11]) {
+            combatant *c = g_partyCombatants[0];
+            for(auto x : g_partyCombatants) {
+              if(x->baseSkill > c->baseSkill) {
+                c = x;
+              }
+            }
+            useItem(g_combatInventory[combatUIManager->currentInventoryOption], combatUIManager->currentTarget, c);
+            g_combatInventory.erase(g_combatInventory.begin() + combatUIManager->currentInventoryOption);
+            combatUIManager->currentInventoryOption = clamp(combatUIManager->currentInventoryOption, 0, g_combatInventory.size()-1);
+            g_amState = amState::ITEM;
+          }
+          break;
+        }
+      case amState::STATUS:
+        {
+          adventureUIManager->showSt();
+          if(input[8] && !oldinput[8]) {
+            g_amState = amState::MAJOR;
+          }
+
+          if(input[2] && !oldinput[2]) {
+            if(adventureUIManager->stIndex - 1 >= 0) {
+              adventureUIManager->stIndex -= 1;
+            }
+          }
+          if(input[3] && !oldinput[3]) {
+            if(adventureUIManager->stIndex + 1 < g_partyCombatants.size()) {
+              adventureUIManager->stIndex += 1;
+            }
+          }
+
+          combatant* c = g_partyCombatants[adventureUIManager->stIndex];
+          int lastXP = levelToXp(c->level);
+          int nextXP = levelToXp(c->level+1);
+          int percentToNxt = 100*(c->xp - lastXP)/(nextXP - lastXP);
+
+          int usI = 0;
+          int usv = 0;
+          string cname = "";
+          if(c->filename == "common/fomm") {
+            usI = 0;
+            usv = (int)c->level * 1.3;
+            cname = getLanguageData("ProtagManCentered");
+          } else if(c->filename == "common/neheten") {
+            usI = 1;
+            usv = abs(sin((c->level *M_PI *36)/100)) *7 + 4;
+            cname = getLanguageData("ProtagWifeCentered");
+          } else if(c->filename == "common/blish") {
+            usI = 2;
+            usv = (int)c->level * 0.8;
+            cname = getLanguageData("ProtagFriendCentered");
+          } else if(c->filename == "common/dafua") {
+            usI = 3;
+            usv = (int)c->level * 1.1;
+            cname = getLanguageData("ProtagDaughterCentered");
+          }
+
+          string precede = " ";
+          string procede = " ";
+
+          if(adventureUIManager->stIndex > 0) {
+            precede = "    <";
+          }
+
+          if(adventureUIManager->stIndex != g_partyCombatants.size()-1) {
+            procede = "    >";
+          }
+          string uselessStat = getLanguageData("UselessStat" + to_string(usI));
+          adventureUIManager->stTextbox3->updateText(precede);
+          adventureUIManager->stTextbox4->updateText(procede);
+
+          adventureUIManager->stTextbox->updateText(
+              "    " + cname +"\n\n"
+              +
+              "HP: " + to_string(c->health) + "/" + to_string(c->baseStrength) + "\n"
+              +
+              "SP: " + to_string(c->sp) + "/" + to_string(c->baseStrength) + "\n"
+              +
+              "Attack: " + to_stringF((int)c->baseAttack)+ "\n"
+              +
+              "Defense: " + to_stringF((int)c->baseDefense)+ "\n"
+              +
+              "Soul: " + to_stringF((int)c->baseSoul)+ "\n"
+              +
+              "Critical: " + to_stringF((int)c->baseCritical)+ "\n"
+              +
+              "Skill: " + to_stringF((int)c->baseSkill)+ "\n"
+              +
+              "Recovery: " + to_stringF((int)c->baseRecovery)+ "\n"
+              +
+              uselessStat + ": " + to_string(usv)+ "\n"
+              );
+          string s1 = "-";
+          string s2 = "-";
+          string s3 = "-";
+          string s4 = "-";
+
+          if(c->spiritMoves[0] >= 0) {
+            s1 = spiritTable[c->spiritMoves[0]].name;
+          }
+          if(c->spiritMoves[1] >= 0) {
+            s2 = spiritTable[c->spiritMoves[1]].name;
+          }
+          if(c->spiritMoves[2] >= 0) {
+            s3 = spiritTable[c->spiritMoves[2]].name;
+          }
+          if(c->spiritMoves[3] >= 0) {
+            s4 = spiritTable[c->spiritMoves[3]].name;
+          }
+
+          adventureUIManager->stTextbox2->updateText("Level " + to_string(c->level) + " (" + to_string(percentToNxt) + "% to next)\n\n"
+              +
+              "Spirit-moves:\n"
+              +
+              s1 + "\n"
+              +
+              s2 + "\n"
+              +
+              s3 + "\n"
+              +
+              s4 + "\n\n"
+              +
+              "Last fight:\n"
+              + 
+              "Damage Dealt: " + to_string((int)c->dmgDealtOverFight) + "\n"
+              +
+              "Damage Taken: " + to_string((int)c->dmgTakenOverFight) + "\n"
+
+
+              );
+
+          break;
+        }
+      case amState::SPIRIT:
+        {
+          if(input[8] && !oldinput[8]) {
+            g_amState = amState::MAJOR;
+            combatUIManager->partyText->show = 0;
+            combatUIManager->partyMiniText->show = 0;
+          }
+
+          if(input[2] && !oldinput[2]) {
+            curCombatantIndex--;
+          }
+          if(input[3] && !oldinput[3]) {
+            curCombatantIndex++;
+          }
+          if(curCombatantIndex < 0) curCombatantIndex = 0;
+          if(curCombatantIndex >= g_partyCombatants.size()) curCombatantIndex = g_partyCombatants.size()-1;
+
+          if(input[11] && !oldinput[11]) {
+            g_amState = amState::SPIRITSELECT;
+            combatUIManager->spiritPanel->show = 1;
+            combatUIManager->spiritText->show = 1;
+            combatUIManager->menuPicker->show = 1;
+            combatUIManager->menuPicker->x = 10;
+            combatUIManager->currentInventoryOption = 0;
+
+
+          }
+
+          break;
+        }
+      case amState::SPIRITSELECT:
+        {
+          if(protag_is_talking) {
+            combatUIManager->partyText->show = 0;
+            combatUIManager->partyMiniText->show = 0;
+          } else {
+            combatUIManager->partyText->show = 1;
+            combatUIManager->partyMiniText->show = 1;
+          }
+          if(input[8] && !oldinput[8] && !protag_is_talking) {
+            g_amState = amState::SPIRIT;
+            combatUIManager->spiritPanel->show = 0;
+            combatUIManager->spiritText->show = 0;
+            combatUIManager->menuPicker->show = 0;
+          }
+          if(input[0] && !oldinput[0] && !protag_is_talking) {
+            combatUIManager->currentInventoryOption--;
+          }
+          if(input[1] && !oldinput[1] && !protag_is_talking) {
+            combatUIManager->currentInventoryOption++;
+          }
+          if(combatUIManager->currentInventoryOption < 0) {
+            combatUIManager->currentInventoryOption = 0;
+          }
+          if(combatUIManager->currentInventoryOption >= g_partyCombatants[curCombatantIndex]->spiritMoves.size()) {
+            combatUIManager->currentInventoryOption = g_partyCombatants[curCombatantIndex]->spiritMoves.size()-1;
+          }
+          if(input[11] && !oldinput[11] && !protag_is_talking) {
+            int spiritIndex = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
+            int targeting = spiritTable[spiritIndex].targeting;
+            if(targeting == 1) {
               combatUIManager->currentTarget = 0;
-              combatUIManager->partyText->show = 1;
-              combatUIManager->partyMiniText->show = 1;
-
-              break;
+              g_amState = amState::STARGETING;
             } else {
               vector<string> spiritScript = {};
               adventureUIManager->talker = narrarator;
-              spiritScript.push_back(getLanguageData("ItemError"));
+              spiritScript.push_back(getLanguageData("SpiritError"));
               spiritScript.push_back("#");
-  
+
               adventureUIManager->ownScript = spiritScript;
               adventureUIManager->dialogue_index = -1;
               adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
@@ -599,288 +845,59 @@ void ExplorationLoop() {
               g_keyItemFlavorDisplay = 1; //really just means make sure we dont use the input from the dialog ending to start another one
               g_forceEndDialogue = 0;
               adventureUIManager->continueDialogue();
-
             }
-          }
-        }
-        break;
-      }
-      case amState::ITARGETING:
-      {
-        if(input[8] && !oldinput[8]) {
-          g_amState = amState::ITEM;
-        }
-        if(input[2] && !oldinput[2] && !protag_is_talking) {
-          combatUIManager->currentTarget--;
-        }
-        if(input[3] && !oldinput[3] && !protag_is_talking) {
-          combatUIManager->currentTarget++;
-        }
-        combatUIManager->currentTarget = clamp(combatUIManager->currentTarget, 0, g_partyCombatants.size()-1);
-        if(input[11] && !oldinput[11]) {
-          combatant *c = g_partyCombatants[0];
-          for(auto x : g_partyCombatants) {
-            if(x->baseSkill > c->baseSkill) {
-              c = x;
-            }
-          }
-          useItem(g_combatInventory[combatUIManager->currentInventoryOption], combatUIManager->currentTarget, c);
-          g_combatInventory.erase(g_combatInventory.begin() + combatUIManager->currentInventoryOption);
-          combatUIManager->currentInventoryOption = clamp(combatUIManager->currentInventoryOption, 0, g_combatInventory.size()-1);
-          g_amState = amState::ITEM;
-        }
-        break;
-      }
-      case amState::STATUS:
-      {
-        adventureUIManager->showSt();
-        if(input[8] && !oldinput[8]) {
-          g_amState = amState::MAJOR;
-        }
 
-        if(input[2] && !oldinput[2]) {
-          if(adventureUIManager->stIndex - 1 >= 0) {
-            adventureUIManager->stIndex -= 1;
-          }
-        }
-        if(input[3] && !oldinput[3]) {
-          if(adventureUIManager->stIndex + 1 < g_partyCombatants.size()) {
-            adventureUIManager->stIndex += 1;
-          }
-        }
-
-        combatant* c = g_partyCombatants[adventureUIManager->stIndex];
-        int lastXP = levelToXp(c->level);
-        int nextXP = levelToXp(c->level+1);
-        int percentToNxt = 100*(c->xp - lastXP)/(nextXP - lastXP);
-
-        int usI = 0;
-        int usv = 0;
-        string cname = "";
-        if(c->filename == "common/fomm") {
-          usI = 0;
-          usv = (int)c->level * 1.3;
-          cname = getLanguageData("ProtagManCentered");
-        } else if(c->filename == "common/neheten") {
-          usI = 1;
-          usv = abs(sin((c->level *M_PI *36)/100)) *7 + 4;
-          cname = getLanguageData("ProtagWifeCentered");
-        } else if(c->filename == "common/blish") {
-          usI = 2;
-          usv = (int)c->level * 0.8;
-          cname = getLanguageData("ProtagFriendCentered");
-        } else if(c->filename == "common/dafua") {
-          usI = 3;
-          usv = (int)c->level * 1.1;
-          cname = getLanguageData("ProtagDaughterCentered");
-        }
-
-        string precede = " ";
-        string procede = " ";
-
-        if(adventureUIManager->stIndex > 0) {
-          precede = "    <";
-        }
-        
-        if(adventureUIManager->stIndex != g_partyCombatants.size()-1) {
-          procede = "    >";
-        }
-        string uselessStat = getLanguageData("UselessStat" + to_string(usI));
-        adventureUIManager->stTextbox3->updateText(precede);
-        adventureUIManager->stTextbox4->updateText(procede);
-
-        adventureUIManager->stTextbox->updateText(
-            "    " + cname +"\n\n"
-            +
-            "HP: " + to_string(c->health) + "/" + to_string(c->baseStrength) + "\n"
-            +
-            "SP: " + to_string(c->sp) + "/" + to_string(c->baseStrength) + "\n"
-            +
-            "Attack: " + to_stringF((int)c->baseAttack)+ "\n"
-            +
-            "Defense: " + to_stringF((int)c->baseDefense)+ "\n"
-            +
-            "Soul: " + to_stringF((int)c->baseSoul)+ "\n"
-            +
-            "Critical: " + to_stringF((int)c->baseCritical)+ "\n"
-            +
-            "Skill: " + to_stringF((int)c->baseSkill)+ "\n"
-            +
-            "Recovery: " + to_stringF((int)c->baseRecovery)+ "\n"
-            +
-            uselessStat + ": " + to_string(usv)+ "\n"
-            );
-        string s1 = "-";
-        string s2 = "-";
-        string s3 = "-";
-        string s4 = "-";
-
-        if(c->spiritMoves[0] >= 0) {
-          s1 = spiritTable[c->spiritMoves[0]].name;
-        }
-        if(c->spiritMoves[1] >= 0) {
-          s2 = spiritTable[c->spiritMoves[1]].name;
-        }
-        if(c->spiritMoves[2] >= 0) {
-          s3 = spiritTable[c->spiritMoves[2]].name;
-        }
-        if(c->spiritMoves[3] >= 0) {
-          s4 = spiritTable[c->spiritMoves[3]].name;
-        }
-
-        adventureUIManager->stTextbox2->updateText("Level " + to_string(c->level) + " (" + to_string(percentToNxt) + "% to next)\n\n"
-            +
-            "Spirit-moves:\n"
-            +
-            s1 + "\n"
-            +
-            s2 + "\n"
-            +
-            s3 + "\n"
-            +
-            s4 + "\n\n"
-            +
-            "Last fight:\n"
-            + 
-            "Damage Dealt: " + to_string((int)c->dmgDealtOverFight) + "\n"
-            +
-            "Damage Taken: " + to_string((int)c->dmgTakenOverFight) + "\n"
-
-            
-            );
-
-        break;
-      }
-      case amState::SPIRIT:
-      {
-        if(input[8] && !oldinput[8]) {
-          g_amState = amState::MAJOR;
-          combatUIManager->partyText->show = 0;
-          combatUIManager->partyMiniText->show = 0;
-        }
-
-        if(input[2] && !oldinput[2]) {
-          curCombatantIndex--;
-        }
-        if(input[3] && !oldinput[3]) {
-          curCombatantIndex++;
-        }
-        if(curCombatantIndex < 0) curCombatantIndex = 0;
-        if(curCombatantIndex >= g_partyCombatants.size()) curCombatantIndex = g_partyCombatants.size()-1;
-
-        if(input[11] && !oldinput[11]) {
-          g_amState = amState::SPIRITSELECT;
-          combatUIManager->spiritPanel->show = 1;
-          combatUIManager->spiritText->show = 1;
-          combatUIManager->menuPicker->show = 1;
-          combatUIManager->menuPicker->x = 10;
-          combatUIManager->currentInventoryOption = 0;
-
-
-        }
-
-        break;
-      }
-      case amState::SPIRITSELECT:
-      {
-        if(protag_is_talking) {
-          combatUIManager->partyText->show = 0;
-          combatUIManager->partyMiniText->show = 0;
-        } else {
-          combatUIManager->partyText->show = 1;
-          combatUIManager->partyMiniText->show = 1;
-        }
-        if(input[8] && !oldinput[8] && !protag_is_talking) {
-          g_amState = amState::SPIRIT;
-          combatUIManager->spiritPanel->show = 0;
-          combatUIManager->spiritText->show = 0;
-          combatUIManager->menuPicker->show = 0;
-        }
-        if(input[0] && !oldinput[0] && !protag_is_talking) {
-          combatUIManager->currentInventoryOption--;
-        }
-        if(input[1] && !oldinput[1] && !protag_is_talking) {
-          combatUIManager->currentInventoryOption++;
-        }
-        if(combatUIManager->currentInventoryOption < 0) {
-          combatUIManager->currentInventoryOption = 0;
-        }
-        if(combatUIManager->currentInventoryOption >= g_partyCombatants[curCombatantIndex]->spiritMoves.size()) {
-          combatUIManager->currentInventoryOption = g_partyCombatants[curCombatantIndex]->spiritMoves.size()-1;
-        }
-        if(input[11] && !oldinput[11] && !protag_is_talking) {
-          int spiritIndex = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
-          int targeting = spiritTable[spiritIndex].targeting;
-          if(targeting == 1) {
-            combatUIManager->currentTarget = 0;
-            g_amState = amState::STARGETING;
-          } else {
-            vector<string> spiritScript = {};
-            adventureUIManager->talker = narrarator;
-            spiritScript.push_back(getLanguageData("SpiritError"));
-            spiritScript.push_back("#");
-
-            adventureUIManager->ownScript = spiritScript;
-            adventureUIManager->dialogue_index = -1;
-            adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
-            adventureUIManager->sleepingMS = 0;
-            protag_is_talking = 1;
-            g_keyItemFlavorDisplay = 1; //really just means make sure we dont use the input from the dialog ending to start another one
-            g_forceEndDialogue = 0;
-            adventureUIManager->continueDialogue();
           }
 
+          break;
         }
-
-        break;
-      }
       case amState::STARGETING:
-      {
-        if(protag_is_talking) {
-          combatUIManager->partyText->show = 0;
-          combatUIManager->partyMiniText->show = 0;
-        } else {
-          combatUIManager->partyText->show = 1;
-          combatUIManager->partyMiniText->show = 1;
-        }
-        if(input[8] && !oldinput[8] && !protag_is_talking ) {
-          g_amState = amState::SPIRITSELECT;
-          combatUIManager->menuPicker->x = 10;
-        }
-        if(input[2] && !oldinput[2] && !protag_is_talking) {
-          combatUIManager->currentTarget--;
-        }
-        if(input[3] && !oldinput[3] && !protag_is_talking) {
-          combatUIManager->currentTarget++;
-        }
-        if(input[11] && !oldinput[11] && !protag_is_talking) {
-          //move must be ally-targeted
-          int spiritIndex = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
-          //int targeting = spiritTable[spiritIndex].targeting;
-          int cost = spiritTable[spiritIndex].cost;
-
-          if(g_partyCombatants[curCombatantIndex]->sp >= cost) {
-            useSpiritMove(spiritIndex, combatUIManager->currentTarget, g_partyCombatants[curCombatantIndex]);
-//            vector<string> spiritScript = {};
-//            adventureUIManager->talker = narrarator;
-//            spiritScript.push_back(combatUIManager->finalText);
-//            spiritScript.push_back("#");
-//
-//            adventureUIManager->ownScript = spiritScript;
-//            adventureUIManager->dialogue_index = -1;
-//            adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
-//            adventureUIManager->sleepingMS = 0;
-//            protag_is_talking = 1;
-//            g_keyItemFlavorDisplay = 1; //really just means make sure we dont use the input from the dialog ending to start another one
-//            g_forceEndDialogue = 0;
-//            adventureUIManager->continueDialogue();
-
+        {
+          if(protag_is_talking) {
+            combatUIManager->partyText->show = 0;
+            combatUIManager->partyMiniText->show = 0;
+          } else {
+            combatUIManager->partyText->show = 1;
+            combatUIManager->partyMiniText->show = 1;
           }
+          if(input[8] && !oldinput[8] && !protag_is_talking ) {
+            g_amState = amState::SPIRITSELECT;
+            combatUIManager->menuPicker->x = 10;
+          }
+          if(input[2] && !oldinput[2] && !protag_is_talking) {
+            combatUIManager->currentTarget--;
+          }
+          if(input[3] && !oldinput[3] && !protag_is_talking) {
+            combatUIManager->currentTarget++;
+          }
+          if(input[11] && !oldinput[11] && !protag_is_talking) {
+            //move must be ally-targeted
+            int spiritIndex = g_partyCombatants[curCombatantIndex]->spiritMoves[combatUIManager->currentInventoryOption];
+            //int targeting = spiritTable[spiritIndex].targeting;
+            int cost = spiritTable[spiritIndex].cost;
+
+            if(g_partyCombatants[curCombatantIndex]->sp >= cost) {
+              useSpiritMove(spiritIndex, combatUIManager->currentTarget, g_partyCombatants[curCombatantIndex]);
+              //            vector<string> spiritScript = {};
+              //            adventureUIManager->talker = narrarator;
+              //            spiritScript.push_back(combatUIManager->finalText);
+              //            spiritScript.push_back("#");
+              //
+              //            adventureUIManager->ownScript = spiritScript;
+              //            adventureUIManager->dialogue_index = -1;
+              //            adventureUIManager->useOwnScriptInsteadOfTalkersScript = 1;
+              //            adventureUIManager->sleepingMS = 0;
+              //            protag_is_talking = 1;
+              //            g_keyItemFlavorDisplay = 1; //really just means make sure we dont use the input from the dialog ending to start another one
+              //            g_forceEndDialogue = 0;
+              //            adventureUIManager->continueDialogue();
+
+            }
+          }
+          if(combatUIManager->currentTarget < 0) combatUIManager->currentTarget = 0;
+          if(combatUIManager->currentTarget >= g_partyCombatants.size()) combatUIManager->currentTarget = g_partyCombatants.size()-1;
+          break;
         }
-        if(combatUIManager->currentTarget < 0) combatUIManager->currentTarget = 0;
-        if(combatUIManager->currentTarget >= g_partyCombatants.size()) combatUIManager->currentTarget = g_partyCombatants.size()-1;
-        break;
-      }
     }
   }
 
@@ -908,46 +925,46 @@ void ExplorationLoop() {
         float y2 = adventureUIManager->dialogpointer->y1 * WIN_HEIGHT;
         float x1 = adventureUIManager->dialogpointer->x2 * WIN_WIDTH;
         float y1 = adventureUIManager->dialogpointer->y2 * WIN_HEIGHT;
-      
+
         // Calculate slope and y-intercept of the original line
         float m = (y2 - y1) / (x2 - x1);
         float b = y1 - (m * x1);
-      
+
         // Distance from the line
         float distance = 52.0f;
         float distanceL = 58;
-      
+
         // Angle for the perpendicular line
         float angle = atan(-1 / m);
-      
+
         // Offset values for the perpendicular distance
         float offsetX = distance * cos(angle);
         float offsetY = distance * sin(angle);
         float offsetXL = distanceL * cos(angle);
         float offsetYL = distanceL * sin(angle);
 
-      
+
         // Final point coordinates
         float endX = x2;
         float endY = y2;
-      
+
         // Calculate points on either side of the line
         float xLeft = x1 - offsetXL;
         float yLeft = y1 - offsetYL;
         float xRight = x1 + offsetX;
         float yRight = y1 + offsetY;
-      
+
         // Calculate slopes for lines converging to the end point
         float mlLeft = (endY - yLeft) / (endX - xLeft);
         float mlRight = (endY - yRight) / (endX - xRight);
-      
+
         // Calculate new y-intercepts for the lines
         float blLeft = yLeft - (mlLeft * xLeft);
         float blRight = yRight - (mlRight * xRight);
-      
+
         // Use any given y coordinate
         float y = adventureUIManager->dialogpointergap->y * WIN_HEIGHT;
-      
+
         // Calculate x coordinates along the two other lines for the given y
         float xLeftConverge = (y - blLeft) / mlLeft;
         float xRightConverge = (y - blRight) / mlRight;
@@ -956,12 +973,12 @@ void ExplorationLoop() {
         adventureUIManager->dialogpointergap->width = xRightConverge -xLeftConverge;
         adventureUIManager->dialogpointergap->x /= WIN_WIDTH;
         adventureUIManager->dialogpointergap->width /= WIN_WIDTH;
-//        // Draw squares on either side
-//        SDL_Rect rLeft = {static_cast<int>(xLeftConverge), static_cast<int>(y), 5, 5};
-//        SDL_RenderCopy(renderer, grassTexture, NULL, &rLeft);
-//      
-//        SDL_Rect rRight = {static_cast<int>(xRightConverge), static_cast<int>(y), 5, 5};
-//        SDL_RenderCopy(renderer, grassTexture, NULL, &rRight);
+        //        // Draw squares on either side
+        //        SDL_Rect rLeft = {static_cast<int>(xLeftConverge), static_cast<int>(y), 5, 5};
+        //        SDL_RenderCopy(renderer, grassTexture, NULL, &rLeft);
+        //      
+        //        SDL_Rect rRight = {static_cast<int>(xRightConverge), static_cast<int>(y), 5, 5};
+        //        SDL_RenderCopy(renderer, grassTexture, NULL, &rRight);
       }	
 
     }
@@ -1151,27 +1168,6 @@ void ExplorationLoop() {
     g_camera.height = WIN_HEIGHT;
   }
 
-  if (freecamera)
-  {
-    g_camera.update_movement(elapsed, camx, camy);
-  }
-  else
-  {
-    // lerp cameratargets
-    g_cameraAimingOffsetY = g_cameraAimingOffsetY * g_cameraAimingOffsetLerpScale + g_cameraAimingOffsetYTarget * (1 - (g_cameraAimingOffsetLerpScale));
-    g_cameraAimingOffsetX = g_cameraAimingOffsetX * g_cameraAimingOffsetLerpScale + g_cameraAimingOffsetXTarget * (1 - (g_cameraAimingOffsetLerpScale));
-    float zoomoffsetx = ((float)WIN_WIDTH / 2) / g_zoom_mod;
-    float zoomoffsety = ((float)WIN_HEIGHT / 2) / g_zoom_mod;
-    // g_camera.zoom = 0.9;
-
-    if(g_hog == 0) {
-      g_camera.update_movement(elapsed, g_focus->getOriginX() - zoomoffsetx + (g_cameraAimingOffsetX * g_cameraShove), ((g_focus->getOriginY() - XtoZ * g_focus->z) - zoomoffsety - (g_cameraAimingOffsetY * g_cameraShove)));
-    } else {
-      int avgX = g_focus->getOriginX() + g_hog->getOriginX(); avgX *= 0.5;
-      int avgY = g_focus->getOriginY() + g_hog->getOriginY(); avgY *= 0.5;
-      g_camera.update_movement(elapsed, avgX - zoomoffsetx, ((avgY - XtoZ * g_focus->z) - zoomoffsety));
-    }
-  }
 
   // update ui
   curTextWait += elapsed * text_speed_up;
@@ -1595,7 +1591,7 @@ void ExplorationLoop() {
     {
       g_fogslates[i]->x = (int)g_focus->getOriginX() + px - 657;										   // 658
       g_fogslates[i]->y = (int)g_focus->getOriginY() - ((int)g_focus->getOriginY() % 55) + 55 * i - 453; // 449
-      //g_fogslates[i]->z = g_focus->stableLayer * 64;
+                                                                                                         //g_fogslates[i]->z = g_focus->stableLayer * 64;
       g_fogslates[i]->z = 0;
     }
 
@@ -1611,7 +1607,7 @@ void ExplorationLoop() {
     {
       g_fogslatesA[i]->x = (int)g_focus->getOriginX() + px - 658;											// 655
       g_fogslatesA[i]->y = (int)g_focus->getOriginY() - ((int)g_focus->getOriginY() % 55) + 55 * i - 453; // 449
-      //g_fogslatesA[i]->z = g_focus->stableLayer * 64 + 64;
+                                                                                                          //g_fogslatesA[i]->z = g_focus->stableLayer * 64 + 64;
       g_fogslatesA[i]->z = 64;
     }
 
@@ -1924,22 +1920,6 @@ void ExplorationLoop() {
     adventureUIManager->seeingDetectable->show = 1;
   }
 
-  // tiles
-  for (long long unsigned int i = 0; i < g_tiles.size(); i++)
-  {
-    if (g_tiles[i]->z == 0)
-    {
-      g_tiles[i]->render(renderer, g_camera);
-    }
-  }
-
-  for (long long unsigned int i = 0; i < g_tiles.size(); i++)
-  {
-    if (g_tiles[i]->z == 1)
-    {
-      g_tiles[i]->render(renderer, g_camera);
-    }
-  }
 
   // SDL_Rect FoWrect;
 
@@ -1996,243 +1976,9 @@ void ExplorationLoop() {
 
   }
 
-  // sort
-  sort_by_y(g_actors);
-  for (long long unsigned int i = 0; i < g_actors.size(); i++)
-  {
-    g_actors[i]->render(renderer, g_camera);
-  }
-
-  for (long long unsigned int i = 0; i < g_tiles.size(); i++)
-  {
-    if (g_tiles[i]->z == 2)
-    {
-      g_tiles[i]->render(renderer, g_camera);
-    }
-  }
-  B("After tiles");
-
-  //render black bars
-  {
-    SDL_Rect blackrect;
-
-    blackrect = {
-      g_camera.desiredX - g_camera.width,
-      g_camera.desiredY - g_camera.height,
-      g_camera.width,
-      g_camera.height*3
-    };
 
 
-    blackrect = transformRect(blackrect);
 
-    SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
-
-    blackrect = {
-      g_camera.desiredX + g_camera.width,
-      g_camera.desiredY - g_camera.height,
-      g_camera.width,
-      g_camera.height*3
-    };
-
-
-    blackrect = transformRect(blackrect);
-
-    SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
-
-    blackrect = {
-      g_camera.desiredX,
-      g_camera.desiredY - g_camera.height,
-      g_camera.width,
-      g_camera.height
-    };
-
-    blackrect = transformRect(blackrect);
-
-    SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
-
-    blackrect = {
-      g_camera.desiredX,
-      g_camera.desiredY + g_camera.height,
-      g_camera.width,
-      g_camera.height
-    };
-
-    blackrect = transformRect(blackrect);
-
-    SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
-
-
-  }
-
-  // map editing
-  if (devMode)
-  {
-    nodeInfoText->textcolor = {0, 0, 0};
-    nodeInfoText->show = 1;
-
-    // draw nodes
-    for (long long unsigned int i = 0; i < g_worldsounds.size(); i++)
-    {
-      SDL_Rect obj = {(int)((g_worldsounds[i]->x - g_camera.x - 20) * g_camera.zoom), (int)(((g_worldsounds[i]->y - g_camera.y - 20) * g_camera.zoom)), (int)((40 * g_camera.zoom)), (int)((40 * g_camera.zoom))};
-      SDL_RenderCopy(renderer, worldsoundIcon->texture, NULL, &obj);
-
-      SDL_Rect textrect = {(int)(obj.x), (int)(obj.y + 20), (int)(obj.w - 15), (int)(obj.h - 15)};
-
-      //SDL_Surface *textsurface = TTF_RenderText_Blended_Wrapped(nodeInfoText->font, g_worldsounds[i]->name.c_str(), {15, 15, 15}, 1 * WIN_WIDTH);
-      //        SDL_Texture *texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
-      //
-      //        SDL_RenderCopy(renderer, texttexture, NULL, &textrect);
-      //
-      //        SDL_FreeSurface(textsurface);
-      //        SDL_DestroyTexture(texttexture);
-
-      nodeInfoText->x = obj.x;
-      nodeInfoText->y = obj.y - 20;
-      nodeInfoText->updateText(g_worldsounds[i]->name, -1, 15);
-      nodeInfoText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-    }
-
-
-    //draw precede node(s)
-    if(precedeProtagNode != nullptr) {
-      SDL_Rect obj = { precedeProtagNode->x, precedeProtagNode->y, 40, 40};
-
-      obj = transformRect(obj);
-      SDL_RenderCopy(renderer, worldsoundIcon->texture, NULL, &obj);
-    }
-
-    for (long long unsigned int i = 0; i < g_musicNodes.size(); i++)
-    {
-      SDL_Rect obj = {(int)((g_musicNodes[i]->x - g_camera.x - 20) * g_camera.zoom), (int)(((g_musicNodes[i]->y - g_camera.y - 20) * g_camera.zoom)), (int)((40 * g_camera.zoom)), (int)((40 * g_camera.zoom))};
-      SDL_RenderCopy(renderer, musicIcon->texture, NULL, &obj);
-
-      SDL_Rect textrect = {(int)obj.x, (int)(obj.y + 20), (int)(obj.w - 15), (int)(obj.h - 15)};
-
-      SDL_Surface *textsurface = TTF_RenderText_Blended_Wrapped(nodeInfoText->font, g_musicNodes[i]->name.c_str(), {15, 15, 15}, 1 * WIN_WIDTH);
-      SDL_Texture *texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
-
-      SDL_RenderCopy(renderer, texttexture, NULL, &textrect);
-
-      SDL_FreeSurface(textsurface);
-      SDL_DestroyTexture(texttexture);
-    }
-
-    for (long long unsigned int i = 0; i < g_cueSounds.size(); i++)
-    {
-      SDL_Rect obj = {(int)((g_cueSounds[i]->x - g_camera.x - 20) * g_camera.zoom), (int)(((g_cueSounds[i]->y - g_camera.y - 20) * g_camera.zoom)), (int)((40 * g_camera.zoom)), (int)((40 * g_camera.zoom))};
-      SDL_RenderCopy(renderer, cueIcon->texture, NULL, &obj);
-      SDL_Rect textrect = {(int)obj.x, (int)(obj.y + 20), (int)(obj.w - 15), (int)(obj.h - 15)};
-
-      SDL_Surface *textsurface = TTF_RenderText_Blended_Wrapped(nodeInfoText->font, g_cueSounds[i]->name.c_str(), {15, 15, 15}, 1 * WIN_WIDTH);
-      SDL_Texture *texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
-
-      SDL_RenderCopy(renderer, texttexture, NULL, &textrect);
-
-      SDL_FreeSurface(textsurface);
-      SDL_DestroyTexture(texttexture);
-    }
-
-    for (long long unsigned int i = 0; i < g_waypoints.size(); i++)
-    {
-      if(!drawhitboxes) {break;}
-      SDL_Rect obj = {(int)((g_waypoints[i]->x - g_camera.x - 20) * g_camera.zoom), (int)(((g_waypoints[i]->y - 20 - g_camera.y - g_waypoints[i]->z * XtoZ) * g_camera.zoom)), (int)((40 * g_camera.zoom)), (int)((40 * g_camera.zoom))};
-      SDL_RenderCopy(renderer, waypointIcon->texture, NULL, &obj);
-      SDL_Rect textrect = {(int)obj.x, (int)(obj.y + 20), (int)(obj.w - 15), (int)(obj.h - 15)};
-
-      nodeInfoText->boxX = (float)obj.x / (float)WIN_WIDTH * g_zoom_mod;
-      nodeInfoText->boxY = (float)obj.y / (float) WIN_HEIGHT* g_zoom_mod;
-      nodeInfoText->boxX -= 0.02;
-      nodeInfoText->boxY -= 0.03;
-      nodeInfoText->updateText(g_waypoints[i]->name, -1, 15);
-      nodeInfoText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-
-      //SDL_Surface *textsurface = TTF_RenderText_Blended_Wrapped(nodeInfoText->font, g_waypoints[i]->name.c_str(), {15, 15, 15}, 1 * WIN_WIDTH);
-      //SDL_Texture *texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
-      //nodeInfoText->updateText(g_waypoints[i]->name
-
-      //SDL_RenderCopy(renderer, texttexture, NULL, &textrect);
-
-      //SDL_FreeSurface(textsurface);
-      //SDL_DestroyTexture(texttexture);
-    }
-
-    for (auto x : g_setsOfInterest)
-    {
-      for (auto y : x)
-      {
-        SDL_Rect obj = {(int)((y->x - g_camera.x - 20) * g_camera.zoom), (int)((y->y - g_camera.y - 20) * g_camera.zoom), (int)((40 * g_camera.zoom)), (int)((40 * g_camera.zoom))};
-        SDL_RenderCopy(renderer, poiIcon->texture, NULL, &obj);
-
-        SDL_Rect textrect = {(int)obj.x, (int)(obj.y + 20), (int)(obj.w - 15), (int)(obj.h - 15)};
-
-        SDL_Surface *textsurface = TTF_RenderText_Blended_Wrapped(nodeInfoText->font, to_string(y->index).c_str(), {15, 15, 15}, 1 * WIN_WIDTH);
-        SDL_Texture *texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
-
-        SDL_RenderCopy(renderer, texttexture, NULL, &textrect);
-
-        SDL_FreeSurface(textsurface);
-        SDL_DestroyTexture(texttexture);
-      }
-    }
-
-    // doors
-    for (long long unsigned int i = 0; i < g_doors.size(); i++)
-    {
-      SDL_Rect obj = {(int)((g_doors[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_doors[i]->y - g_camera.y ) * g_camera.zoom)), (int)((g_doors[i]->width * g_camera.zoom)), (int)((g_doors[i]->height * g_camera.zoom))};
-      SDL_RenderCopy(renderer, doorIcon->texture, NULL, &obj);
-      // the wall
-      SDL_Rect obj2 = {(int)((g_doors[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_doors[i]->y - g_camera.y - (g_doors[i]->zeight) * XtoZ) * g_camera.zoom)), (int)((g_doors[i]->width * g_camera.zoom)), (int)(((g_doors[i]->zeight - g_doors[i]->z) * XtoZ * g_camera.zoom) + (g_doors[i]->height * g_camera.zoom))};
-      //SDL_RenderCopy(renderer, doorIcon->texture, NULL, &obj2);
-      nodeInfoText->boxX = (float)obj.x / (float)WIN_WIDTH * g_zoom_mod;
-      nodeInfoText->boxY = (float)obj.y / (float) WIN_HEIGHT* g_zoom_mod;
-      nodeInfoText->updateText(g_doors[i]->to_map + "->" + g_doors[i]->to_point, -1, 15);
-      nodeInfoText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-    }
-
-    for (long long unsigned int i = 0; i < g_dungeonDoors.size(); i++)
-    {
-      SDL_Rect obj = {(int)((g_dungeonDoors[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_dungeonDoors[i]->y - g_camera.y - (128) * XtoZ) * g_camera.zoom)), (int)((g_dungeonDoors[i]->width * g_camera.zoom)), (int)((g_dungeonDoors[i]->height * g_camera.zoom))};
-      SDL_RenderCopy(renderer, ddoorIcon->texture, NULL, &obj);
-      // the wall
-      SDL_Rect obj2 = {(int)((g_dungeonDoors[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_dungeonDoors[i]->y - g_camera.y - (128) * XtoZ) * g_camera.zoom)), (int)((g_dungeonDoors[i]->width * g_camera.zoom)), (int)(((128) * XtoZ * g_camera.zoom) + (g_dungeonDoors[i]->height * g_camera.zoom))};
-      SDL_RenderCopy(renderer, ddoorIcon->texture, NULL, &obj2);
-    }
-
-
-    for (long long unsigned int i = 0; i < g_triggers.size(); i++)
-    {
-      SDL_Rect obj = {(int)((g_triggers[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_triggers[i]->y - g_camera.y - (g_triggers[i]->zeight) * XtoZ) * g_camera.zoom)), (int)((g_triggers[i]->width * g_camera.zoom)), (int)((g_triggers[i]->height * g_camera.zoom))};
-      SDL_RenderCopy(renderer, triggerIcon->texture, NULL, &obj);
-      // the wall
-      SDL_Rect obj2 = {(int)((g_triggers[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_triggers[i]->y - g_camera.y - (g_triggers[i]->zeight) * XtoZ) * g_camera.zoom)), (int)((g_triggers[i]->width * g_camera.zoom)), (int)(((g_triggers[i]->zeight - g_triggers[i]->z) * XtoZ * g_camera.zoom) + (g_triggers[i]->height * g_camera.zoom))};
-      SDL_RenderCopy(renderer, triggerIcon->texture, NULL, &obj2);
-
-      nodeInfoText->x = obj.x + 25;
-      nodeInfoText->y = obj.y + 25;
-      nodeInfoText->updateText(g_triggers[i]->binding, -1, 15);
-      nodeInfoText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-    }
-
-    // listeners
-    for (long long unsigned int i = 0; i < g_listeners.size(); i++)
-    {
-      SDL_Rect obj = {(int)((g_listeners[i]->x - g_camera.x - 20) * g_camera.zoom), (int)((g_listeners[i]->y - g_camera.y - 20) * g_camera.zoom), (int)(40 * g_camera.zoom), (int)(40 * g_camera.zoom)};
-      SDL_RenderCopy(renderer, listenerIcon->texture, NULL, &obj);
-      nodeInfoText->x = obj.x;
-      nodeInfoText->y = obj.y - 20;
-      nodeInfoText->updateText(g_listeners[i]->listenList.size() + " of " + g_listeners[i]->entityName, -1, 15);
-      nodeInfoText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
-    }
-
-    write_map(protag);
-    for (int i = 0; i < 50; i++)
-    {
-      devinput[i] = 0;
-    }
-    nodeInfoText->show = 0;
-  }
-  B("After mapedit");
 
   {
     //to fix a problem with too many trees which were large entities
@@ -2292,12 +2038,12 @@ void ExplorationLoop() {
         obj.y = (x->bounds.y -g_camera.y - height) * g_camera.zoom;
         obj.w = x->bounds.width * g_camera.zoom;
         obj.h = x->bounds.height * g_camera.zoom;
-  
+
         if(RectOverlap(obj, cam))
         {
           g_lt_collisions.push_back(x);
         }
-  
+
       }
     }
 
@@ -2434,301 +2180,6 @@ void ExplorationLoop() {
   }
   B("UI");
 
-  //shade
-  SDL_RenderCopy(renderer, g_shade, NULL, NULL);
-
-  drawUI();
-
-  //render fancybox
-  g_fancybox->render();
-  g_fancybox->update(elapsed);
-
-
-  // settings menu
-  if (g_inSettingsMenu) 
-  {
-    //move reticle to the correct position
-    if(!g_settingsUI->cursorIsOnBackButton) {
-      g_settingsUI->handMarker->targety
-        = g_settingsUI->optionTextboxes[g_settingsUI->positionOfCursor]->boxY
-        + (g_settingsUI->handOffset);
-
-      g_settingsUI->handMarker->targetx
-        = g_settingsUI->markerHandX;
-
-      g_settingsUI->fingerMarker->targety
-        = g_settingsUI->optionTextboxes[g_settingsUI->positionOfCursor]->boxY
-        + (g_settingsUI->fingerOffset);
-
-      g_settingsUI->fingerMarker->targetx
-        = g_settingsUI->markerFingerX;
-
-
-    } else {
-      float ww = WIN_WIDTH;
-      float wh = WIN_HEIGHT;
-
-      g_settingsUI->fingerMarker->targetx = g_settingsUI->bbNinePatch->x + (g_settingsUI->markerBBOffset);
-      g_settingsUI->fingerMarker->targety = g_settingsUI->bbNinePatch->y + (g_settingsUI->markerBBOffsetY * (ww/wh));
-
-      g_settingsUI->handMarker->targetx = g_settingsUI->bbNinePatch->x + (g_settingsUI->markerBBOffset);
-      g_settingsUI->handMarker->targety = g_settingsUI->bbNinePatch->y + (g_settingsUI->markerBBOffsetY * (ww/wh));
-    }
-
-    if(g_firstFrameOfSettingsMenu) {
-      g_firstFrameOfSettingsMenu = 0;
-      g_settingsUI->handMarker->x = g_settingsUI->handMarker->targetx;
-      g_settingsUI->handMarker->y = g_settingsUI->handMarker->targety;
-      g_settingsUI->fingerMarker->x = g_settingsUI->fingerMarker->targetx;
-      g_settingsUI->fingerMarker->y = g_settingsUI->fingerMarker->targety;
-
-    }
-
-  }
-
-  //this is the menu for quitting or going back to the "overworld"
-  if (g_inEscapeMenu) 
-  {
-    elapsed = 0;
-    //move reticle to the correct position
-    g_escapeUI->handMarker->targety
-      = g_escapeUI->optionTextboxes[g_escapeUI->positionOfCursor]->boxY
-      + (g_escapeUI->handOffset);
-
-    g_escapeUI->handMarker->targetx
-      = g_escapeUI->markerHandX;
-
-    g_escapeUI->fingerMarker->targety
-      = g_escapeUI->optionTextboxes[g_escapeUI->positionOfCursor]->boxY
-      + (g_escapeUI->fingerOffset);
-
-    float ww = WIN_WIDTH;
-    float fwidth = g_escapeUI->optionTextboxes[g_escapeUI->positionOfCursor]->width;
-    g_escapeUI->fingerMarker->targetx
-      = g_escapeUI->optionTextboxes[g_escapeUI->positionOfCursor]->boxX + 
-      fwidth / ww / 2;
-
-
-
-    if(g_firstFrameOfSettingsMenu) {
-      g_firstFrameOfSettingsMenu = 0;
-      g_escapeUI->handMarker->x = g_escapeUI->handMarker->targetx;
-      g_escapeUI->handMarker->y = g_escapeUI->handMarker->targety;
-      g_escapeUI->fingerMarker->x = g_escapeUI->fingerMarker->targetx;
-      g_escapeUI->fingerMarker->y = g_escapeUI->fingerMarker->targety;
-
-    }
-
-  }
-
-  // draw pause screen
-  if (inPauseMenu)
-  {
-    adventureUIManager->crosshair->x = 5;
-
-    // iterate thru inventory and draw items on screen
-    float defaultX = WIN_WIDTH * 0.05;
-    float defaultY = WIN_HEIGHT * adventureUIManager->inventoryYStart;
-    float x = defaultX;
-    float y = defaultY;
-    float maxX = WIN_WIDTH * 0.9;
-    float maxY = WIN_HEIGHT * adventureUIManager->inventoryYEnd;
-    float itemWidth = WIN_WIDTH * 0.07;
-    float padding = WIN_WIDTH * 0.01;
-
-    int i = 0;
-
-    if (g_inventoryUiIsLevelSelect == 0) {
-      if(g_inventoryUiIsKeyboard == 1) {
-        //draw a letter in each box and append to a string
-
-
-        for(int j = 0; j < g_alphabet.size(); j++) {
-          if( i < itemsPerRow * inventoryScroll) {
-            i++;
-            continue;
-          }
-
-          SDL_Rect drect;
-          if(g_alphabet == g_alphabet_lower) {
-            drect = {(int)x + (0.02 * WIN_WIDTH) - (g_alphabet_widths[i] * itemWidth/230) , (int)y, (int)itemWidth * (g_alphabet_widths[i] / 60), (int)itemWidth}; 
-          } else {
-            drect = {(int)x + (0.02 * WIN_WIDTH) - (g_alphabet_widths[i] * itemWidth/230), (int)y, (int)itemWidth * (g_alphabet_upper_widths[i] / 60), (int)itemWidth}; 
-          }
-
-          // draw the ith letter of "alphabet" in drect
-          if(1) {
-            SDL_Rect shadowRect = drect;
-            float booshAmount = g_textDropShadowDist  * (60 * g_fontsize);
-            shadowRect.x += booshAmount;
-            shadowRect.y += booshAmount;
-            SDL_SetTextureColorMod(g_alphabet_textures->at(i), g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
-            SDL_RenderCopy(renderer, g_alphabet_textures->at(i), NULL, &shadowRect);
-            SDL_SetTextureColorMod(g_alphabet_textures->at(i), 255,255,255);
-          }
-          SDL_RenderCopy(renderer, g_alphabet_textures->at(i), NULL, &drect);
-
-
-          if (i == inventorySelection || g_firstFrameOfPauseMenu)
-          {
-            // this item should have the marker
-            inventoryMarker->show = 1;
-            float biggen = 0; // !!! resolutions : might have problems with diff resolutions
-
-            if(g_firstFrameOfPauseMenu) {
-              inventoryMarker->x = x / WIN_WIDTH;
-              inventoryMarker->y = y / WIN_HEIGHT;
-              inventoryMarker->x -= biggen;
-              inventoryMarker->y -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              //now that it's a hand
-              inventoryMarker->x += 0.015 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              inventoryMarker->y += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              inventoryMarker->targetx = inventoryMarker->x;
-              inventoryMarker->targety = inventoryMarker->y;
-              g_firstFrameOfPauseMenu = 0;
-            } else {
-              inventoryMarker->targetx = x / WIN_WIDTH;
-              inventoryMarker->targety = y / WIN_HEIGHT;
-              inventoryMarker->targetx -= biggen;
-              inventoryMarker->targety -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              //now that it's a hand
-              inventoryMarker->targetx += 0.015 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-              inventoryMarker->targety += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-            }
-
-            inventoryMarker->width = itemWidth / WIN_WIDTH;
-
-            inventoryMarker->width += biggen * 2;
-            //inventoryMarker->height = inventoryMarker->width * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-          }
-
-          x += itemWidth + padding;
-          if (x > maxX)
-          {
-            x = defaultX;
-            y += itemWidth + padding;
-            if (y > maxY)
-            {
-              // we filled up the entire inventory, so lets leave
-              break;
-            }
-          }
-          i++;
-
-        }
-
-        //draw current input in the bottom box
-        adventureUIManager->inputText->updateText(g_keyboardInput.c_str(), -1, 0.9);
-        adventureUIManager->escText->updateText(adventureUIManager->keyboardPrompt, -1, 0.9);
-
-
-        g_itemsInInventory = g_alphabet.size();
-
-
-      }
-    } else {
-      //populate the UI based on the loaded level sequence.
-      for(int j = 0; j < g_levelSequence->levelNodes.size(); j++) {
-        if( i < itemsPerRow * inventoryScroll) {
-          i++;
-          continue;
-        }
-        SDL_Rect drect = {(int)x, (int)y, (int)itemWidth, (int)itemWidth}; 
-        int boosh = 5;
-        drect.w += boosh * 2;
-        drect.h += boosh * 2;
-        drect.x -= boosh;
-        drect.y -= boosh;
-
-        levelNode* tn = g_levelSequence->levelNodes[j];
-
-        //should we draw the locked graphic?
-        if(tn->locked) {
-
-          SDL_RenderCopy(renderer, g_locked_level_texture, NULL, &drect);
-
-          //render the face
-          SDL_RenderCopy(renderer, tn->mouthTexture, NULL, &drect);
-
-          SDL_Rect srect = tn->getEyeRect();
-          SDL_RenderCopy(renderer, tn->eyeTexture, &srect, &drect);
-          g_levelSequence->levelNodes[j]->blinkCooldownMS -= 16;
-          if(tn->blinkCooldownMS < 0) { tn->blinkCooldownMS = rng(tn->minBlinkCooldownMS, tn->maxBlinkCooldownMS); }
-        } else {
-          SDL_RenderCopy(renderer, tn->sprite, NULL, &drect);
-        }
-
-
-        if (i == inventorySelection)
-        {
-
-          if(g_levelSequence->levelNodes[i]->locked) {
-            adventureUIManager->escText->updateText("Locked", -1, 0.9);
-          } else {
-            string dispText = g_levelSequence->levelNodes[i]->name;
-            std::replace(dispText.begin(), dispText.end(),'_',' ');
-            adventureUIManager->escText->updateText(g_levelSequence->levelNodes[i]->name, -1, 0.9);
-          }
-
-          // this item should have the marker
-          inventoryMarker->show = 1;
-          float biggen = 0.01; // !!! resolutions : might have problems with diff resolutions
-
-          if(g_firstFrameOfPauseMenu) {
-            inventoryMarker->x = x / WIN_WIDTH;
-            inventoryMarker->y = y / WIN_HEIGHT;
-            inventoryMarker->x -= biggen;
-            inventoryMarker->y -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-            //now that it's a hand
-            inventoryMarker->x += 0.02 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-            inventoryMarker->y += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-            inventoryMarker->targetx = inventoryMarker->x;
-            inventoryMarker->targety = inventoryMarker->y;
-            g_firstFrameOfPauseMenu = 0;
-          } else {
-            inventoryMarker->targetx = x / WIN_WIDTH;
-            inventoryMarker->targety = y / WIN_HEIGHT;
-            inventoryMarker->targetx -= biggen;
-            inventoryMarker->targety -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-            //now that it's a hand
-            inventoryMarker->targetx += 0.02 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-            inventoryMarker->targety += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-          }
-
-          inventoryMarker->width = itemWidth / WIN_WIDTH;
-
-          inventoryMarker->width += biggen * 2;
-          inventoryMarker->height = inventoryMarker->width * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
-        }
-
-        x += itemWidth + padding;
-        if (x > maxX)
-        {
-          x = defaultX;
-          y += itemWidth + padding;
-          if (y > maxY)
-          {
-            // we filled up the entire inventory, so lets leave
-            break;
-          }
-        }
-        i++;
-
-      }
-      g_itemsInInventory = g_levelSequence->levelNodes.size();
-
-    }
-
-    //re-render inventory reticle so it goes on top of the items/level icons
-    inventoryMarker->render(renderer, g_camera, 0);
-    inventoryMarker->show = 0;
-
-  }
-  else
-  {
-    inventoryMarker->show = 0;
-    inventoryText->show = 0;
-  }
   B("Inventory ui");
 
   // sines for item bouncing
@@ -2742,13 +2193,13 @@ void ExplorationLoop() {
   g_itemsines[6] = ( sin((g_elapsed_accumulator + (235 * 6) ) / 300) * 10 + 30);
   g_itemsines[7] = ( sin((g_elapsed_accumulator + (235 * 7) ) / 300) * 10 + 30);
   B("Itemsines");
-  
-  
+
+
   if (g_elapsed_accumulator > 1800 * M_PI)
   {
     g_elapsed_accumulator -= 1800* M_PI;
   }
-  
+
 
   if(g_waterAllocated && g_waterOnscreen) {
     g_wAcc+= 0.1;
@@ -2969,6 +2420,31 @@ g_lastGrassY = grassY;
 }*/
 B("Tall grass update");
 
+{ //set frames for protags
+
+  for(auto &x : party) {
+    if(x->hisCombatant->health <= 0) {
+      x->frameInAnimation = 2;
+      x->animlimit = 0;
+    } else {
+      x->animlimit = 0.01;
+      if(x->flashingMS > 0) {
+        x->frameInAnimation = 1;
+      } else {
+        x->frameInAnimation = 0;
+      }
+    }
+
+  }
+  if(protag->hisCombatant->health <= 0) {
+    g_spin_entity->animation = 1;
+  } else {
+    g_spin_entity->animation = 0;
+  }
+
+}
+
+
 // ENTITY MOVEMENT (ENTITY UPDATE)
 // dont update movement while transitioning
 if (1)
@@ -2984,6 +2460,10 @@ if (1)
     door* taken = nullptr;
     if( (protag_is_talking == 0 && g_amState == amState::CLOSED && inPauseMenu == 0)) {
       taken = g_entities[i]->update(g_doors, elapsed);
+      if(g_breakFromPrimarySwitch) {
+        g_breakFromPrimarySwitch = 0;
+        return;
+      }
     }
 
 
@@ -3081,6 +2561,10 @@ if (1)
   }
 }
 B("Entity update");
+if(g_breakFromPrimarySwitch) {
+  g_breakFromPrimarySwitch = 0;
+  return;
+}
 
 
 //dungeon door flash
@@ -3596,6 +3080,596 @@ if(punishValue > 1) {
 } else {
   SDL_GL_SetSwapInterval(1);
 }
+
+g_spin_entity->setOriginX(protag->getOriginX());
+g_spin_entity->setOriginY(protag->getOriginY());
+g_spin_entity->z = protag->z;
+
+
+if (freecamera)
+{
+  g_camera.update_movement(elapsed, camx, camy);
+}
+else
+{
+  float zoomoffsetx = ((float)WIN_WIDTH / 2) / g_zoom_mod;
+  float zoomoffsety = ((float)WIN_HEIGHT / 2) / g_zoom_mod;
+  // g_camera.zoom = 0.9;
+
+  if(g_hog == 0) {
+    g_camera.update_movement(elapsed, g_focus->getOriginX() - zoomoffsetx, ((g_focus->getOriginY() - XtoZ * g_focus->z) - zoomoffsety));
+  } else {
+    int avgX = g_focus->getOriginX() + g_hog->getOriginX(); avgX *= 0.5;
+    int avgY = g_focus->getOriginY() + g_hog->getOriginY(); avgY *= 0.5;
+    g_camera.update_movement(elapsed, avgX - zoomoffsetx, ((avgY - XtoZ * g_focus->z) - zoomoffsety));
+  }
+}
+
+
+// tiles
+for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+{
+  if (g_tiles[i]->z == 0)
+  {
+    g_tiles[i]->render(renderer, g_camera);
+  }
+}
+
+for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+{
+  if (g_tiles[i]->z == 1)
+  {
+    g_tiles[i]->render(renderer, g_camera);
+  }
+}
+
+//meshes
+for(auto &x : g_meshes) {
+  SDL_Vertex v[x->numVertices];
+  for(int i = 0; i < x->numVertices; i++) {
+    v[i] = x->vertex[i];
+    v[i].position.x += x->origin.x - g_camera.x;
+    v[i].position.y += x->origin.y - g_camera.y;
+  }
+
+  SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, NULL, 0);
+}
+
+// sort
+sort_by_y(g_actors);
+for (long long unsigned int i = 0; i < g_actors.size(); i++)
+{
+  g_actors[i]->render(renderer, g_camera);
+}
+
+for (long long unsigned int i = 0; i < g_tiles.size(); i++)
+{
+  if (g_tiles[i]->z == 2)
+  {
+    g_tiles[i]->render(renderer, g_camera);
+  }
+}
+B("After tiles");
+
+//render black bars
+{
+  SDL_Rect blackrect;
+
+  blackrect = {
+    g_camera.desiredX - g_camera.width,
+    g_camera.desiredY - g_camera.height,
+    g_camera.width,
+    g_camera.height*3
+  };
+
+
+  blackrect = transformRect(blackrect);
+
+  SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+
+  blackrect = {
+    g_camera.desiredX + g_camera.width,
+    g_camera.desiredY - g_camera.height,
+    g_camera.width,
+    g_camera.height*3
+  };
+
+
+  blackrect = transformRect(blackrect);
+
+  SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+
+  blackrect = {
+    g_camera.desiredX,
+    g_camera.desiredY - g_camera.height,
+    g_camera.width,
+    g_camera.height
+  };
+
+  blackrect = transformRect(blackrect);
+
+  SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+
+  blackrect = {
+    g_camera.desiredX,
+    g_camera.desiredY + g_camera.height,
+    g_camera.width,
+    g_camera.height
+  };
+
+  blackrect = transformRect(blackrect);
+
+  SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
+
+
+}
+
+
+//shade
+SDL_RenderCopy(renderer, g_shade, NULL, NULL);
+
+drawUI();
+
+//render fancybox
+g_fancybox->render();
+g_fancybox->update(elapsed);
+
+
+// settings menu
+if (g_inSettingsMenu) 
+{
+  //move reticle to the correct position
+  if(!g_settingsUI->cursorIsOnBackButton) {
+    g_settingsUI->handMarker->targety
+      = g_settingsUI->optionTextboxes[g_settingsUI->positionOfCursor]->boxY
+      + (g_settingsUI->handOffset);
+
+    g_settingsUI->handMarker->targetx
+      = g_settingsUI->markerHandX;
+
+    g_settingsUI->fingerMarker->targety
+      = g_settingsUI->optionTextboxes[g_settingsUI->positionOfCursor]->boxY
+      + (g_settingsUI->fingerOffset);
+
+    g_settingsUI->fingerMarker->targetx
+      = g_settingsUI->markerFingerX;
+
+
+  } else {
+    float ww = WIN_WIDTH;
+    float wh = WIN_HEIGHT;
+
+    g_settingsUI->fingerMarker->targetx = g_settingsUI->bbNinePatch->x + (g_settingsUI->markerBBOffset);
+    g_settingsUI->fingerMarker->targety = g_settingsUI->bbNinePatch->y + (g_settingsUI->markerBBOffsetY * (ww/wh));
+
+    g_settingsUI->handMarker->targetx = g_settingsUI->bbNinePatch->x + (g_settingsUI->markerBBOffset);
+    g_settingsUI->handMarker->targety = g_settingsUI->bbNinePatch->y + (g_settingsUI->markerBBOffsetY * (ww/wh));
+  }
+
+  if(g_firstFrameOfSettingsMenu) {
+    g_firstFrameOfSettingsMenu = 0;
+    g_settingsUI->handMarker->x = g_settingsUI->handMarker->targetx;
+    g_settingsUI->handMarker->y = g_settingsUI->handMarker->targety;
+    g_settingsUI->fingerMarker->x = g_settingsUI->fingerMarker->targetx;
+    g_settingsUI->fingerMarker->y = g_settingsUI->fingerMarker->targety;
+
+  }
+
+}
+
+//this is the menu for quitting or going back to the "overworld"
+if (g_inEscapeMenu) 
+{
+  elapsed = 0;
+  //move reticle to the correct position
+  g_escapeUI->handMarker->targety
+    = g_escapeUI->optionTextboxes[g_escapeUI->positionOfCursor]->boxY
+    + (g_escapeUI->handOffset);
+
+  g_escapeUI->handMarker->targetx
+    = g_escapeUI->markerHandX;
+
+  g_escapeUI->fingerMarker->targety
+    = g_escapeUI->optionTextboxes[g_escapeUI->positionOfCursor]->boxY
+    + (g_escapeUI->fingerOffset);
+
+  float ww = WIN_WIDTH;
+  float fwidth = g_escapeUI->optionTextboxes[g_escapeUI->positionOfCursor]->width;
+  g_escapeUI->fingerMarker->targetx
+    = g_escapeUI->optionTextboxes[g_escapeUI->positionOfCursor]->boxX + 
+    fwidth / ww / 2;
+
+
+
+  if(g_firstFrameOfSettingsMenu) {
+    g_firstFrameOfSettingsMenu = 0;
+    g_escapeUI->handMarker->x = g_escapeUI->handMarker->targetx;
+    g_escapeUI->handMarker->y = g_escapeUI->handMarker->targety;
+    g_escapeUI->fingerMarker->x = g_escapeUI->fingerMarker->targetx;
+    g_escapeUI->fingerMarker->y = g_escapeUI->fingerMarker->targety;
+
+  }
+
+}
+
+// draw pause screen
+if (inPauseMenu)
+{
+  adventureUIManager->crosshair->x = 5;
+
+  // iterate thru inventory and draw items on screen
+  float defaultX = WIN_WIDTH * 0.05;
+  float defaultY = WIN_HEIGHT * adventureUIManager->inventoryYStart;
+  float x = defaultX;
+  float y = defaultY;
+  float maxX = WIN_WIDTH * 0.9;
+  float maxY = WIN_HEIGHT * adventureUIManager->inventoryYEnd;
+  float itemWidth = WIN_WIDTH * 0.07;
+  float padding = WIN_WIDTH * 0.01;
+
+  int i = 0;
+
+  if (g_inventoryUiIsLevelSelect == 0) {
+    if(g_inventoryUiIsKeyboard == 1) {
+      //draw a letter in each box and append to a string
+
+
+      for(int j = 0; j < g_alphabet.size(); j++) {
+        if( i < itemsPerRow * inventoryScroll) {
+          i++;
+          continue;
+        }
+
+        SDL_Rect drect;
+        if(g_alphabet == g_alphabet_lower) {
+          drect = {(int)x + (0.02 * WIN_WIDTH) - (g_alphabet_widths[i] * itemWidth/230) , (int)y, (int)itemWidth * (g_alphabet_widths[i] / 60), (int)itemWidth}; 
+        } else {
+          drect = {(int)x + (0.02 * WIN_WIDTH) - (g_alphabet_widths[i] * itemWidth/230), (int)y, (int)itemWidth * (g_alphabet_upper_widths[i] / 60), (int)itemWidth}; 
+        }
+
+        // draw the ith letter of "alphabet" in drect
+        if(1) {
+          SDL_Rect shadowRect = drect;
+          float booshAmount = g_textDropShadowDist  * (60 * g_fontsize);
+          shadowRect.x += booshAmount;
+          shadowRect.y += booshAmount;
+          SDL_SetTextureColorMod(g_alphabet_textures->at(i), g_textDropShadowColor,g_textDropShadowColor,g_textDropShadowColor);
+          SDL_RenderCopy(renderer, g_alphabet_textures->at(i), NULL, &shadowRect);
+          SDL_SetTextureColorMod(g_alphabet_textures->at(i), 255,255,255);
+        }
+        SDL_RenderCopy(renderer, g_alphabet_textures->at(i), NULL, &drect);
+
+
+        if (i == inventorySelection || g_firstFrameOfPauseMenu)
+        {
+          // this item should have the marker
+          inventoryMarker->show = 1;
+          float biggen = 0; // !!! resolutions : might have problems with diff resolutions
+
+          if(g_firstFrameOfPauseMenu) {
+            inventoryMarker->x = x / WIN_WIDTH;
+            inventoryMarker->y = y / WIN_HEIGHT;
+            inventoryMarker->x -= biggen;
+            inventoryMarker->y -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+            //now that it's a hand
+            inventoryMarker->x += 0.015 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+            inventoryMarker->y += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+            inventoryMarker->targetx = inventoryMarker->x;
+            inventoryMarker->targety = inventoryMarker->y;
+            g_firstFrameOfPauseMenu = 0;
+          } else {
+            inventoryMarker->targetx = x / WIN_WIDTH;
+            inventoryMarker->targety = y / WIN_HEIGHT;
+            inventoryMarker->targetx -= biggen;
+            inventoryMarker->targety -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+            //now that it's a hand
+            inventoryMarker->targetx += 0.015 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+            inventoryMarker->targety += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+          }
+
+          inventoryMarker->width = itemWidth / WIN_WIDTH;
+
+          inventoryMarker->width += biggen * 2;
+          //inventoryMarker->height = inventoryMarker->width * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+        }
+
+        x += itemWidth + padding;
+        if (x > maxX)
+        {
+          x = defaultX;
+          y += itemWidth + padding;
+          if (y > maxY)
+          {
+            // we filled up the entire inventory, so lets leave
+            break;
+          }
+        }
+        i++;
+
+      }
+
+      //draw current input in the bottom box
+      adventureUIManager->inputText->updateText(g_keyboardInput.c_str(), -1, 0.9);
+      adventureUIManager->escText->updateText(adventureUIManager->keyboardPrompt, -1, 0.9);
+
+
+      g_itemsInInventory = g_alphabet.size();
+
+
+    }
+  } else {
+    //populate the UI based on the loaded level sequence.
+    for(int j = 0; j < g_levelSequence->levelNodes.size(); j++) {
+      if( i < itemsPerRow * inventoryScroll) {
+        i++;
+        continue;
+      }
+      SDL_Rect drect = {(int)x, (int)y, (int)itemWidth, (int)itemWidth}; 
+      int boosh = 5;
+      drect.w += boosh * 2;
+      drect.h += boosh * 2;
+      drect.x -= boosh;
+      drect.y -= boosh;
+
+      levelNode* tn = g_levelSequence->levelNodes[j];
+
+      //should we draw the locked graphic?
+      if(tn->locked) {
+
+        SDL_RenderCopy(renderer, g_locked_level_texture, NULL, &drect);
+
+        //render the face
+        SDL_RenderCopy(renderer, tn->mouthTexture, NULL, &drect);
+
+        SDL_Rect srect = tn->getEyeRect();
+        SDL_RenderCopy(renderer, tn->eyeTexture, &srect, &drect);
+        g_levelSequence->levelNodes[j]->blinkCooldownMS -= 16;
+        if(tn->blinkCooldownMS < 0) { tn->blinkCooldownMS = rng(tn->minBlinkCooldownMS, tn->maxBlinkCooldownMS); }
+      } else {
+        SDL_RenderCopy(renderer, tn->sprite, NULL, &drect);
+      }
+
+
+      if (i == inventorySelection)
+      {
+
+        if(g_levelSequence->levelNodes[i]->locked) {
+          adventureUIManager->escText->updateText("Locked", -1, 0.9);
+        } else {
+          string dispText = g_levelSequence->levelNodes[i]->name;
+          std::replace(dispText.begin(), dispText.end(),'_',' ');
+          adventureUIManager->escText->updateText(g_levelSequence->levelNodes[i]->name, -1, 0.9);
+        }
+
+        // this item should have the marker
+        inventoryMarker->show = 1;
+        float biggen = 0.01; // !!! resolutions : might have problems with diff resolutions
+
+        if(g_firstFrameOfPauseMenu) {
+          inventoryMarker->x = x / WIN_WIDTH;
+          inventoryMarker->y = y / WIN_HEIGHT;
+          inventoryMarker->x -= biggen;
+          inventoryMarker->y -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+          //now that it's a hand
+          inventoryMarker->x += 0.02 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+          inventoryMarker->y += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+          inventoryMarker->targetx = inventoryMarker->x;
+          inventoryMarker->targety = inventoryMarker->y;
+          g_firstFrameOfPauseMenu = 0;
+        } else {
+          inventoryMarker->targetx = x / WIN_WIDTH;
+          inventoryMarker->targety = y / WIN_HEIGHT;
+          inventoryMarker->targetx -= biggen;
+          inventoryMarker->targety -= biggen * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+          //now that it's a hand
+          inventoryMarker->targetx += 0.02 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+          inventoryMarker->targety += 0.03 * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+        }
+
+        inventoryMarker->width = itemWidth / WIN_WIDTH;
+
+        inventoryMarker->width += biggen * 2;
+        inventoryMarker->height = inventoryMarker->width * ((float)WIN_WIDTH / (float)WIN_HEIGHT);
+      }
+
+      x += itemWidth + padding;
+      if (x > maxX)
+      {
+        x = defaultX;
+        y += itemWidth + padding;
+        if (y > maxY)
+        {
+          // we filled up the entire inventory, so lets leave
+          break;
+        }
+      }
+      i++;
+
+    }
+    g_itemsInInventory = g_levelSequence->levelNodes.size();
+
+  }
+
+  //re-render inventory reticle so it goes on top of the items/level icons
+  inventoryMarker->render(renderer, g_camera, 0);
+  inventoryMarker->show = 0;
+
+}
+else
+{
+  inventoryMarker->show = 0;
+  inventoryText->show = 0;
+}
+
+// map editing
+if (devMode)
+{
+  nodeInfoText->textcolor = {0, 0, 0};
+  nodeInfoText->show = 1;
+
+  // draw nodes
+  for (long long unsigned int i = 0; i < g_worldsounds.size(); i++)
+  {
+    SDL_Rect obj = {(int)((g_worldsounds[i]->x - g_camera.x - 20) * g_camera.zoom), (int)(((g_worldsounds[i]->y - g_camera.y - 20) * g_camera.zoom)), (int)((40 * g_camera.zoom)), (int)((40 * g_camera.zoom))};
+    SDL_RenderCopy(renderer, worldsoundIcon->texture, NULL, &obj);
+
+    SDL_Rect textrect = {(int)(obj.x), (int)(obj.y + 20), (int)(obj.w - 15), (int)(obj.h - 15)};
+
+    //SDL_Surface *textsurface = TTF_RenderText_Blended_Wrapped(nodeInfoText->font, g_worldsounds[i]->name.c_str(), {15, 15, 15}, 1 * WIN_WIDTH);
+    //        SDL_Texture *texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
+    //
+    //        SDL_RenderCopy(renderer, texttexture, NULL, &textrect);
+    //
+    //        SDL_FreeSurface(textsurface);
+    //        SDL_DestroyTexture(texttexture);
+
+    nodeInfoText->x = obj.x;
+    nodeInfoText->y = obj.y - 20;
+    nodeInfoText->updateText(g_worldsounds[i]->name, -1, 15);
+    nodeInfoText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+  }
+
+
+  //draw precede node(s)
+  if(precedeProtagNode != nullptr) {
+    SDL_Rect obj = { precedeProtagNode->x, precedeProtagNode->y, 40, 40};
+
+    obj = transformRect(obj);
+    SDL_RenderCopy(renderer, worldsoundIcon->texture, NULL, &obj);
+  }
+
+  for (long long unsigned int i = 0; i < g_musicNodes.size(); i++)
+  {
+    SDL_Rect obj = {(int)((g_musicNodes[i]->x - g_camera.x - 20) * g_camera.zoom), (int)(((g_musicNodes[i]->y - g_camera.y - 20) * g_camera.zoom)), (int)((40 * g_camera.zoom)), (int)((40 * g_camera.zoom))};
+    SDL_RenderCopy(renderer, musicIcon->texture, NULL, &obj);
+
+    SDL_Rect textrect = {(int)obj.x, (int)(obj.y + 20), (int)(obj.w - 15), (int)(obj.h - 15)};
+
+    SDL_Surface *textsurface = TTF_RenderText_Blended_Wrapped(nodeInfoText->font, g_musicNodes[i]->name.c_str(), {15, 15, 15}, 1 * WIN_WIDTH);
+    SDL_Texture *texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
+
+    SDL_RenderCopy(renderer, texttexture, NULL, &textrect);
+
+    SDL_FreeSurface(textsurface);
+    SDL_DestroyTexture(texttexture);
+  }
+
+  for (long long unsigned int i = 0; i < g_cueSounds.size(); i++)
+  {
+    SDL_Rect obj = {(int)((g_cueSounds[i]->x - g_camera.x - 20) * g_camera.zoom), (int)(((g_cueSounds[i]->y - g_camera.y - 20) * g_camera.zoom)), (int)((40 * g_camera.zoom)), (int)((40 * g_camera.zoom))};
+    SDL_RenderCopy(renderer, cueIcon->texture, NULL, &obj);
+    SDL_Rect textrect = {(int)obj.x, (int)(obj.y + 20), (int)(obj.w - 15), (int)(obj.h - 15)};
+
+    SDL_Surface *textsurface = TTF_RenderText_Blended_Wrapped(nodeInfoText->font, g_cueSounds[i]->name.c_str(), {15, 15, 15}, 1 * WIN_WIDTH);
+    SDL_Texture *texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
+
+    SDL_RenderCopy(renderer, texttexture, NULL, &textrect);
+
+    SDL_FreeSurface(textsurface);
+    SDL_DestroyTexture(texttexture);
+  }
+
+  for (long long unsigned int i = 0; i < g_waypoints.size(); i++)
+  {
+    if(!drawhitboxes) {break;}
+    SDL_Rect obj = {(int)((g_waypoints[i]->x - g_camera.x - 20) * g_camera.zoom), (int)(((g_waypoints[i]->y - 20 - g_camera.y - g_waypoints[i]->z * XtoZ) * g_camera.zoom)), (int)((40 * g_camera.zoom)), (int)((40 * g_camera.zoom))};
+    SDL_RenderCopy(renderer, waypointIcon->texture, NULL, &obj);
+    SDL_Rect textrect = {(int)obj.x, (int)(obj.y + 20), (int)(obj.w - 15), (int)(obj.h - 15)};
+
+    nodeInfoText->boxX = (float)obj.x / (float)WIN_WIDTH * g_zoom_mod;
+    nodeInfoText->boxY = (float)obj.y / (float) WIN_HEIGHT* g_zoom_mod;
+    nodeInfoText->boxX -= 0.02;
+    nodeInfoText->boxY -= 0.03;
+    nodeInfoText->updateText(g_waypoints[i]->name, -1, 15);
+    nodeInfoText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+
+    //SDL_Surface *textsurface = TTF_RenderText_Blended_Wrapped(nodeInfoText->font, g_waypoints[i]->name.c_str(), {15, 15, 15}, 1 * WIN_WIDTH);
+    //SDL_Texture *texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
+    //nodeInfoText->updateText(g_waypoints[i]->name
+
+    //SDL_RenderCopy(renderer, texttexture, NULL, &textrect);
+
+    //SDL_FreeSurface(textsurface);
+    //SDL_DestroyTexture(texttexture);
+  }
+
+  for (auto x : g_setsOfInterest)
+  {
+    for (auto y : x)
+    {
+      SDL_Rect obj = {(int)((y->x - g_camera.x - 20) * g_camera.zoom), (int)((y->y - g_camera.y - 20) * g_camera.zoom), (int)((40 * g_camera.zoom)), (int)((40 * g_camera.zoom))};
+      SDL_RenderCopy(renderer, poiIcon->texture, NULL, &obj);
+
+      SDL_Rect textrect = {(int)obj.x, (int)(obj.y + 20), (int)(obj.w - 15), (int)(obj.h - 15)};
+
+      SDL_Surface *textsurface = TTF_RenderText_Blended_Wrapped(nodeInfoText->font, to_string(y->index).c_str(), {15, 15, 15}, 1 * WIN_WIDTH);
+      SDL_Texture *texttexture = SDL_CreateTextureFromSurface(renderer, textsurface);
+
+      SDL_RenderCopy(renderer, texttexture, NULL, &textrect);
+
+      SDL_FreeSurface(textsurface);
+      SDL_DestroyTexture(texttexture);
+    }
+  }
+
+  // doors
+  for (long long unsigned int i = 0; i < g_doors.size(); i++)
+  {
+    SDL_Rect obj = {(int)((g_doors[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_doors[i]->y - g_camera.y ) * g_camera.zoom)), (int)((g_doors[i]->width * g_camera.zoom)), (int)((g_doors[i]->height * g_camera.zoom))};
+    SDL_RenderCopy(renderer, doorIcon->texture, NULL, &obj);
+    // the wall
+    SDL_Rect obj2 = {(int)((g_doors[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_doors[i]->y - g_camera.y - (g_doors[i]->zeight) * XtoZ) * g_camera.zoom)), (int)((g_doors[i]->width * g_camera.zoom)), (int)(((g_doors[i]->zeight - g_doors[i]->z) * XtoZ * g_camera.zoom) + (g_doors[i]->height * g_camera.zoom))};
+    //SDL_RenderCopy(renderer, doorIcon->texture, NULL, &obj2);
+    nodeInfoText->boxX = (float)obj.x / (float)WIN_WIDTH * g_zoom_mod;
+    nodeInfoText->boxY = (float)obj.y / (float) WIN_HEIGHT* g_zoom_mod;
+    nodeInfoText->updateText(g_doors[i]->to_map + "->" + g_doors[i]->to_point, -1, 15);
+    nodeInfoText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+  }
+
+  for (long long unsigned int i = 0; i < g_dungeonDoors.size(); i++)
+  {
+    SDL_Rect obj = {(int)((g_dungeonDoors[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_dungeonDoors[i]->y - g_camera.y - (128) * XtoZ) * g_camera.zoom)), (int)((g_dungeonDoors[i]->width * g_camera.zoom)), (int)((g_dungeonDoors[i]->height * g_camera.zoom))};
+    SDL_RenderCopy(renderer, ddoorIcon->texture, NULL, &obj);
+    // the wall
+    SDL_Rect obj2 = {(int)((g_dungeonDoors[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_dungeonDoors[i]->y - g_camera.y - (128) * XtoZ) * g_camera.zoom)), (int)((g_dungeonDoors[i]->width * g_camera.zoom)), (int)(((128) * XtoZ * g_camera.zoom) + (g_dungeonDoors[i]->height * g_camera.zoom))};
+    SDL_RenderCopy(renderer, ddoorIcon->texture, NULL, &obj2);
+  }
+
+
+  for (long long unsigned int i = 0; i < g_triggers.size(); i++)
+  {
+    SDL_Rect obj = {(int)((g_triggers[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_triggers[i]->y - g_camera.y - (g_triggers[i]->zeight) * XtoZ) * g_camera.zoom)), (int)((g_triggers[i]->width * g_camera.zoom)), (int)((g_triggers[i]->height * g_camera.zoom))};
+    SDL_RenderCopy(renderer, triggerIcon->texture, NULL, &obj);
+    // the wall
+    SDL_Rect obj2 = {(int)((g_triggers[i]->x - g_camera.x) * g_camera.zoom), (int)(((g_triggers[i]->y - g_camera.y - (g_triggers[i]->zeight) * XtoZ) * g_camera.zoom)), (int)((g_triggers[i]->width * g_camera.zoom)), (int)(((g_triggers[i]->zeight - g_triggers[i]->z) * XtoZ * g_camera.zoom) + (g_triggers[i]->height * g_camera.zoom))};
+    SDL_RenderCopy(renderer, triggerIcon->texture, NULL, &obj2);
+
+    nodeInfoText->x = obj.x + 25;
+    nodeInfoText->y = obj.y + 25;
+    nodeInfoText->updateText(g_triggers[i]->binding, -1, 15);
+    nodeInfoText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+  }
+
+  // listeners
+  for (long long unsigned int i = 0; i < g_listeners.size(); i++)
+  {
+    SDL_Rect obj = {(int)((g_listeners[i]->x - g_camera.x - 20) * g_camera.zoom), (int)((g_listeners[i]->y - g_camera.y - 20) * g_camera.zoom), (int)(40 * g_camera.zoom), (int)(40 * g_camera.zoom)};
+    SDL_RenderCopy(renderer, listenerIcon->texture, NULL, &obj);
+    nodeInfoText->x = obj.x;
+    nodeInfoText->y = obj.y - 20;
+    nodeInfoText->updateText(g_listeners[i]->listenList.size() + " of " + g_listeners[i]->entityName, -1, 15);
+    nodeInfoText->render(renderer, WIN_WIDTH, WIN_HEIGHT);
+  }
+
+  write_map(protag);
+  for (int i = 0; i < 50; i++)
+  {
+    devinput[i] = 0;
+  }
+  nodeInfoText->show = 0;
+}
+B("After mapedit");
+
 
 SDL_RenderPresent(renderer);
 B("End of frame");
@@ -4304,6 +4378,10 @@ int WinMain()
   g_loadingATM = 0;
   transitionDelta = transitionImageHeight;
   transition = 1;
+
+  mesh* m = loadMeshFromPly("test/stage", {111065, 98846,0},  250);
+  m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
+
 
   while (!quit)
   {
@@ -5668,6 +5746,7 @@ void getExplorationInput(float &elapsed)
           g_gamemode = gamemode::TITLE;
           titleUIManager->option = 0;
           titleUIManager->showAll();
+          return;
         }
 
         if(g_escapeUI->positionOfCursor == 2) { //Settings

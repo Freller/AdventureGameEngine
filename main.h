@@ -13,6 +13,8 @@ void toggleDevmode();
 
 void toggleFullscreen();
 
+void resetUnremarkableData();
+
 void drawUI();
 
 #endif

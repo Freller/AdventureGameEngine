@@ -22,6 +22,7 @@
 #include "combat.h"
 #include "title.h"
 #include "loss.h"
+#include "mesh.h"
 
 // this is unique to the windowsport
 //#include "windowsinclude.h"
@@ -141,13 +142,15 @@ class lossUI;
 
 class keyItemInfo;
 
+class mesh;
+
 class camera
 {
   public:
     float oldx = 0;
     float oldy = 0;
-    int x = 200;
-    int y = 200;
+    float x = 200;
+    float y = 200;
     int desiredX = 0;
     int desiredY = 0;
     int repoX = -1;
@@ -294,6 +297,8 @@ extern vector<tallGrass*> g_tallGrasses;
 extern vector<camBlocker*> g_camBlockers;
 
 extern vector<gradient*> g_gradients;
+
+extern vector<mesh*> g_meshes;
 
 extern SDL_Texture* g_gradient_a;
 extern SDL_Texture* g_gradient_b;
@@ -1117,6 +1122,8 @@ extern gamemode g_gamemode;
 extern turn g_turn;
 
 extern submode g_submode;
+
+extern int g_breakFromPrimarySwitch;
 
 extern combatUI* combatUIManager;
 

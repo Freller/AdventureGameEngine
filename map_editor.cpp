@@ -1415,8 +1415,13 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
           closestDoor = x;
         }
       }
-      if(closestDoor->width != g_oldDoorWidth ||
-          closestDoor->height != g_oldDoorHeight && (g_useOffset != 0)) {
+
+      if(
+          ((closestDoor->width != g_oldDoorWidth && g_useOffset == 1)
+          ||
+          (closestDoor->height != g_oldDoorHeight && g_useOffset == 2))
+         
+        && (g_useOffset != 0)) {
         if(canSwitchOffDevMode) {
           D(g_oldDoorHeight);
           D(g_oldDoorWidth);
@@ -1451,7 +1456,6 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
           e->animation = 0;
         }
 
-        D(closestDoor);
         if(closestDoor != nullptr) {
           if(g_useOffset == 1) {
             e->setOriginX(closestDoor->x + (closestDoor->width)/2 + g_wayOffsetX);

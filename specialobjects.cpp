@@ -291,7 +291,6 @@ void specialObjectsInit(entity* a) {
     case 24:
     {
       //fireball
-      M("This is the fireball, init'ed");
       a->msPerFrame = 70;
       a->loopAnimation = 1;
       a->scriptedAnimation = 1;
@@ -1120,7 +1119,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
     {
       //fireball
       if(CylinderOverlap(a->getMovedBounds(), protag->getMovedBounds())) {
-        hurtProtag(1);
+        hurtProtag(2);
       }
 
       break;
@@ -1666,7 +1665,7 @@ void specialObjectsUpdate(entity* a, float elapsed) {
           a->shadow->visible = 0;
           a->usingTimeToLive = 1;
           a->sortingOffset = 100;
-          a->timeToLiveMs = 2000;
+          a->timeToLiveMs = 2500;
         }
       }
       break;
