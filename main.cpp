@@ -37,20 +37,6 @@ void protagMakesNoise();
 
 void dungeonFlash();
 
-void resetUnremarkableData() {
-  if(protag != nullptr) {
-    protag->xvel = 0;
-    protag->yvel = 0;
-    protag->xaccel = 0;
-    protag->yaccel = 0;
-  
-    g_spin_cooldown = 0;
-    g_spinning_duration = 0;
-    g_afterspin_duration = 0;
-  }
-
-}
-
 void drawUI() {
 
   adventureUIManager->dialogpointer->render(renderer, g_camera);
@@ -150,9 +136,6 @@ void updateWindowResolution() {
 }
 
 void ExplorationLoop() {
-
-  D(protag->zvel);
-
   // cooldowns
   if(g_dungeonSystemOn) {g_dungeonMs += elapsed;}
   halfsecondtimer += elapsed;
@@ -1106,8 +1089,6 @@ void ExplorationLoop() {
     }
   }
 
-  // background
-  // SDL_SetRenderTarget(renderer, TextureA);
   SDL_RenderClear(renderer);
 
   if (g_backgroundLoaded && g_useBackgrounds)
@@ -1175,529 +1156,6 @@ void ExplorationLoop() {
   {
     adventureUIManager->updateText();
     curTextWait = 0;
-  }
-
-  B("Before fogofwar");
-  // old Fogofwar
-  if (g_fogofwarEnabled && !devMode)
-  {
-    int functionalX = g_focus->getOriginX();
-    int functionalY = g_focus->getOriginY();
-
-    functionalX -= functionalX % 64;
-    functionalX += 32;
-    functionalY -= functionalY % 55;
-    functionalY += 26;
-
-    // for low spec, update only when the player moves across a space
-    if (g_graphicsquality == 0)
-    {
-      // for low spec
-      if (functionalX != g_lastFunctionalX || functionalY != g_lastFunctionalY || g_force_cookies_update)
-      {
-
-        int xdiff = functionalX - g_lastFunctionalX;
-        int ydiff = functionalY - g_lastFunctionalY;
-        if(g_force_cookies_update) {xdiff = 0; ydiff = 0;}
-
-        // to make old tiles fade out
-
-        bool flipper = 0;
-        for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
-        {
-          for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
-          {
-            flipper = !flipper;
-            int xpos = ((i - g_fogMiddleX) * 64) + functionalX;
-            int ypos = ((j - g_fogMiddleY) * 55) + functionalY;
-            //if (XYWorldDistance(functionalX, functionalY, xpos, ypos) > g_viewdist)
-            if(g_fog_window[i][j] == 0)
-            {
-              // g_fogcookies[i][j] -= g_tile_fade_speed; if (g_fogcookies[i][j] < 0) g_fogcookies[i][j] = 0;
-              g_fogcookies[i][j] = 0;
-
-              // g_fc[i][j] -= g_tile_fade_speed; if (g_fc[i][j] < 0) g_fc[i][j] = 0;
-              g_fc[i][j] = 0;
-
-              // g_sc[i][j] -= g_tile_fade_speed; if (g_sc[i][j] < 0) g_sc[i][j] = 0;
-              g_sc[i][j] = 0;
-            }
-            else if (g_fog_relevent[i][j] == 1 && 
-                LineTrace(functionalX, functionalY, xpos, ypos, 0, 35, g_focus->stableLayer + 1, 7, 1, 1) 
-                &&
-                !g_transferingByBoardable
-
-                )
-            {
-              g_fogcookies[i][j] = 255;
-              g_fc[i][j] = 255;
-
-              g_sc[i][j] = 255;
-
-            }
-            else
-            {
-
-              // g_fogcookies[i][j] -= g_tile_fade_speed; if (g_fogcookies[i][j] < 0) g_fogcookies[i][j] = 0;
-              g_fogcookies[i][j] = 0;
-
-              // g_fc[i][j] -= g_tile_fade_speed; if (g_fc[i][j] < 0) g_fc[i][j] = 0;
-              g_fc[i][j] = 0;
-
-              // g_sc[i][j] -= g_tile_fade_speed; if (g_sc[i][j] < 0) g_sc[i][j] = 0;
-              g_sc[i][j] = 0;
-            }
-          }
-        }
-      }
-    }
-    else
-    {
-      if (1)
-      {
-
-        if (functionalX != g_lastFunctionalX)
-        {
-          xtileshift = functionalX - g_lastFunctionalX;
-          xtileshift = xtileshift / abs(xtileshift);
-
-          if (functionalY == g_lastFunctionalY)
-          {
-            ytileshift = 0;
-          }
-        }
-
-        if (functionalY != g_lastFunctionalY)
-        {
-
-          ytileshift = functionalY - g_lastFunctionalY;
-
-          ytileshift = ytileshift / abs(ytileshift);
-
-          if (functionalX == g_lastFunctionalX)
-          {
-            xtileshift = 0;
-          }
-        }
-
-        if (g_force_cookies_update)
-        {
-          g_lastFunctionalX = functionalX;
-          g_lastFunctionalY = functionalY;
-        }
-
-        // to make old tiles fade out, when we move set the tiles opacity to their "old" tile
-        if (functionalX != g_lastFunctionalX || functionalY != g_lastFunctionalY || g_force_cookies_update)
-        {
-
-          g_force_cookies_update = 0;
-
-          // copy the vector
-          auto fogcopy = g_fogcookies;
-          auto fccopy = g_fc;
-          auto sccopy = g_sc;
-
-          for (long long unsigned i = 5; i < 16; i++)
-          {
-            for (long long unsigned j = 4; j < 16; j++)
-            {
-              if(g_fog_relevent[i][j] == 1) {
-                // check if there was an "old" cookie
-                if ((i + xtileshift >= 0 && i + xtileshift < g_fogcookies.size()) && (j + ytileshift >= 0 && j + ytileshift < g_fogheight) && i >= 0 && i < g_fogwidth && j >= 0 && j < g_fogheight)
-                {
-                  g_fogcookies[i][j] = fogcopy[i + xtileshift][j + ytileshift];
-                  g_fc[i][j] = fccopy[i + xtileshift][j + ytileshift];
-                  g_sc[i][j] = sccopy[i + xtileshift][j + ytileshift];
-                }
-              }
-            }
-          }
-        }
-
-        for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
-        {
-          for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
-          {
-
-            if(g_fog_relevent[i][j] == 1) {
-
-              int xpos = ((i - g_fogMiddleX) * 64) + functionalX;
-              int ypos = ((j - g_fogMiddleY) * 55) + functionalY;
-
-              int xpos_fc = ((i - 10) * 64) + functionalX;
-              int ypos_fc = ((j - 9) * 55) + functionalY;
-
-              bool blocked = 1;
-              if (g_fogIgnoresLOS)
-              {
-                blocked = LineTrace(xpos, ypos, xpos, ypos, 0, 10, g_focus->stableLayer + 1, 7, 1, 1);
-              }
-              else
-              {
-                blocked = LineTrace(functionalX, functionalY + 3, xpos, ypos, 0, 7, g_focus->stableLayer + 1, 10, 1, 1);
-              }
-
-              int yBoost = 0;  //you could debate this, but since the block closest to the bottom of the screen is hidden by the shadow-cookie above it, I'll give the player an extra block of vision towards the bottom of the screen
-              if(ypos < functionalY) {yBoost = 55;}
-
-              //if (!(XYWorldDistance(functionalX, functionalY + yBoost, xpos, ypos) > g_viewdist) && blocked)
-              if(g_fog_window[i][j] && blocked && !g_transferingByBoardable)
-              {
-
-                g_fogcookies[i][j] += g_tile_fade_speed * (elapsed / 60);
-                if (g_fogcookies[i][j] > 255)
-                {
-                  g_fogcookies[i][j] = 255;
-                }
-                // g_fogcookies[i][j] = 0;
-
-                // if you want to increment g_fc, there is an additional rule
-                //
-
-                g_fc[i][j] += g_tile_fade_speed * (elapsed / 60);
-                if (g_fc[i][j] > 255)
-                {
-                  g_fc[i][j] = 255;
-                }
-
-                // g_fc[i][j] = 0;
-
-                g_sc[i][j] += g_tile_fade_speed * (elapsed / 60);
-                if (g_sc[i][j] > 255)
-                {
-                  g_sc[i][j] = 255;
-                }
-                // g_sc[i][j] = 0;
-              }
-              else
-              {
-
-                g_fogcookies[i][j] -= g_tile_fade_speed * (elapsed / 60);
-                if (g_fogcookies[i][j] < 0)
-                {
-                  g_fogcookies[i][j] = 0;
-                }
-                // g_fogcookies[i][j] = 0;
-
-                g_fc[i][j] -= g_tile_fade_speed * (elapsed / 60);
-                if (g_fc[i][j] < 0)
-                {
-                  g_fc[i][j] = 0;
-                }
-
-                // g_fc[i][j] = 0;
-
-                g_sc[i][j] -= g_tile_fade_speed * (elapsed / 60);
-                if (g_sc[i][j] < 0)
-                {
-                  g_sc[i][j] = 0;
-                }
-                // g_sc[i][j] = 0;
-              }
-            } else {
-              g_sc[i][j] = 0;
-              g_fc[i][j] = 0;
-              g_fogcookies[i][j] = 0;
-            }
-          }
-        }
-      }
-    }
-
-    // save cookies that are just dark because they are inside of walls to g_savedcookies
-    // AND if they tile infront is at 255
-
-    for (long long unsigned i = 0; i < g_fogwidth; i++)
-    {
-      for (long long unsigned j = 0; j < g_fogheight; j++)
-      {
-        if(g_fog_relevent_c[i][j]) {
-          int xpos = ((i - 10) * 64) + functionalX;
-          int ypos = ((j - 9) * 55) + functionalY;
-          // is this cookie in a wall? or behind a wall
-
-          if (g_focus->stableLayer > g_layers)
-          {
-            break;
-          }
-          if (j + 1 < g_fogheight && g_fc[i][j + 1] > 0)
-          {
-            bool firsttrace = LineTrace(xpos, ypos, xpos, ypos, 0, 15, g_focus->stableLayer + 1, 2, 1, 1);
-            bool secondtrace = LineTrace(xpos, ypos + 55, xpos, ypos + 55, 0, 15, g_focus->stableLayer + 1, 2, 1, 1);
-            rect a = {xpos, ypos, 5, 5};
-
-            // for large entities
-            // if(firsttrace == -1) {
-            //	g_fc[i][j] = 255;
-            //	g_sc[i][j] = 255;
-            // } else {
-            if ((!firsttrace || !secondtrace))
-            {
-              // !!!
-              // g_fc[i][j] += g_tile_fade_speed*2; if (g_fc[i][j] >255) {g_fc[i][j] = 255;}
-              g_fc[i][j] = 255;
-            }
-            //}
-          }
-        }
-      }
-    }
-
-    // this is meant to prevent nasty clipping of shadows and large entities
-    for (auto x : g_large_entities)
-    {
-      // if(XYWorldDistance(functionalX, functionalY, x->getOriginX(), x->getOriginY()) < g_viewdist) {
-      for (long long unsigned i = 5; i < 15; i++)
-      {
-        for (long long unsigned j = 4; j < 15; j++)
-        {
-          if(g_fog_relevent[i][j]) {
-            int xpos = ((i - 10) * 64) + functionalX;
-            int ypos = ((j - 9) * 55) + functionalY;
-            rect a = {xpos, ypos, 1, 1};
-
-            if (RectOverlap(a, x->getMovedBounds()))
-            {
-              if (j > 0)
-              {
-                g_fc[i][j - 1] = 255;
-              }
-              g_fc[i][j] = 255;
-              // g_sc[i][j] = 255;
-            }
-          }
-        }
-      }
-      //}
-    }
-
-    // if a cookie intercepts a large entity, dont darken it
-    // for(long long unsigned i = 0; i < g_fogcookies.size(); i++) {
-    //	for(long long unsigned j = 0; j < g_fogcookies[0].size(); j++) {
-    //		int xpos = ((i - 10) * 64) + functionalX;
-    //		int ypos = ((j - 9) * 55) + functionalY;
-    //		//is this cookie in a wall? or behind a wall
-
-    //		bool firsttrace = LineTrace(xpos, ypos, xpos, ypos, 0, 15, 0, 2, 0);
-    //		bool secondtrace = LineTrace(xpos, ypos + 55, xpos, ypos +55, 0, 15, 0, 2, 0);
-    //		//for large entities
-    //		if(firsttrace == -1) {
-    //			g_fc[i][j] = 255;
-    //			g_sc[i][j] = 255;
-    //			cout << "why is this not triggering" << endl;
-    //		}
-    //
-    //	}
-    //}
-
-    // if a cookie is light, and it is intersecting a triangle, not that in g_shc
-    for (long long unsigned i = 4; i < 16; i++)
-    {
-      for (long long unsigned j = 3; j < 16; j++)
-      {
-        if(g_fog_relevent[i][j] || 1) {
-          g_shc[i][j] = -1;
-          int xpos = ((i - g_fogMiddleX) * 64) + functionalX;
-          int ypos = ((j - g_fogMiddleY) * 55) + functionalY;
-          rect r = {xpos - 10, ypos - 10, 20, 20};
-          if (1)
-          {
-            for (auto t : g_triangles[g_focus->stableLayer + 1])
-            {
-              if (TriRectOverlap(t, r))
-              {
-                if (g_fogcookies[i][j])
-                {
-                  g_shc[i][j] = t->type;
-                  g_fc[i][j] += g_tile_fade_speed * (elapsed / 60);
-                  if (g_fc[i][j] > 255)
-                  {
-                    g_fc[i][j] = 255;
-                  }
-                  g_fc[i][j] = 255;
-                  g_shc[i][j] += 4 * t->style;
-                }
-
-                break;
-              }
-            }
-          }
-        }
-      }
-    }
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "3");
-
-    g_lastFunctionalX = functionalX;
-    g_lastFunctionalY = functionalY;
-
-    // these are the corners and the center
-    //  g_fogcookies[0][0] = 1;
-    //  g_fogcookies[20][0] = 1;
-    //  g_fogcookies[20][17] = 1;
-    //  g_fogcookies[0][17] = 1;
-    //  g_fogcookies[10][9] = 1;
-
-    px = -(int)g_focus->getOriginX() % 64;
-
-    // offset us to the protag's location
-    // int yoffset =  ((g_focus->y- (g_focus->z + g_focus->zeight) * XtoZ)) * g_camera.zoom;
-    // the zeight is constant at level 2  for now
-    int yoffset = (g_focus->getOriginY()) * g_camera.zoom;
-
-    // and then subtract half of the screen
-    yoffset -= yoffset % 55;
-    yoffset -= (g_fogheight * 55 + 12) / 2;
-    yoffset -= g_camera.y;
-
-    // we do this stuff to keep the offset on the grid
-    // yoffset -= yoffset % 55;
-
-    // px = 64 - px - 64;
-    // py = 55 - py - 55;
-    //  50 50
-
-    //      M("--\n");
-    //      for(int i = 0; i < g_fogcookies.size(); i++) {
-    //        for(int j = 0; j < g_fogcookies.size(); j++) {
-    //          Dnn(i); Snn(); Dnn(j); Snn(); D(g_sc[i][j]);
-    //        }
-    //      }
-    //      M("--\n");
-    //      M("--\n");
-    //      for(int i = 0; i < 19; i++) {
-    //        Dnn(i); Snn();
-    //        Dnn(g_fogslates[i]->animation); Snn();
-    //        D(g_fogslates[i]->texture);
-    //      }
-    //      M("--\n");
-
-    //no matter what, tiles on the edges are off
-
-    addTextures(renderer, g_fc, canvas, light, 500, 500, 250, 250, 0); //g_fc is normal
-
-    TextureC = IlluminateTexture(renderer, TextureD, canvas, result_c);
-
-    // render graphics
-    FoWrect = {px - 23, yoffset + 15, g_fogwidth * 64 + 50, g_fogheight * 55 + 18};
-    // SDL_RenderCopy(renderer, TextureC, NULL, &FoWrect);
-
-    for (auto x : g_fogslates)
-    {
-      x->texture = TextureC;
-    }
-
-
-    for (size_t i = 0; i < g_fogslates.size(); i++)
-    {
-      g_fogslates[i]->x = (int)g_focus->getOriginX() + px - 657;										   // 658
-      g_fogslates[i]->y = (int)g_focus->getOriginY() - ((int)g_focus->getOriginY() % 55) + 55 * i - 453; // 449
-                                                                                                         //g_fogslates[i]->z = g_focus->stableLayer * 64;
-      g_fogslates[i]->z = 0;
-    }
-
-    // do it for z = 64
-    FoWrect.y -= 64 * XtoZ;
-    // SDL_RenderCopy(renderer, TextureC, NULL, &FoWrect);
-    for (auto x : g_fogslatesA)
-    {
-      x->texture = TextureC;
-    }
-
-    for (size_t i = 0; i < g_fogslatesA.size(); i++)
-    {
-      g_fogslatesA[i]->x = (int)g_focus->getOriginX() + px - 658;											// 655
-      g_fogslatesA[i]->y = (int)g_focus->getOriginY() - ((int)g_focus->getOriginY() % 55) + 55 * i - 453; // 449
-                                                                                                          //g_fogslatesA[i]->z = g_focus->stableLayer * 64 + 64;
-      g_fogslatesA[i]->z = 64;
-    }
-
-    addTextures(renderer, g_sc, canvas, light, 500, 500, 250, 250, 1); //g_sc is normal
-
-    TextureB = IlluminateTexture(renderer, TextureA, canvas, result);
-
-    for (auto x : g_fogslatesB)
-    {
-      x->texture = TextureB;
-      //x->z = g_focus->stableLayer * 64 + 128;
-      x->z = 128;
-    }
-
-    for (size_t i = 0; i < g_fogslates.size(); i++)
-    {
-      g_fogslatesB[i]->x = (int)g_focus->getOriginX() + px - 658;											// 655
-      g_fogslatesB[i]->y = (int)g_focus->getOriginY() - ((int)g_focus->getOriginY() % 55) + 55 * i - 453; // 449
-    }
-
-    // render graphics
-    FoWrect.y -= 67 * XtoZ;
-    // SDL_RenderCopy(renderer, TextureB, NULL, &FoWrect);
-  }
-  B("After fog of war");
-
-
-  // don't render triangles hidden behind fogofwar
-  if (g_fogofwarEnabled && g_trifog_optimize && 0)
-  {
-    // make a list of the triangular walls on the screen
-    vector<tri *> onscreentris;
-
-    SDL_FRect obj; // = {(floor((x -fcamera.x)* fcamera.zoom) , floor((y-fcamera.y - height - XtoZ * z) * fcamera.zoom), ceil(width * fcamera.zoom), ceil(height * fcamera.zoom))};
-                   // obj.x = (x -fcamera.x)* fcamera.zoom;
-                   // obj.y = (y-fcamera.y - height - XtoZ * z) * fcamera.zoom;
-                   // obj.w = width * fcamera.zoom;
-                   // obj.h = height * fcamera.zoom;
-
-    SDL_FRect cam;
-    cam.x = 0;
-    cam.y = 0;
-    cam.w = g_camera.width;
-    cam.h = g_camera.height;
-
-    // only checking for layer 0. come back and hide all triangles above hidden triangles
-    for (auto t : g_triangles[0])
-    {
-      obj.x = t->x;
-      obj.y = t->y;
-      obj.w = t->width;
-      obj.h = t->height;
-
-      obj = transformRect(obj);
-
-      // !!! save the result of this check to not redo it later for the same frame?
-      if (RectOverlap(obj, cam))
-      {
-        onscreentris.push_back(t);
-      }
-    }
-
-    // sort the cookies based on x and y
-    sort(onscreentris.begin(), onscreentris.end(), trisort);
-
-    // see if it works
-    M("Debug information here:");
-    for (auto t : onscreentris)
-    {
-      D(t->x);
-      D(t->y);
-      M("------");
-    }
-    // decide which cookie each one falls under.
-    //      for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
-    //      {
-    //        for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
-    //        {
-    //        }
-    //      }
-
-    // if that cookie, and the adjacent cookies, are all turned off, don't render the traingle
-
-    // check which of them are completely hidden behind fog
-    //      for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
-    //      {
-    //        for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
-    //        {
-    //        }
-    //      }
   }
 
   if(0){ //behemoth ui
@@ -3081,8 +2539,8 @@ if(punishValue > 1) {
   SDL_GL_SetSwapInterval(1);
 }
 
-g_spin_entity->setOriginX(protag->getOriginX());
-g_spin_entity->setOriginY(protag->getOriginY());
+g_spin_entity->setOriginX(protag->getOriginX() + protag->xvel * ((double)elapsed/256.0));
+g_spin_entity->setOriginY(protag->getOriginY() + protag->yvel * ((double)elapsed/256.0));
 g_spin_entity->z = protag->z;
 
 
@@ -3124,15 +2582,41 @@ for (long long unsigned int i = 0; i < g_tiles.size(); i++)
 }
 
 //meshes
-for(auto &x : g_meshes) {
-  SDL_Vertex v[x->numVertices];
-  for(int i = 0; i < x->numVertices; i++) {
-    v[i] = x->vertex[i];
-    v[i].position.x += x->origin.x - g_camera.x;
-    v[i].position.y += x->origin.y - g_camera.y;
+for(auto &x : g_meshFloors) {
+  if(x->visible) {
+    SDL_Vertex v[x->numVertices];
+    for(int i = 0; i < x->numVertices; i++) {
+      v[i] = x->vertex[i];
+      v[i].position.x += x->origin.x - g_camera.x;
+      v[i].position.y += x->origin.y - g_camera.y;
+    }
+  
+    SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, NULL, 0);
+    
+    //render shade
+    if(x->lighting != nullptr) {
+      for(int i = 0; i < x->lighting->numVertices; i++) {
+        v[i].tex_coord.x = x->lighting->vertex[i].tex_coord.x;
+        v[i].tex_coord.y = x->lighting->vertex[i].tex_coord.y;
+      }
+      
+      SDL_RenderGeometry(renderer, g_meshShadeTexture, v, x->lighting->numVertices, NULL, 0);
+    }
   }
+}
 
-  SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, NULL, 0);
+for(auto &x : g_meshCollisions) {
+  if(x->visible) {
+    SDL_Vertex v[x->numVertices];
+    for(int i = 0; i < x->numVertices; i++) {
+      v[i] = x->vertex[i];
+      v[i].position.x += x->origin.x - g_camera.x;
+      v[i].position.y += x->origin.y - g_camera.y;
+    }
+  
+    SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, NULL, 0);
+
+    }
 }
 
 // sort
@@ -3152,7 +2636,7 @@ for (long long unsigned int i = 0; i < g_tiles.size(); i++)
 B("After tiles");
 
 //render black bars
-{
+if(!devMode) {
   SDL_Rect blackrect;
 
   blackrect = {
@@ -3201,6 +2685,15 @@ B("After tiles");
 
   SDL_RenderCopy(renderer, blackbarTexture, NULL, &blackrect);
 
+  blackrect = {
+    g_camera.desiredX,
+    g_camera.desiredY,
+    g_camera.width,
+    g_camera.height
+  };
+
+  blackrect = transformRect(blackrect);
+  SDL_RenderCopy(renderer, spotlightTexture, NULL, &blackrect);
 
 }
 
@@ -3884,6 +3377,8 @@ int WinMain()
   SDL_SetWindowBrightness(window, g_brightness/100.0 );
   SDL_SetTextureAlphaMod(g_shade, 0);
 
+  g_meshShadeTexture = loadTexture(renderer, "resources/engine/mesh-shade.qoi");
+
   switch (g_graphicsquality)
   {
     case 0:
@@ -4196,12 +3691,6 @@ int WinMain()
     g_itemsines.push_back( sin((g_elapsed_accumulator + 1020) / 300) * 10 + 30);
 
 
-  // This stuff is for the FoW mechanic
-  // engine/resolution.qoi has resolution 1920 x 1200
-  SDL_Surface *SurfaceA = loadSurface("resources/engine/resolution.qoi");
-
-  TextureA = SDL_CreateTextureFromSurface(renderer, SurfaceA);
-  TextureD = SDL_CreateTextureFromSurface(renderer, SurfaceA);
 
   //light gradients to put near where maps transition
   g_gradient_a = loadTexture(renderer, "resources/engine/fade-a.qoi");
@@ -4215,9 +3704,8 @@ int WinMain()
   g_gradient_i = loadTexture(renderer, "resources/engine/fade-i.qoi");
   g_gradient_j = loadTexture(renderer, "resources/engine/fade-j.qoi");
 
-  SDL_FreeSurface(SurfaceA);
-
   blackbarTexture = loadTexture(renderer, "resources/engine/black-diffuse.qoi");
+  spotlightTexture = loadTexture(renderer, "resources/engine/spotlight.qoi");
 
 
   result = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 500, 500);
@@ -4225,111 +3713,6 @@ int WinMain()
 
   SDL_SetTextureBlendMode(result, SDL_BLENDMODE_MOD);
   SDL_SetTextureBlendMode(result_c, SDL_BLENDMODE_MOD);
-
-  SDL_SetTextureBlendMode(TextureA, SDL_BLENDMODE_MOD);
-  SDL_SetTextureBlendMode(TextureA, SDL_BLENDMODE_MOD);
-  SDL_SetTextureBlendMode(TextureD, SDL_BLENDMODE_MOD);
-
-  // SDL_SetTextureBlendMode(TextureB, SDL_BLENDMODE_NONE);
-
-  // init fogslates
-
-  //strange displacement in debugger vs standalone
-  //in debugger g_fc[20][19] = g_fc[20][20] = -1414812757
-  //but standalone = 0
-  //?
-  for(int i = 0; i < g_fogwidth; i++) {
-    for(int j = 0; j < g_fogheight; j++) {
-      g_fc[i][j] = 0;
-      g_sc[i][j] = 0;
-      g_fogcookies[i][j] = 0;
-    }
-  }
-
-
-  entity *s = nullptr;
-  //  s->dynamic = 0;
-  //  s->width = 0;
-
-  for (size_t i = 0; i < 19; i++)
-  {
-    s = new entity(renderer, "engine/sp-fogslate");
-    g_fogslates.push_back(s);
-    s->height = 56;
-    s->width = g_fogwidth * 64 + 50;
-    s->curheight = s->height - 1;
-    s->curwidth = s->width;
-    s->xframes = 1;
-    s->yframes = 19;
-    s->animation = i;
-    // s->persistentGeneral = 1;
-    s->frameheight = 26;
-    s->framewidth = 500;
-    s->shadow->width = 0;
-    s->dynamic = 0;
-    s->sortingOffset = 130; // -35 then 130
-    s->isFogSlate = 1;
-  }
-
-  for (size_t i = 0; i < 19; i++)
-  {
-    s = new entity(renderer, "engine/sp-fogslate");
-    g_fogslatesA.push_back(s);
-    s->z = 64;
-    s->height = 56;
-    s->width = g_fogwidth * 64 + 50;
-    s->curheight = s->height - 1;
-    s->curwidth = s->width;
-    s->xframes = 1;
-    s->yframes = 19;
-    s->animation = i;
-    // s->persistentGeneral = 1;
-    s->frameheight = 26;
-    s->framewidth = 500;
-    s->shadow->width = 0;
-    s->dynamic = 0;
-    s->sortingOffset = 165; // -65 55
-                            //s->width = 0;
-    s->isFogSlate = 1;
-  }
-
-  for (size_t i = 0; i < 19; i++)
-  {
-    s = new entity(renderer, "engine/sp-fogslate");
-    g_fogslatesB.push_back(s);
-    s->height = 56;
-    s->width = g_fogwidth * 64 + 50;
-    s->curheight = s->height - 1;
-    s->curwidth = s->width;
-    s->xframes = 1;
-    s->yframes = 19;
-    s->animation = i;
-    // s->persistentGeneral = 1;
-    s->frameheight = 26;
-    s->framewidth = 500;
-    s->shadow->width = 0;
-    s->dynamic = 0;
-    s->sortingOffset = 45000; // !!! might need to be bigger
-                              //s->width = 0;
-    s->isFogSlate = 1;
-  }
-
-  SDL_DestroyTexture(s->texture);
-
-  for (auto x : g_fogslates)
-  {
-    x->texture = TextureC;
-  }
-
-  for (auto x : g_fogslatesA)
-  {
-    x->texture = TextureC;
-  }
-
-  for (auto x : g_fogslatesB)
-  {
-    x->texture = TextureC;
-  }
 
   //this is used when spawning in entities
   smokeEffect = new effectIndex("puff", renderer);
@@ -4379,8 +3762,19 @@ int WinMain()
   transitionDelta = transitionImageHeight;
   transition = 1;
 
-  mesh* m = loadMeshFromPly("test/stage", {111065, 98846,0},  250);
-  m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
+  //mesh* m = loadMeshFromPly("test/stage", {111065, 98846,0},  250, meshtype::FLOOR);
+  
+
+    PHYSFS_exists("whatthefuck");
+//  M("load mesh from ply");
+    mesh* m = loadMeshFromPly("test/stage", {99279, 99455,0}, 250, meshtype::FLOOR);
+//  m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
+
+  //mesh* mShade = loadMeshFromPly("test/stage-shade", {111065, 98846,0},  250, meshtype::LIGHTING);
+//  m->lighting = mShade;
+//
+  //mesh* w = loadMeshFromPly("test/stagewall", {114065, 98846,0}, 250, meshtype::COLLISION);
+
 
 
   while (!quit)
@@ -4440,10 +3834,11 @@ int WinMain()
               // protag->getItem(a, 1);
               break;
             case SDLK_LALT:
+              M("Set tab");
               g_holdingTAB = 1;
+              break;
           }
           if(g_swallowAKey) {
-            M("We should swallow this key");
             g_swallowedKey = event.key.keysym.scancode;
             g_swallowAKey = 0;
             g_swallowedAKeyThisFrame = 1;
@@ -6298,25 +5693,6 @@ void getExplorationInput(float &elapsed)
     dialogue_cooldown = 500;
   }
 
-  if (keystate[SDL_SCANCODE_LSHIFT] && devMode)
-  {
-    protag->xmaxspeed = 100;
-    protag->turningSpeed = 1.4;
-    //protag->ymaxspeed = 145;
-  }
-  if (keystate[SDL_SCANCODE_LCTRL] && devMode)
-  {
-    protag->xmaxspeed = 20;
-    protag->turningSpeed = 16;
-    //protag->ymaxspeed = 20;
-  }
-  if (keystate[SDL_SCANCODE_CAPSLOCK] && devMode)
-  {
-    protag->xmaxspeed = 750;
-    protag->turningSpeed = 16;
-    //protag->ymaxspeed = 750;
-  }
-
   if (keystate[SDL_SCANCODE_SLASH] && devMode)
   {
   }
@@ -6651,36 +6027,6 @@ void toggleDevmode() {
     g_update_zoom = 1;
     marker->x = -1000;
     markerz->x = -1000;
-    if (g_fogofwarEnabled && !devMode)
-    {
-      for (auto x : g_fogslates)
-      {
-        x->tangible = 1;
-      }
-      for (auto x : g_fogslatesA)
-      {
-        x->tangible = 1;
-      }
-      for (auto x : g_fogslatesB)
-      {
-        x->tangible = 1;
-      }
-    }
-    else
-    {
-      for (auto x : g_fogslates)
-      {
-        x->tangible = 0;
-      }
-      for (auto x : g_fogslatesA)
-      {
-        x->tangible = 0;
-      }
-      for (auto x : g_fogslatesB)
-      {
-        x->tangible = 0;
-      }
-    }
   }
   if (devMode)
   {

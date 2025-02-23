@@ -298,7 +298,9 @@ extern vector<camBlocker*> g_camBlockers;
 
 extern vector<gradient*> g_gradients;
 
-extern vector<mesh*> g_meshes;
+extern vector<mesh*> g_meshFloors;
+
+extern vector<mesh*> g_meshCollisions;
 
 extern SDL_Texture* g_gradient_a;
 extern SDL_Texture* g_gradient_b;
@@ -418,8 +420,7 @@ extern int g_walldarkness;
 extern bool g_unlit;
 extern int g_graphicsquality;
 extern float g_extraShadowSize;
-extern int g_fogofwarEnabled;
-extern int g_fogofwarRays;
+extern int g_spotlightEnabled;
 extern bool g_showHealthbar;
 extern int g_entitySleepDistance;
 extern effectIndex *smokeEffect;
@@ -451,11 +452,8 @@ extern SDL_Texture *lightbri;
 extern SDL_Texture *lightcri;
 extern SDL_Texture *lightdri;
 
-extern SDL_Texture *TextureA;
-extern SDL_Texture *TextureB;
-extern SDL_Texture *TextureC;
-extern SDL_Texture *TextureD;
 extern SDL_Texture *blackbarTexture;
+extern SDL_Texture *spotlightTexture;
 
 #define g_fogheight 19
 #define g_fogwidth 21
@@ -984,6 +982,8 @@ extern int m_enemyPoints;
 extern string textureDirectory;
 extern float mapeditorNavNodeCullRadius;
 extern float mapeditorNavNodeTraceRadius;
+
+extern SDL_Texture* g_meshShadeTexture;
 
 extern vector<string> consolehistory;
 extern int consolehistoryindex;

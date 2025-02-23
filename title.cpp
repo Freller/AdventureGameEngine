@@ -270,7 +270,7 @@ void TitleLoop() {
         loadSave();
         g_saveName = "a";
         g_gamemode = gamemode::EXPLORATION;
-        resetUnremarkableData();
+        resetTrivialData();
         Mix_FadeOutMusic(1000);
     
         //SDL_GL_SetSwapInterval(0);
@@ -395,7 +395,7 @@ void TitleLoop() {
       {
         //continue game
         g_gamemode = gamemode::EXPLORATION;
-        resetUnremarkableData();
+        resetTrivialData();
         loadSave();
         Mix_FadeOutMusic(1000);
     

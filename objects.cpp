@@ -34,6 +34,162 @@ using namespace std;
 
 class usable;
 
+
+void resetTrivialData() {
+  for(auto &x : party) {
+    x->xvel = 0;
+    x->yvel = 0;
+    x->xaccel = 0;
+    x->yaccel = 0;
+  }
+
+  g_spin_cooldown = 0;
+  g_spinning_duration = 0;
+  g_afterspin_duration = 0;
+  storedSpin = 0;
+
+}
+
+struct CollisionInfo {
+    bool isColliding;
+    std::array<float, 3> normal;
+};
+
+// Function to calculate normal of a face
+std::array<float, 3> calculateNormal(vertex3d vA, vertex3d vB, vertex3d vC) {
+    std::array<float, 3> normal;
+    float x1 = vB.x - vA.x;
+    float y1 = vB.y - vA.y;
+    float z1 = vB.z - vA.z;
+    float x2 = vC.x - vA.x;
+    float y2 = vC.y - vA.y;
+    float z2 = vC.z - vA.z;
+    normal[0] = y1 * z2 - z1 * y2;
+    normal[1] = z1 * x2 - x1 * z2;
+    normal[2] = x1 * y2 - y1 * x2;
+
+    // Normalize the normal vector
+    float length = sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+    if (length != 0) {
+        normal[0] /= length;
+        normal[1] /= length;
+        normal[2] /= length;
+    }
+    return normal;
+}
+// Function to calculate the distance from a point to the face along the normal direction
+float calculateDistanceToFace(const std::array<float, 3>& normal, float d, float x, float y, float z) {
+    return normal[0] * x + normal[1] * y + normal[2] * z + d;
+}
+
+// Function to calculate barycentric coordinates
+std::array<float, 3> getBarycentricCoords(vertex3d p, vertex3d a, vertex3d b, vertex3d c) {
+    std::array<float, 3> bary;
+    float denom = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+    bary[0] = ((b.y - c.y) * (p.x - c.x) + (c.x - b.x) * (p.y - c.y)) / denom;
+    bary[1] = ((c.y - a.y) * (p.x - c.x) + (a.x - c.x) * (p.y - c.y)) / denom;
+    bary[2] = 1 - bary[0] - bary[1];
+    return bary;
+}
+
+// Function to check if the entity is inside a wall
+CollisionInfo isEntityInsideWall(entity* entity, float xvel = 0.0f, float yvel = 0.0f) {
+    // Entity's bounding box center and velocities
+    float entityX = entity->getOriginX() + xvel*((double)elapsed/256);
+    float entityY = entity->getOriginY() + yvel*((double)elapsed/256);
+    float entityZ = entity->bounds.height / 2.0f;
+
+    for (const auto& mesh : g_meshCollisions) {
+      if(Distance(mesh->origin.x, mesh->origin.y, entityX, entityY) < mesh->sleepRadius +(entity->bounds.width + entity->bounds.height)) {
+        // Adjust coordinates for the mesh origin
+        float adjustedEntityX = entityX - mesh->origin.x;
+        float adjustedEntityY = entityY - mesh->origin.y;
+
+        for (const auto& face : mesh->faces) {
+            // Get vertices of the face
+            vertex3d vA = mesh->vertices[face.a];
+            vertex3d vB = mesh->vertices[face.b];
+            vertex3d vC = mesh->vertices[face.c];
+
+            // Calculate face normal
+            auto normal = calculateNormal(vA, vB, vC);
+
+            // Calculate plane equation
+            float d = -(normal[0] * vA.x + normal[1] * vA.y + normal[2] * vA.z);
+
+            // Calculate the distance to the face along the normal direction
+            float distance = calculateDistanceToFace(normal, d, adjustedEntityX, adjustedEntityY, entityZ);
+
+	    if (std::abs(distance) < entity->bounds.height / 2.0f) {
+                // Project the entity's center onto the face plane
+                float projectionX = adjustedEntityX - distance * normal[0];
+                float projectionY = adjustedEntityY - distance * normal[1];
+
+                // 2D bounding box check within the face's projected area
+                if (projectionX >= std::min({ vA.x, vB.x, vC.x }) && projectionX <= std::max({ vA.x, vB.x, vC.x }) &&
+                    projectionY >= std::min({ vA.y, vB.y, vC.y }) && projectionY <= std::max({ vA.y, vB.y, vC.y })) {
+                    return { true, normal };
+                }
+            }
+        }
+      }
+    }
+
+    return { false, { 0.0f, 0.0f, 0.0f } };
+}
+
+// Function to adjust the player's velocity to slide along the wall
+void adjustVelocityForWallCollision(entity* entity, float& xvel, float& yvel) {
+    const float buffer = 16; // Small buffer zone to prevent catching
+
+    // Check for initial collisions with the current velocities
+    auto collision = isEntityInsideWall(entity, xvel, yvel);
+
+    if (collision.isColliding) {
+        // Calculate the dot product of the velocity and the normal
+        
+
+        //a 45 deg wall in blender will become a 38 degree wall in the world
+        //this will turn the normal back to that of a 45 deg wall
+        collision.normal[1] *= XtoY;
+        float length = sqrt(collision.normal[0] * collision.normal[0] + collision.normal[1] * collision.normal[1] + collision.normal[2] * collision.normal[2]);
+        if (length != 0) {
+            collision.normal[0] /= length;
+            collision.normal[1] /= length;
+            collision.normal[2] /= length;
+        }
+
+        float dotProduct = xvel * collision.normal[0] + yvel * collision.normal[1];
+
+        // Subtract the component of the velocity that is parallel to the normal
+        float adjustedXvel = xvel - dotProduct * collision.normal[0];
+        float adjustedYvel = yvel - dotProduct * collision.normal[1];
+
+        // Check for new collisions with the adjusted velocities
+        auto newCollision = isEntityInsideWall(entity, adjustedXvel, adjustedYvel);
+
+        if (newCollision.isColliding) {
+            array<float, 3> newNormal = newCollision.normal;
+            newNormal[1] *= XtoY;
+            float mainAxis = newNormal[0] - newNormal[1];
+            newNormal[0] *= mainAxis;
+
+            xvel += buffer * newCollision.normal[0];
+            yvel += buffer * newCollision.normal[1];
+
+            // If still colliding, set velocities to zero
+            auto finalCollision = isEntityInsideWall(entity, xvel, yvel);
+            if (finalCollision.isColliding) {
+                xvel = 0;
+                yvel = 0;
+            }
+        } else {
+            xvel = adjustedXvel;
+            yvel = adjustedYvel;
+        }
+    }
+}
+
 navNode* getNodeByPos(vector<navNode*> array, int x, int y) {
   float min_dist = 0;
   navNode* ret = nullptr;
@@ -120,38 +276,7 @@ void parseScriptForLabels(vector<string> &sayings) {
 
 }
 
-// Function to calculate barycentric coordinates
-std::array<float, 3> getBarycentricCoords(vertex3d p, vertex3d a, vertex3d b, vertex3d c) {
-    std::array<float, 3> bary;
-    float denom = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
-    bary[0] = ((b.y - c.y) * (p.x - c.x) + (c.x - b.x) * (p.y - c.y)) / denom;
-    bary[1] = ((c.y - a.y) * (p.x - c.x) + (a.x - c.x) * (p.y - c.y)) / denom;
-    bary[2] = 1 - bary[0] - bary[1];
-    return bary;
-}
 
-// Function to calculate normal of a face
-std::array<float, 3> calculateNormal(vertex3d vA, vertex3d vB, vertex3d vC) {
-    std::array<float, 3> normal;
-    float x1 = vB.x - vA.x;
-    float y1 = vB.y - vA.y;
-    float z1 = vB.z - vA.z;
-    float x2 = vC.x - vA.x;
-    float y2 = vC.y - vA.y;
-    float z2 = vC.z - vA.z;
-    normal[0] = y1 * z2 - z1 * y2;
-    normal[1] = z1 * x2 - x1 * z2;
-    normal[2] = x1 * y2 - y1 * x2;
-
-    // Normalize the normal vector
-    float length = sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
-    if (length != 0) {
-        normal[0] /= length;
-        normal[1] /= length;
-        normal[2] /= length;
-    }
-    return normal;
-}
 
 //this seems to work
 void parseWScriptForDialogHooks(vector<wstring> &sayings) {
@@ -397,14 +522,14 @@ rect::rect() {
   height=45;
 }
 
-rect::rect(int a, int b, int c, int d) {
+rect::rect(float a, float b, float c, float d) {
   x=a;
   y=b;
   width=c;
   height=d;
 }
 
-rect::rect(int fx, int fy, int fz, int fw, int fh, int fzh) {
+rect::rect(float fx, float fy, float fz, float fw, float fh, float fzh) {
   x=fx;
   y=fy;
   width=fw;
@@ -802,10 +927,10 @@ bool ITriRectOverlap(impliedSlopeTri* a, int x, int y, int width, int height) {
 
 SDL_Rect transformRect(SDL_Rect input) {
   SDL_Rect obj;
-  obj.x = floor((input.x -g_camera.x) * g_camera.zoom);
-  obj.y = floor((input.y - g_camera.y) * g_camera.zoom);
-  obj.w = ceil(input.w * g_camera.zoom);
-  obj.h = ceil(input.h * g_camera.zoom);
+  obj.x = (input.x -g_camera.x) * g_camera.zoom;
+  obj.y = (input.y - g_camera.y) * g_camera.zoom;
+  obj.w = input.w * g_camera.zoom;
+  obj.h = input.h * g_camera.zoom;
   return obj;
 }
 
@@ -820,10 +945,10 @@ SDL_FRect transformRect(SDL_FRect input) {
 
 rect transformRect(rect input) {
   rect obj;
-  obj.x = floor((input.x -g_camera.x) * g_camera.zoom);
-  obj.y = floor((input.y - g_camera.y) * g_camera.zoom);
-  obj.width = ceil(input.width * g_camera.zoom);
-  obj.height = ceil(input.height * g_camera.zoom);
+  obj.x = (input.x -g_camera.x) * g_camera.zoom;
+  obj.y = (input.y - g_camera.y) * g_camera.zoom;
+  obj.width = input.width * g_camera.zoom;
+  obj.height = input.height * g_camera.zoom;
   return obj;
 }
 
@@ -2155,9 +2280,9 @@ void mapObject::render(SDL_Renderer * renderer, camera fcamera) {
 
   if(RectOverlap(obj, cam)) {
     SDL_Rect srcrect;
-    SDL_Rect dstrect;
-    int ypos = 0;
-    int xpos = 0;
+    SDL_FRect dstrect;
+    float ypos = 0;
+    float xpos = 0;
     srcrect.x = xoffset;
     srcrect.y = yoffset;
 
@@ -2206,7 +2331,7 @@ void mapObject::render(SDL_Renderer * renderer, camera fcamera) {
       dstrect.w = (dstrect.w * fcamera.zoom);
       dstrect.h = (dstrect.h * fcamera.zoom);
 
-      SDL_RenderCopy(renderer, texture, &srcrect, &dstrect);
+      SDL_RenderCopyF(renderer, texture, &srcrect, &dstrect);
       xpos += srcrect.w;
       srcrect.x = 0;
 
@@ -4471,6 +4596,30 @@ door* entity::update(vector<door*> doors, float elapsed) {
   if(mobile) {xmaxspeed = baseMaxSpeed + bonusSpeed;} else 
   {xmaxspeed = baseMaxSpeed;}
 
+  if(devMode && this == protag) {
+    protag->turningSpeed = 1.4;
+    protag->baseMaxSpeed = 160;
+    if(g_holdingTAB) {
+      protag->baseMaxSpeed = 0;
+      protag->turningSpeed = 16;
+    }
+    if (keystate[SDL_SCANCODE_LSHIFT])
+    {
+      protag->baseMaxSpeed = 160;
+      protag->turningSpeed = 1.4;
+    }
+    if (keystate[SDL_SCANCODE_LCTRL])
+    {
+      protag->baseMaxSpeed = 10;
+      protag->turningSpeed = 16;
+    }
+    if (keystate[SDL_SCANCODE_CAPSLOCK])
+    {
+      protag->xmaxspeed = 750;
+      protag->turningSpeed = 16;
+    }
+  }
+
   //normalize accel vector
   float vectorlen = pow( pow(xaccel, 2) + pow(yaccel, 2), 0.5) /(xmaxspeed * (1 - statusSlownPercent));
   if(xaccel != 0) {
@@ -4587,6 +4736,14 @@ door* entity::update(vector<door*> doors, float elapsed) {
             }
           }
 
+        }
+
+        if(!inCollision && this == protag) { //!!! change later
+          auto c = isEntityInsideWall(this);
+          if(c.isColliding) {
+            inCollision = 1;
+            break;
+          }
         }
 
         if(!inCollision) { //shortcut if already in collision
@@ -4979,7 +5136,10 @@ door* entity::update(vector<door*> doors, float elapsed) {
     }
 
     //if we didnt use a cz, use all boxes
-
+    if(this == protag) {
+      adjustVelocityForWallCollision(this, xvel, yvel);
+      auto c = isEntityInsideWall(this);
+    } 
 
 
     //how much to push the player to not overlap with triangles.
@@ -5586,8 +5746,8 @@ door* entity::update(vector<door*> doors, float elapsed) {
   }
 
   //for meshes
-  for(auto m : g_meshes) {
-    if(XYWorldDistance(m->origin.x, m->origin.y, getOriginX(), getOriginY()) < m->sleepRadius -(bounds.width + bounds.height) || this == protag) {
+  for(auto m : g_meshFloors) {
+    if(Distance(m->origin.x, m->origin.y, getOriginX(), getOriginY()) < m->sleepRadius +(bounds.width + bounds.height)) {
       for (const auto& f : m->faces) {
         // Get vertices of the face
         vertex3d vA = m->vertices[f.a];
@@ -5612,18 +5772,16 @@ door* entity::update(vector<door*> doors, float elapsed) {
           this->shadow->z = floor + 1;
 
           // Calculate normal of the face
-                auto normal = calculateNormal(vA, vB, vC);
-                float slope = sqrt(normal[0] * normal[0] + normal[1] * normal[1]);
-                float slopeFactor = 1 - slope; // Slope factor decreases with increasing slope
+          auto normal = calculateNormal(vA, vB, vC);
+          float slope = sqrt(normal[0] * normal[0] + normal[1] * normal[1]);
+          float slopeFactor = 1 - slope; // Slope factor decreases with increasing slope
 
-                D(slopeFactor);
-                slopeFactor += (1-slopeFactor) * 0.9;
-                if(slopeFactor < 1) {
-  
-                  // Adjust velocities based on the slope
-                  xvel *= slopeFactor;
-                  yvel *= slopeFactor;
-                }
+          slopeFactor += (1-slopeFactor) * 0.9;
+          if(slopeFactor < 1) {
+            // Adjust velocities based on the slope
+            xvel *= slopeFactor;
+            yvel *= slopeFactor;
+          }
 
           break;
         }
@@ -7468,12 +7626,6 @@ int LineTrace(int x1, int y1, int x2, int y2, bool display, int size, int layer,
 
 
     for(auto x : g_solid_entities) {
-      if(visibility) {
-        if(!x->navblock) {continue;}
-      }
-      if(fogOfWar) {
-        if(x->large) {continue;}
-      }
       if(RectOverlap(a, x->getMovedBounds())) {
         lineTraceX = a.x + a.width/2;
         lineTraceY = a.y + a.height/2;
@@ -8223,7 +8375,7 @@ void escapeUI::uiSelecting() {
 //clear map
 //CLEAR MAP
 void clear_map(camera& cameraToReset) {
-  resetUnremarkableData();
+  resetTrivialData();
   g_eheightmaps.clear();
   g_poweredDoors.clear();
   g_poweredLevers.clear();
@@ -9696,7 +9848,7 @@ void adventureUI::continueDialogue()
   {
     g_forceEndDialogue = 0;
     protag_is_talking = 2;
-    resetUnremarkableData();
+    resetTrivialData();
     talker = narrarator;
     adventureUIManager->hideTalkingUI();
     M("Ret A");
@@ -9738,7 +9890,7 @@ void adventureUI::continueDialogue()
     //absorb this Z press
     if(playersUI) {
       protag_is_talking = 2;
-      resetUnremarkableData();
+      resetTrivialData();
       //don't reset talker
       //other code will end dialog soon
       //and reset talker
@@ -9768,7 +9920,7 @@ void adventureUI::continueDialogue()
     if (playersUI)
     {
       protag_is_talking = 2;
-      resetUnremarkableData();
+      resetTrivialData();
       talker = narrarator;
     }
     executingScript = 0;
@@ -11485,50 +11637,6 @@ void adventureUI::continueDialogue()
     float transitionspeed = stof(transtr);
 
     entity *hopeful = searchEntities(name);
-    if (hopeful != nullptr)
-    {
-
-      for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
-      {
-        for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
-        {
-          g_fogcookies[i][j] = 0;
-          g_sc[i][j] = 0;
-          g_fc[i][j] = 0;
-        }
-      }
-
-      g_focus = hopeful;
-
-      g_force_cookies_update = 1;
-
-      int px = -(int)g_focus->getOriginX() % 64;
-      for (size_t i = 0; i < g_fogslates.size(); i++)
-      {
-        g_fogslates[i]->x = (int)g_focus->getOriginX() + px - 658;                                         // 655
-        g_fogslates[i]->y = (int)g_focus->getOriginY() - ((int)g_focus->getOriginY() % 55) + 55 * i - 453; // 449
-      }
-
-      if (transitionspeed != 0)
-      {
-        // This check means that if the camera is already moving, don't reset
-        // it's velocity, because that would be jarring
-        if (g_camera.lag == 0)
-        {
-          g_camera.lag = transitionspeed;
-          g_camera.lagaccel = transitionspeed;
-        }
-        else
-        {
-          g_camera.lagaccel = transitionspeed;
-        }
-      }
-      else
-      {
-        g_camera.lag = 0;
-        g_camera.lagaccel = g_camera.DEFAULTLAGACCEL;
-      }
-    }
 
     dialogue_index++;
     this->continueDialogue();
@@ -11549,47 +11657,6 @@ void adventureUI::continueDialogue()
     float transitionspeed = stof(transtr);
 
     vector<entity *> hopefuls = gatherEntities(name);
-    if (hopefuls.size() != 0)
-    {
-      g_focus = hopefuls[countEntities];
-      for (long long unsigned i = 0; i < g_fogcookies.size(); i++)
-      {
-        for (long long unsigned j = 0; j < g_fogcookies[0].size(); j++)
-        {
-          g_fogcookies[i][j] = 0;
-          g_sc[i][j] = 0;
-          g_fc[i][j] = 0;
-        }
-      }
-
-      g_force_cookies_update = 1;
-      int px = -(int)g_focus->getOriginX() % 64;
-      for (size_t i = 0; i < g_fogslates.size(); i++)
-      {
-        g_fogslates[i]->x = (int)g_focus->getOriginX() + px - 658;                                         // 655
-        g_fogslates[i]->y = (int)g_focus->getOriginY() - ((int)g_focus->getOriginY() % 55) + 55 * i - 453; // 449
-      }
-
-      if (transitionspeed != 0)
-      {
-        // This check means that if the camera is already moving, don't reset
-        // it's velocity, because that would be jarring
-        if (g_camera.lag == 0)
-        {
-          g_camera.lag = transitionspeed;
-          g_camera.lagaccel = transitionspeed;
-        }
-        else
-        {
-          g_camera.lagaccel = transitionspeed;
-        }
-      }
-      else
-      {
-        g_camera.lag = 0;
-        g_camera.lagaccel = g_camera.DEFAULTLAGACCEL;
-      }
-    }
     countEntities++;
     if (countEntities == (int)hopefuls.size())
     {
@@ -11870,7 +11937,6 @@ void adventureUI::continueDialogue()
     if (playersUI)
     {
       protag_is_talking = 2;
-      resetUnremarkableData();
       talker = narrarator;
     }
     executingScript = 0;
@@ -12319,7 +12385,6 @@ void adventureUI::continueDialogue()
     quit = 1;
     if(playersUI) {
       protag_is_talking = 2;
-      resetUnremarkableData();
       talker = narrarator;
     }
     return;

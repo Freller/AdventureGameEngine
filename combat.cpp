@@ -2376,6 +2376,7 @@ void CombatLoop() {
       }
     case submode::OUTWIPE:
       {
+        resetTrivialData();
         M("OUTWIPE");
 
         for(auto x : g_partyCombatants) {

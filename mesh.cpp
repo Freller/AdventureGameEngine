@@ -7,11 +7,29 @@
 vec3::vec3(int fx = 0, int fy = 0, int fz = 0) :x(fx), y(fy), z(fz) {}
 
 mesh::mesh() {
-  g_meshes.push_back(this);
+  M("");
+  M("mesh::mesh()");
+  M("");
 }
 
 mesh::~mesh() {
-  g_meshes.erase(remove(g_meshes.begin(), g_meshes.end(), this), g_meshes.end());
+  M("");
+  M("mesh::~mesh()");
+  M("");
+  if(mtype == meshtype::FLOOR) {
+    g_meshFloors.erase(remove(g_meshFloors.begin(), g_meshFloors.end(), this), g_meshFloors.end());
+  } else {
+    g_meshCollisions.erase(remove(g_meshCollisions.begin(), g_meshCollisions.end(), this), g_meshCollisions.end());
+  }
+
+  if(lighting != nullptr) {
+    delete lighting;
+  }
+
+  //add support for sharing textures later
+  if(mtype != meshtype::LIGHTING && texture != nullptr) {
+    SDL_DestroyTexture(texture);
+  }
 }
 
 // Function to calculate the normal of a face
@@ -67,17 +85,47 @@ void setVertexColors(vector<vertex3d>& vertices, const vector<face>& faces, cons
         vertex.color = {intensity, intensity, intensity, 255};
     }
 }
-
-mesh* loadMeshFromPly(const string& faddress, vec3 forigin, float scale) {
+mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtype) {
     string address = "resources/static/meshes/" + faddress + ".ply";
     vector<vertex3d> vertices;
     vector<face> faces;
     mesh* result = new mesh();
     result->origin = forigin;
+    result->mtype = fmtype;
+    
+    if(fmtype == meshtype::FLOOR) {
+      M("This is a floor");
+        g_meshFloors.push_back(result);
+    } else if (fmtype == meshtype::COLLISION) {
+      M("This is a collision");
+        g_meshCollisions.push_back(result);
+    } else if(fmtype == meshtype::LIGHTING) {
+      M("This is a lighting");
+        // No specific action for LIGHTING type currently
+    }
+
+    if(fmtype == meshtype::FLOOR) {
+//        string saddress = faddress;
+//        saddress = saddress + "-shade";
+//        D(saddress);
+//        string fulladdress = "resources/static/meshes/" + saddress + ".ply";
+//        D(fulladdress);
+
+      //PHYSFS_exists("whatthefuck");
+//        if(PHYSFS_exists("resources/static/meshes/simple-shade.ply")) {
+//          M("Found shade file");
+//            //result->lighting = loadMeshFromPly(saddress, forigin, scale, meshtype::LIGHTING);
+//        } else {
+//          M("No shade file exists");
+//        }
+    }
+    M("Do we get here");
 
     if (PHYSFS_exists(address.c_str())) {
-        PHYSFS_file* myfile = PHYSFS_openRead(address.c_str());
+      M("Got here A");
         PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
+        PHYSFS_file* myfile = PHYSFS_openRead(address.c_str());
+        error = PHYSFS_getLastErrorCode();
 
         if (error != 0) {
             cerr << "Error opening file: " << address << " Error: " << PHYSFS_getErrorByCode(error) << endl;
@@ -116,18 +164,9 @@ mesh* loadMeshFromPly(const string& faddress, vec3 forigin, float scale) {
             v.y = static_cast<float>(vertexData[i][1]);
             v.z = static_cast<float>(vertexData[i][2]);
 
-//            if (i < vertexColors.size()) {
-//                v.color = {static_cast<Uint8>(vertexColors[i][0]), static_cast<Uint8>(vertexColors[i][1]), static_cast<Uint8>(vertexColors[i][2]), 255};
-//                D(v.color.r);
-//                D(v.color.g);
-//                D(v.color.b);
-//            }
-            
-       
-
             if (i < vertexUVs.size()) {
                 v.u = static_cast<float>(vertexUVs[i][0]);
-                v.v = 1-static_cast<float>(vertexUVs[i][1]);
+                v.v = 1 - static_cast<float>(vertexUVs[i][1]);
             }
 
             vertices.push_back(v);
@@ -141,18 +180,17 @@ mesh* loadMeshFromPly(const string& faddress, vec3 forigin, float scale) {
             if (f.size() == 3) { // Ensure it's a triangle
                 faces.push_back({f[0], f[1], f[2]});
             } else {
-              E("");
-              E("Non triangular face in mesh");
-              E("");
+                E("");
+                E("Non triangular face in mesh");
+                E("");
             }
         }
 
         //only do this if you want lighting
-      	const array<float, 3> lightDir = {0, -0.4472, -0.8944};
-      	setVertexColors(vertices, faces, lightDir);
-      
-      
-      	// Transform 3D coordinates to 2D and set up SDL_Vertex array
+        const array<float, 3> lightDir = {0, -0.4472, -0.8944};
+        setVertexColors(vertices, faces, lightDir);
+
+        // Transform 3D coordinates to 2D and set up SDL_Vertex array
         result->numVertices = faces.size() * 3;
         result->vertex = new SDL_Vertex[result->numVertices];
 
@@ -160,18 +198,18 @@ mesh* loadMeshFromPly(const string& faddress, vec3 forigin, float scale) {
         float maxDistanceFromOrigin = 0;
         for (const auto& f : faces) {
             auto convertVertex = [&](const vertex3d& v) {
-                result->vertex[index].position.x = ((-v.x)*scale);
-                result->vertex[index].position.y = ((v.y*scale)) * XtoY - ((v.z*scale)) * XtoZ;
+                result->vertex[index].position.x = ((-v.x) * scale);
+                result->vertex[index].position.y = ((v.y * scale)) * XtoY;
+                float dist = Distance(result->vertex[index].position.x, result->vertex[index].position.y * XtoY, 0, 0);
+                result->vertex[index].position.y -= ((v.z * scale)) * XtoZ;
                 result->vertex[index].color = v.color;
                 result->vertex[index].tex_coord.x = v.u;
                 result->vertex[index].tex_coord.y = v.v;
-                float dist = XYWorldDistance(result->vertex[index].position.x,result->vertex[index].position.y, 0, 0);
                 if(dist > maxDistanceFromOrigin) {
-                  maxDistanceFromOrigin = dist;
+                    maxDistanceFromOrigin = dist;
                 }
                 ++index;
             };
-
 
             convertVertex(vertices[f.a]);
             convertVertex(vertices[f.b]);
@@ -179,13 +217,11 @@ mesh* loadMeshFromPly(const string& faddress, vec3 forigin, float scale) {
         }
 
         result->sleepRadius = maxDistanceFromOrigin;
-        D(maxDistanceFromOrigin);
-
         result->faces = faces;
-        for(auto&x :vertices) {
-          x.x *=-scale;
-          x.y *=scale;
-          x.z *=scale;
+        for(auto& x : vertices) {
+            x.x *= -scale;
+            x.y *= scale * XtoY;
+            x.z *= scale;
         }
         result->vertices = vertices;
     } else {

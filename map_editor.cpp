@@ -206,37 +206,7 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
     if (word == "dark")
     {
       iss >> s0 >> p1;
-      g_fogofwarEnabled = p1;
-      if (g_fogofwarEnabled)
-      {
-        for (auto x : g_fogslates)
-        {
-          x->tangible = 1;
-        }
-        for (auto x : g_fogslatesA)
-        {
-          x->tangible = 1;
-        }
-        for (auto x : g_fogslatesB)
-        {
-          x->tangible = 1;
-        }
-      }
-      else
-      {
-        for (auto x : g_fogslates)
-        {
-          x->tangible = 0;
-        }
-        for (auto x : g_fogslatesA)
-        {
-          x->tangible = 0;
-        }
-        for (auto x : g_fogslatesB)
-        {
-          x->tangible = 0;
-        }
-      }
+      g_spotlightEnabled = p1;
     }
     if(word == "darkness") {
       iss >> s0 >> p1;
@@ -1416,10 +1386,11 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
         }
       }
 
-      if(
+      if( closestDoor != nullptr && (
           ((closestDoor->width != g_oldDoorWidth && g_useOffset == 1)
           ||
           (closestDoor->height != g_oldDoorHeight && g_useOffset == 2))
+          )
          
         && (g_useOffset != 0)) {
         if(canSwitchOffDevMode) {
@@ -1512,14 +1483,6 @@ void load_map(SDL_Renderer *renderer, string filename, string destWaypointName)
 
   g_loadingATM = 0;
 
-  //reset cookies
-  for(int i = 0; i < g_fogwidth; i++) {
-    for(int j = 0; j < g_fogheight; j++) {
-      g_fc[i][j] = 0;
-      g_sc[i][j] = 0;
-      g_fogcookies[i][j] = 0;
-    }
-  }
   transition = 0;
 
   //set up the party to follow each other
@@ -1685,7 +1648,7 @@ bool mapeditor_save_map(string word)
 
   // write fow
 
-  ofile << "dark " << g_fogofwarEnabled << endl;
+  ofile << "dark " << g_spotlightEnabled << endl;
 
   ofile << "darkness " << g_dungeonDarkness << endl;
 
@@ -2088,7 +2051,6 @@ void write_map(entity *mapent)
       {
         continue;
       }
-      if(g_entities[i]->isFogSlate) { continue; }
       drect.x = (g_entities[i]->bounds.x + g_entities[i]->x - g_camera.x) * g_camera.zoom;
       drect.y = (g_entities[i]->bounds.y + g_entities[i]->y - g_camera.y - g_entities[i]->z * XtoZ) * g_camera.zoom;
       drect.w = g_entities[i]->bounds.width * g_camera.zoom;
@@ -4745,44 +4707,6 @@ void write_map(entity *mapent)
           }
 
           break;
-        }
-        if (word == "fogofwar" || word == "fow")
-        {
-          bool b;
-          if (line >> b)
-          {
-            g_fogofwarEnabled = b;
-          }
-          if (g_fogofwarEnabled)
-          {
-            for (auto x : g_fogslates)
-            {
-              x->tangible = 1;
-            }
-            for (auto x : g_fogslatesA)
-            {
-              x->tangible = 1;
-            }
-            for (auto x : g_fogslatesB)
-            {
-              x->tangible = 1;
-            }
-          }
-          else
-          {
-            for (auto x : g_fogslates)
-            {
-              x->tangible = 0;
-            }
-            for (auto x : g_fogslatesA)
-            {
-              x->tangible = 0;
-            }
-            for (auto x : g_fogslatesB)
-            {
-              x->tangible = 0;
-            }
-          }
         }
         if (word == "budget")
         {

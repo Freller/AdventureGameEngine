@@ -29,6 +29,8 @@
 
 using namespace std;
 
+void resetTrivialData();
+
 void cyclePalette(SDL_Surface* source, SDL_Surface* destination, std::vector<Uint32>& palette);
 
 navNode* getNodeByPos(vector<navNode*> array, int x, int y);
@@ -126,9 +128,9 @@ class rect {
 
     rect();
 
-    rect(int a, int b, int c, int d);
+    rect(float a, float b, float c, float d);
 
-    rect(int fx, int fy, int fz, int fw, int fh, int fzh);
+    rect(float fx, float fy, float fz, float fw, float fh, float fzh);
 
     void render(SDL_Renderer * renderer);
 };
@@ -1300,8 +1302,6 @@ class entity:public actor {
     bool specialAngleOverride = 0;
 
     bool cachedOriginValsAreGood = 0;
-
-    int isFogSlate = 0;
 
     //sounds
     Mix_Chunk* footstep;

@@ -140,7 +140,9 @@ vector<camBlocker*> g_camBlockers;
 
 vector<gradient*> g_gradients;
 
-vector<mesh*> g_meshes;
+vector<mesh*> g_meshFloors;
+
+vector<mesh*> g_meshCollisions;
 
 SDL_Texture* g_gradient_a = 0;
 SDL_Texture* g_gradient_b = 0;
@@ -223,11 +225,10 @@ int transitionDelta;
 const int transitionImageWidth = 300;
 const int transitionImageHeight = 300;
 int g_walldarkness = 55;			// 65, 75. could be controlled by the map unless you get crafty with recycling textures across maps
-bool g_unlit = 0;							// set to 1 if the user has the lowest graphical setting, to disable lighting in maps for performance. Don't eh, don't dev like this
+bool g_unlit = 0;							// set to 1 if the user has the lowest graphical setting, to disable lighting in maps
 int g_graphicsquality = 3;		// 0 is least, 4 is max
 float g_extraShadowSize = 20; // how much bigger are shadows in comparison to their hitboxes.
-int g_fogofwarEnabled = 1;
-int g_fogofwarRays = 100;
+int g_spotlightEnabled = 1;
 bool g_showHealthbar = 0;
 int g_entitySleepDistance = 1048576*5;
 effectIndex *smokeEffect;
@@ -259,11 +260,8 @@ SDL_Texture *lightbri;
 SDL_Texture *lightcri;
 SDL_Texture *lightdri;
 
-SDL_Texture *TextureA;
-SDL_Texture *TextureB;
-SDL_Texture *TextureC;
-SDL_Texture *TextureD;
 SDL_Texture *blackbarTexture;
+SDL_Texture *spotlightTexture;
 
 //#define g_fogheight 19;
 //#define g_fogwidth 21;
@@ -286,16 +284,6 @@ std::vector<std::vector<int>> g_fogcookies(g_fogwidth, std::vector<int>(g_foghei
 // this second vector is for storing the cookies that are ontopof walls
 // that way, we can draw too layers of shadow before actors and one after
 std::vector<std::vector<int>> g_savedcookies(g_fogwidth, std::vector<int>(g_fogheight));
-
-// data for two passes of cookies
-std::array<std::array<int, g_fogheight>, g_fogwidth> g_fc;
-std::array<std::array<int, g_fogheight>, g_fogwidth> g_sc;
-std::array<std::array<int, g_fogheight>, g_fogwidth> g_shc;
-
-// fogslates - 19 x 2 = 38 actors.
-std::vector<entity *> g_fogslates;
-std::vector<entity *> g_fogslatesA;
-std::vector<entity *> g_fogslatesB;
 
 //for the stutter/punishment effect
 //"don't do that"
@@ -924,6 +912,8 @@ string textureDirectory = "mapeditor";          // for choosing a file to load t
 float mapeditorNavNodeCullRadius = 96;
 float mapeditorNavNodeTraceRadius = 150;        // for choosing the radius of the traces between navNodes when creating them in the editor. Should be the radius of the biggest entity
 // in the level, so that he does not get stuck on corners
+
+SDL_Texture* g_meshShadeTexture = 0;
 
 // for checking old console commands
 vector<string> consolehistory;

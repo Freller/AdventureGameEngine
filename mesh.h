@@ -30,18 +30,28 @@ public:
   float u = 0;
   float v = 0;
 
+  float lu;
+  float lv;
+
   array<float, 3> normal = {0,0,0};
 };
 
 class face {
 public:
-  unsigned int a;
-  unsigned int b;
-  unsigned int c;
+  unsigned int a = 0;
+  unsigned int b = 0;
+  unsigned int c = 0;
+};
+
+enum meshtype {
+  FLOOR,
+  COLLISION,
+  LIGHTING,
 };
 
 class mesh {
 public:
+  mesh* lighting = nullptr;
   vec3 origin = {0,0,0};
   SDL_Texture* texture = NULL;
 
@@ -53,23 +63,15 @@ public:
   vector<face> faces; //for 3d data, for determining z of entities ontop.
   vector<vertex3d> vertices;
 
+  meshtype mtype = meshtype::FLOOR;
+
+  bool visible = 1;
+
   mesh();
 
   ~mesh();
 };
 
-mesh* loadMeshFromPly(const string& faddress, vec3 forigin, float scale);
-
-
-
-
-
-
-
-
-
-
-
-
+mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtype);
 
 #endif
