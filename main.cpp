@@ -3768,7 +3768,7 @@ int WinMain()
     PHYSFS_exists("whatthefuck");
 //  M("load mesh from ply");
     mesh* m = loadMeshFromPly("test/stage", {99279, 99455,0}, 250, meshtype::FLOOR);
-//  m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
+    m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
 
   //mesh* mShade = loadMeshFromPly("test/stage-shade", {111065, 98846,0},  250, meshtype::LIGHTING);
 //  m->lighting = mShade;

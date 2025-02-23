@@ -105,19 +105,18 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
     }
 
     if(fmtype == meshtype::FLOOR) {
-//        string saddress = faddress;
-//        saddress = saddress + "-shade";
-//        D(saddress);
-//        string fulladdress = "resources/static/meshes/" + saddress + ".ply";
-//        D(fulladdress);
+        string saddress = faddress;
+        saddress = saddress + "-shade";
+        D(saddress);
+        string fulladdress = "resources/static/meshes/" + saddress + ".ply";
+        D(fulladdress);
 
-      //PHYSFS_exists("whatthefuck");
-//        if(PHYSFS_exists("resources/static/meshes/simple-shade.ply")) {
-//          M("Found shade file");
-//            //result->lighting = loadMeshFromPly(saddress, forigin, scale, meshtype::LIGHTING);
-//        } else {
-//          M("No shade file exists");
-//        }
+        if(PHYSFS_exists(fulladdress.c_str())) {
+          M("Found shade file");
+            result->lighting = loadMeshFromPly(saddress, forigin, scale, meshtype::LIGHTING);
+        } else {
+          M("No shade file exists");
+        }
     }
     M("Do we get here");
 
