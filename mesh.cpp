@@ -22,10 +22,6 @@ mesh::~mesh() {
     g_meshCollisions.erase(remove(g_meshCollisions.begin(), g_meshCollisions.end(), this), g_meshCollisions.end());
   }
 
-  if(lighting != nullptr) {
-    delete lighting;
-  }
-
   //add support for sharing textures later
   if(mtype != meshtype::LIGHTING && texture != nullptr) {
     SDL_DestroyTexture(texture);
@@ -85,6 +81,7 @@ void setVertexColors(vector<vertex3d>& vertices, const vector<face>& faces, cons
         vertex.color = {intensity, intensity, intensity, 255};
     }
 }
+
 mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtype) {
     string address = "resources/static/meshes/" + faddress + ".ply";
     vector<vertex3d> vertices;
@@ -92,36 +89,43 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
     mesh* result = new mesh();
     result->origin = forigin;
     result->mtype = fmtype;
-    
+
     if(fmtype == meshtype::FLOOR) {
-      M("This is a floor");
         g_meshFloors.push_back(result);
     } else if (fmtype == meshtype::COLLISION) {
-      M("This is a collision");
         g_meshCollisions.push_back(result);
     } else if(fmtype == meshtype::LIGHTING) {
-      M("This is a lighting");
-        // No specific action for LIGHTING type currently
+
     }
+
+    string binAddress = "";
 
     if(fmtype == meshtype::FLOOR) {
-        string saddress = faddress;
-        saddress = saddress + "-shade";
-        D(saddress);
+        string saddress = faddress + "-shade";
         string fulladdress = "resources/static/meshes/" + saddress + ".ply";
-        D(fulladdress);
 
-        if(PHYSFS_exists(fulladdress.c_str())) {
-          M("Found shade file");
-            result->lighting = loadMeshFromPly(saddress, forigin, scale, meshtype::LIGHTING);
-        } else {
-          M("No shade file exists");
+        binAddress = "resources/static/meshes/" + saddress + ".bin";
+        if (!PHYSFS_exists(binAddress.c_str())) {
+            M("No binary file exists, loading shade.ply");
+
+            // Load shade.ply and write binary file with texture coordinates
+            mesh* shadeMesh = loadMeshFromPly(saddress, forigin, scale, meshtype::LIGHTING);
+
+            ofstream binFile(binAddress, ios::binary);
+//            for (const auto& v : shadeMesh->vertices) {
+//                binFile.write(reinterpret_cast<const char*>(&v.u), sizeof(float));
+//                binFile.write(reinterpret_cast<const char*>(&v.v), sizeof(float));
+//            }
+            for (int i = 0; i < shadeMesh->numVertices; i++) {
+                binFile.write(reinterpret_cast<const char*>(&shadeMesh->vertex[i].tex_coord.x), sizeof(float));
+                binFile.write(reinterpret_cast<const char*>(&shadeMesh->vertex[i].tex_coord.y), sizeof(float));
+            }
+            binFile.close();
+            delete shadeMesh;
         }
     }
-    M("Do we get here");
 
     if (PHYSFS_exists(address.c_str())) {
-      M("Got here A");
         PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
         PHYSFS_file* myfile = PHYSFS_openRead(address.c_str());
         error = PHYSFS_getLastErrorCode();
@@ -171,6 +175,7 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
             vertices.push_back(v);
         }
 
+
         // Get face data
         vector<vector<size_t>> faceIndices = plyIn.getFaceIndices<size_t>();
 
@@ -192,6 +197,17 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
         // Transform 3D coordinates to 2D and set up SDL_Vertex array
         result->numVertices = faces.size() * 3;
         result->vertex = new SDL_Vertex[result->numVertices];
+
+        if(fmtype == meshtype::FLOOR) {
+          M("We've gotta read the lighting file now");
+          ifstream binFile(binAddress, ios::binary);
+          for (int i = 0; i < result->numVertices; i++) {
+              std::pair<float, float> texCoord;
+              binFile.read(reinterpret_cast<char*>(&texCoord), sizeof(texCoord));
+              result->vertexExtraData[i] = texCoord;
+          }
+          binFile.close();
+        }
 
         int index = 0;
         float maxDistanceFromOrigin = 0;
@@ -225,6 +241,10 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
         result->vertices = vertices;
     } else {
         cerr << "File does not exist: " << address << endl;
+    }
+    for(int i = 0; i < result->numVertices; i++) {
+      D(result->vertexExtraData[i].first);
+      D(result->vertexExtraData[i].second);
     }
 
     return result;

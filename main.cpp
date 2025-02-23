@@ -2592,16 +2592,15 @@ for(auto &x : g_meshFloors) {
     }
   
     SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, NULL, 0);
-    
+
     //render shade
-    if(x->lighting != nullptr) {
-      for(int i = 0; i < x->lighting->numVertices; i++) {
-        v[i].tex_coord.x = x->lighting->vertex[i].tex_coord.x;
-        v[i].tex_coord.y = x->lighting->vertex[i].tex_coord.y;
-      }
-      
-      SDL_RenderGeometry(renderer, g_meshShadeTexture, v, x->lighting->numVertices, NULL, 0);
+    for(int i = 0; i < x->vertexExtraData.size(); i++) {
+      v[i].tex_coord.x = x->vertexExtraData[i].first;
+      v[i].tex_coord.y = x->vertexExtraData[i].second;
     }
+    
+    SDL_RenderGeometry(renderer, g_meshShadeTexture, v, x->numVertices, NULL, 0);
+    
   }
 }
 
@@ -3765,10 +3764,15 @@ int WinMain()
   //mesh* m = loadMeshFromPly("test/stage", {111065, 98846,0},  250, meshtype::FLOOR);
   
 
-    PHYSFS_exists("whatthefuck");
-//  M("load mesh from ply");
     mesh* m = loadMeshFromPly("test/stage", {99279, 99455,0}, 250, meshtype::FLOOR);
     m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
+    D(m->vertexExtraData.size());
+    D(m->vertexExtraData[20].first);
+    D(m->vertexExtraData[20].second);
+//    for(int i = 0; i < m->vertexExtraData.size(); i++) {
+//      D(m->vertexExtraData[i].first);
+//      D(m->vertexExtraData[i].second);
+//    }
 
   //mesh* mShade = loadMeshFromPly("test/stage-shade", {111065, 98846,0},  250, meshtype::LIGHTING);
 //  m->lighting = mShade;

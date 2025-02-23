@@ -30,8 +30,8 @@ public:
   float u = 0;
   float v = 0;
 
-  float lu;
-  float lv;
+  float lu = 0;
+  float lv = 0;
 
   array<float, 3> normal = {0,0,0};
 };
@@ -51,11 +51,11 @@ enum meshtype {
 
 class mesh {
 public:
-  mesh* lighting = nullptr;
   vec3 origin = {0,0,0};
   SDL_Texture* texture = NULL;
 
   SDL_Vertex* vertex = NULL;
+  map<int, pair<float, float>> vertexExtraData;
   int numVertices = 0;
 
   float sleepRadius = 0;
