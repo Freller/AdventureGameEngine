@@ -37,40 +37,23 @@ void protagMakesNoise();
 
 void dungeonFlash();
 
-SDL_FPoint calculateIntersection(float playerScreenX, float playerScreenY, float vertexX, float vertexY, float screenWidth, float screenHeight) {
+SDL_FPoint calculateIntersection(float x1, float y1, float z1, float x2, float y2, float z2) {
+    // Compute direction vector
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    float dz = z2 - z1;
+
+    // Scale direction vector to move to edge of the screen
+    float maxDim = std::max(WIN_WIDTH, WIN_HEIGHT);
+    float scaleFactor = maxDim / std::sqrt(dx * dx + dy * dy + dz * dz);
+
     SDL_FPoint intersection;
-    float slope = (vertexY - playerScreenY) / (vertexX - playerScreenX);
-
-    if (vertexX > playerScreenX) {
-        // Moving to the right
-        intersection.x = screenWidth;
-        intersection.y = playerScreenY + slope * (screenWidth - playerScreenX);
-    } else {
-        // Moving to the left
-        intersection.x = 0;
-        intersection.y = playerScreenY + slope * (0 - playerScreenX);
-    }
-
-    // If intersection.y is outside the screen height, adjust it
-    if (intersection.y < 0) {
-        intersection.y = 0;
-        intersection.x = playerScreenX + (0 - playerScreenY) / slope;
-    } else if (intersection.y > screenHeight) {
-        intersection.y = screenHeight;
-        intersection.x = playerScreenX + (screenHeight - playerScreenY) / slope;
-    }
-
-    // Push the intersection point to the hypotenuse distance
-    float dx = intersection.x - playerScreenX;
-    float dy = intersection.y - playerScreenY;
-    float distance = sqrt(dx * dx + dy * dy);
-    float scale = WIN_HEIGHT*2 / distance;
-
-    intersection.x = playerScreenX + dx * scale;
-    intersection.y = playerScreenY + dy * scale;
+    intersection.x = x1 + dx * scaleFactor;
+    intersection.y = y1 + dy * scaleFactor;
 
     return intersection;
 }
+
 
 void drawUI() {
 
@@ -2643,21 +2626,31 @@ for (auto &o : g_meshOccluders) {
     SDL_Vertex v[o->numVertices];
     for (int i = 0; i < o->numVertices; i++) {
         v[i] = o->vertex[i];
-        v[i].position.x += o->origin.x - g_camera.x;
-        v[i].position.y += o->origin.y - g_camera.y;
+        v[i].position.x += o->origin.x;
+        v[i].position.y += o->origin.y;
+
+        // (v[i].position.x, v[i].position.y, v[i].tex_coord.y)
+        // is the position in the world
+
 
         // an occluder should have the "top" vertices of the belt have its first x texture coord less than 0.5
         if (v[i].tex_coord.x < 0.5) {
-            float playerScreenX, playerScreenY;
-            transform3dPoint(protag->getOriginX(), protag->getOriginY(), protag->z, playerScreenX, playerScreenY);
             // move this point to the edge of the screen
-            SDL_FPoint intersection = calculateIntersection(playerScreenX, playerScreenY, v[i].position.x, v[i].position.y, WIN_WIDTH, WIN_HEIGHT);
+            SDL_FPoint intersection = calculateIntersection(protag->getOriginX(), protag->getOriginY(), protag->z, v[i].position.x, v[i].position.y, v[i].tex_coord.y);
             v[i].position.x = intersection.x;
             v[i].position.y = intersection.y;
         }
+
+
+        //now use coordinates for rendering
+        v[i].position.x += -g_camera.x;
+        v[i].position.y += -g_camera.y;
+
+
+        v[i].position.y -= v[i].tex_coord.y * XtoZ;
     }
 
-    SDL_RenderGeometry(renderer, blackbarTexture, v, o->numVertices, NULL, 0);
+    SDL_RenderGeometry(renderer, NULL, v, o->numVertices, NULL, 0);
 }
 
 if(drawhitboxes) {

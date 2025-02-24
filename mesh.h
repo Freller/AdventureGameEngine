@@ -26,7 +26,7 @@ public:
   float x = 0;
   float y = 0;
   float z = 0;
-  SDL_Color color = {0,255,0,255};
+  SDL_Color color = {0,0,0,255};
   float u = 0;
   float v = 0;
 

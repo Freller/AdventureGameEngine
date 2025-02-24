@@ -34,6 +34,68 @@ using namespace std;
 
 class usable;
 
+// Utility function to check if two lines intersect
+bool linesIntersect(float x1, float y1, float x2, float y2, float x3, float y3, float x4, float y4) {
+    float denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (denom == 0.0f) {
+        return false; // Parallel lines
+    }
+
+    float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+    float u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+}
+
+bool isOccluderBetween(float protagX, float protagY, float entityX, float entityY) {
+    for (auto &occluder : g_meshOccluders) {
+        for (const auto &face : occluder->faces) {
+            SDL_Vertex &v1 = occluder->vertex[face.a];
+            SDL_Vertex &v2 = occluder->vertex[face.b];
+            SDL_Vertex &v3 = occluder->vertex[face.c];
+
+            float v1x = v1.position.x + occluder->origin.x;
+            float v1y = v1.position.y + occluder->origin.y;
+
+            float v2x = v2.position.x + occluder->origin.x;
+            float v2y = v2.position.y + occluder->origin.y;
+
+            float v3x = v3.position.x + occluder->origin.x;
+            float v3y = v3.position.y + occluder->origin.y;
+
+            if (v1.tex_coord.x > 0.5 && v2.tex_coord.x > 0.5) {
+                if(linesIntersect(protagX, protagY, entityX, entityY, v1x, v1y, v2x, v2y)) {
+                    M("A true");
+                    return true;
+                } 
+           }
+
+           if(v2.tex_coord.x > 0.5 && v3.tex_coord.x > 0.5) {
+             if( linesIntersect(protagX, protagY, entityX, entityY, v2x, v2y, v3x, v3y)) {
+                 M("B true");
+                 return true;
+             }
+           }
+           if(v3.tex_coord.x > 0.5 && v1.tex_coord.x > 0.5) {
+             if(linesIntersect(protagX, protagY, entityX, entityY, v3x, v3y, v1x, v1y)) {
+               M("C true");
+               return true;
+             }
+           }
+
+            // Check if the line (protag, entity) intersects with the line segment (v1, v2) or (v2, v3)
+//            if ((v1.tex_coord.x > 0.5 && v2.tex_coord.x > 0.5 && linesIntersect(protagX, protagY, entityX, entityY, v1x, v1y, v2x, v2y)) ||
+//                (v2.tex_coord.x > 0.5 && v3.tex_coord.x > 0.5 && linesIntersect(protagX, protagY, entityX, entityY, v2x, v2y, v3x, v3y)) ||
+//                (v3.tex_coord.x > 0.5 && v1.tex_coord.x > 0.5 && linesIntersect(protagX, protagY, entityX, entityY, v3x, v3y, v1x, v1y))) {
+//                return true;
+//            }
+        }
+    }
+
+    M("D False");
+    return false;
+}
+
 
 void resetTrivialData() {
   for(auto &x : party) {
@@ -3986,57 +4048,7 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
       SDL_Rect srcrect = {framespots[framePlusSpinOffset].x,framespots[framePlusSpinOffset].y, framewidth, frameheight};
       const SDL_FPoint center = {0 ,0};
 
-      //color for statuseffects
-      Uint8 rmod = 255; Uint8 gmod = 255; Uint8 bmod = 255; bool setColor = 0;
-      if(flashingMS > 0 || hisStatusComponent.enraged.statuses.size() > 0) {
-        gmod = 255 * (1-((float)flashingMS/g_flashtime));
-        bmod = 255 * (1-((float)flashingMS/g_flashtime));
-        //SDL_SetTextureColorMod(texture, 255, 255 * (1-((float)flashingMS/g_flashtime)), 255 * (1-((float)flashingMS/g_flashtime)));
-      }
-
-      if(this == protag && stunned && hisStatusComponent.stunned.statuses.size() > 0) {
-        rmod *= 0.5;
-        gmod *= 0.5;
-        bmod *= 0.5;
-      }
-
-      if(marked) {
-        rmod *= 0.9;
-        gmod *= 0.8;
-        bmod *= 1;
-      }
-
-      if(hisStatusComponent.poisoned.statuses.size() > 0) {
-        rmod *= 0.83;
-        gmod *= 1;
-        bmod *= 0.89;
-      }
-
-      if(poisoned || poisonFlickerFrames > 0) {
-        poisonFlickerFrames--;
-        rmod *= 0.71;
-        gmod *= 0.91;
-        bmod *= 0.81;
-      }
-
-      Uint8 crmod = 0; Uint8 cgmod = 0; Uint8 cbmod = 0;
-      SDL_GetTextureColorMod(texture, &crmod, &cgmod, &cbmod);
-      if(crmod != rmod || cgmod != gmod || cbmod != bmod) {
-        SDL_SetTextureColorMod(texture, rmod, gmod, bmod);
-      }
-      if(darkenMs > 0) {
-        SDL_SetTextureColorMod(texture, darkenValue, darkenValue, darkenValue);
-        darkenValue -= elapsed;
-        if(darkenValue <0) {darkenValue = 0;}
-      } else {
-        if(darkenValue < 255) {
-          darkenValue += 20;
-          if(darkenValue > 255) {darkenValue = 255;}
-          SDL_SetTextureColorMod(texture, darkenValue, darkenValue, darkenValue);
-        } else {
-          darkenValue = 255;
-        }
-      }
+      SDL_SetTextureColorMod(texture, darkenValue, darkenValue, darkenValue);
 
       if(texture != NULL) {
         SDL_RenderCopyExF(renderer, texture, &srcrect, &dstrect, 0, &center, flip);
@@ -4247,6 +4259,18 @@ door* entity::update(vector<door*> doors, float elapsed) {
     visibleMs -= elapsed;
     if(visibleMs <= 0) {
       visible = 0;
+    }
+  }
+
+  if(name == "common/key") {
+    if(isOccluderBetween(protag->getOriginX(), protag->getOriginY(), getOriginX(), getOriginY())) {
+      M("Player can Not see key");
+      darkenValue -= 20;
+      if(darkenValue < 0) darkenValue = 0;
+    } else {
+      M("Player can see key");
+      darkenValue += 20;
+      if(darkenValue > 255) darkenValue = 255;
     }
   }
 

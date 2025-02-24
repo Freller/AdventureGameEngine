@@ -171,9 +171,11 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
             }
         }
 
-        //only do this if you want lighting
-        const array<float, 3> lightDir = {0, -0.4472, -0.8944};
-        setVertexColors(vertices, faces, lightDir);
+        if(fmtype != meshtype::OCCLUDER) {
+
+          const array<float, 3> lightDir = {0, -0.4472, -0.8944};
+          setVertexColors(vertices, faces, lightDir);
+        }
 
         // Transform 3D coordinates to 2D and set up SDL_Vertex array
         result->numVertices = faces.size() * 3;
@@ -189,13 +191,13 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 float dist = Distance(result->vertex[index].position.x, result->vertex[index].position.y * XtoY, 0, 0);
                 if(fmtype != meshtype::OCCLUDER) {
                   result->vertex[index].position.y -= ((v.z * scale)) * XtoZ;
+                  result->vertex[index].tex_coord.y = v.v;
                 } else {
                   result->vertex[index].tex_coord.y = v.z * scale;
-                  result->vertex[index].y = v.y * scale;
+                  result->vertex[index].position.y = v.y * scale * XtoY;
                 }
                 result->vertex[index].color = v.color;
                 result->vertex[index].tex_coord.x = v.u;
-                result->vertex[index].tex_coord.y = v.v;
                 result->vertexExtraData[index].first = v.lu;
                 result->vertexExtraData[index].second = v.lv;
 
