@@ -34,69 +34,6 @@ using namespace std;
 
 class usable;
 
-// Utility function to check if two lines intersect
-bool linesIntersect(float x1, float y1, float x2, float y2, float x3, float y3, float x4, float y4) {
-    float denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    if (denom == 0.0f) {
-        return false; // Parallel lines
-    }
-
-    float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
-    float u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
-
-    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
-}
-
-bool isOccluderBetween(float protagX, float protagY, float entityX, float entityY) {
-    for (auto &occluder : g_meshOccluders) {
-        for (const auto &face : occluder->faces) {
-            SDL_Vertex &v1 = occluder->vertex[face.a];
-            SDL_Vertex &v2 = occluder->vertex[face.b];
-            SDL_Vertex &v3 = occluder->vertex[face.c];
-
-            float v1x = v1.position.x + occluder->origin.x;
-            float v1y = v1.position.y + occluder->origin.y;
-
-            float v2x = v2.position.x + occluder->origin.x;
-            float v2y = v2.position.y + occluder->origin.y;
-
-            float v3x = v3.position.x + occluder->origin.x;
-            float v3y = v3.position.y + occluder->origin.y;
-
-            if (v1.tex_coord.x > 0.5 && v2.tex_coord.x > 0.5) {
-                if(linesIntersect(protagX, protagY, entityX, entityY, v1x, v1y, v2x, v2y)) {
-                    M("A true");
-                    return true;
-                } 
-           }
-
-           if(v2.tex_coord.x > 0.5 && v3.tex_coord.x > 0.5) {
-             if( linesIntersect(protagX, protagY, entityX, entityY, v2x, v2y, v3x, v3y)) {
-                 M("B true");
-                 return true;
-             }
-           }
-           if(v3.tex_coord.x > 0.5 && v1.tex_coord.x > 0.5) {
-             if(linesIntersect(protagX, protagY, entityX, entityY, v3x, v3y, v1x, v1y)) {
-               M("C true");
-               return true;
-             }
-           }
-
-            // Check if the line (protag, entity) intersects with the line segment (v1, v2) or (v2, v3)
-//            if ((v1.tex_coord.x > 0.5 && v2.tex_coord.x > 0.5 && linesIntersect(protagX, protagY, entityX, entityY, v1x, v1y, v2x, v2y)) ||
-//                (v2.tex_coord.x > 0.5 && v3.tex_coord.x > 0.5 && linesIntersect(protagX, protagY, entityX, entityY, v2x, v2y, v3x, v3y)) ||
-//                (v3.tex_coord.x > 0.5 && v1.tex_coord.x > 0.5 && linesIntersect(protagX, protagY, entityX, entityY, v3x, v3y, v1x, v1y))) {
-//                return true;
-//            }
-        }
-    }
-
-    M("D False");
-    return false;
-}
-
-
 void resetTrivialData() {
   for(auto &x : party) {
     x->xvel = 0;
@@ -4263,15 +4200,15 @@ door* entity::update(vector<door*> doors, float elapsed) {
   }
 
   if(name == "common/key") {
-    if(isOccluderBetween(protag->getOriginX(), protag->getOriginY(), getOriginX(), getOriginY())) {
-      M("Player can Not see key");
-      darkenValue -= 20;
-      if(darkenValue < 0) darkenValue = 0;
-    } else {
-      M("Player can see key");
-      darkenValue += 20;
-      if(darkenValue > 255) darkenValue = 255;
-    }
+//    if(isOccluderBetween(protag->getOriginX(), protag->getOriginY(), getOriginX(), getOriginY())) {
+//      M("Player can Not see key");
+//      darkenValue -= 20;
+//      if(darkenValue < 0) darkenValue = 0;
+//    } else {
+//      M("Player can see key");
+//      darkenValue += 20;
+//      if(darkenValue > 255) darkenValue = 255;
+//    }
   }
 
   for(auto t : mobilesounds) {

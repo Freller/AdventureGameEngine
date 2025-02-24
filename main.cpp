@@ -44,7 +44,7 @@ SDL_FPoint calculateIntersection(float x1, float y1, float z1, float x2, float y
     float dz = z2 - z1;
 
     // Scale direction vector to move to edge of the screen
-    float maxDim = std::max(WIN_WIDTH, WIN_HEIGHT);
+    float maxDim = std::max(WIN_WIDTH*2, WIN_HEIGHT*2);
     float scaleFactor = maxDim / std::sqrt(dx * dx + dy * dy + dz * dz);
 
     SDL_FPoint intersection;
@@ -2622,6 +2622,10 @@ for(auto &x : g_meshFloors) {
   }
 }
 
+
+//SDL_SetRenderTarget(renderer, g_occluderTarget);
+//SDL_SetRenderDrawColor(renderer, 255,255,255,255);
+//SDL_RenderClear(renderer);
 for (auto &o : g_meshOccluders) {
     SDL_Vertex v[o->numVertices];
     for (int i = 0; i < o->numVertices; i++) {
@@ -2634,7 +2638,7 @@ for (auto &o : g_meshOccluders) {
 
 
         // an occluder should have the "top" vertices of the belt have its first x texture coord less than 0.5
-        if (v[i].tex_coord.x < 0.5) {
+        if (v[i].tex_coord.x < 0.5) { //!!! bad!
             // move this point to the edge of the screen
             SDL_FPoint intersection = calculateIntersection(protag->getOriginX(), protag->getOriginY(), protag->z, v[i].position.x, v[i].position.y, v[i].tex_coord.y);
             v[i].position.x = intersection.x;
@@ -2648,10 +2652,15 @@ for (auto &o : g_meshOccluders) {
 
 
         v[i].position.y -= v[i].tex_coord.y * XtoZ;
+
     }
+
 
     SDL_RenderGeometry(renderer, NULL, v, o->numVertices, NULL, 0);
 }
+//SDL_SetRenderTarget(renderer, nullptr);
+//SDL_SetRenderDrawColor(renderer, 0,0,0,255);
+//SDL_RenderCopy(renderer, g_occluderTarget, NULL, NULL);
 
 if(drawhitboxes) {
   for(auto &x : g_meshCollisions) {
@@ -3744,6 +3753,9 @@ int WinMain()
     g_itemsines.push_back( sin((g_elapsed_accumulator + 1020) / 300) * 10 + 30);
 
 
+//  g_occluderTarget = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH*2, WIN_HEIGHT*2);
+//  SDL_SetTextureBlendMode(g_occluderTarget, SDL_BLENDMODE_MOD);
+    
 
   //light gradients to put near where maps transition
   g_gradient_a = loadTexture(renderer, "resources/engine/fade-a.qoi");

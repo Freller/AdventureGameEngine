@@ -306,6 +306,8 @@ extern vector<mesh*> g_meshOccluders;
 
 extern vector<mesh*> g_meshDecorative;
 
+extern SDL_Texture* g_occluderTarget;
+
 extern SDL_Texture* g_gradient_a;
 extern SDL_Texture* g_gradient_b;
 extern SDL_Texture* g_gradient_c;
