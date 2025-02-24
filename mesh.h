@@ -46,7 +46,8 @@ public:
 enum meshtype {
   FLOOR,
   COLLISION,
-  LIGHTING,
+  OCCLUDER,
+  DECORATIVE,
 };
 
 class mesh {
@@ -55,7 +56,7 @@ public:
   SDL_Texture* texture = NULL;
 
   SDL_Vertex* vertex = NULL;
-  map<int, pair<float, float>> vertexExtraData;
+  vector<pair<float, float>> vertexExtraData;
   int numVertices = 0;
 
   float sleepRadius = 0;

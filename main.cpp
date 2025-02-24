@@ -37,6 +37,41 @@ void protagMakesNoise();
 
 void dungeonFlash();
 
+SDL_FPoint calculateIntersection(float playerScreenX, float playerScreenY, float vertexX, float vertexY, float screenWidth, float screenHeight) {
+    SDL_FPoint intersection;
+    float slope = (vertexY - playerScreenY) / (vertexX - playerScreenX);
+
+    if (vertexX > playerScreenX) {
+        // Moving to the right
+        intersection.x = screenWidth;
+        intersection.y = playerScreenY + slope * (screenWidth - playerScreenX);
+    } else {
+        // Moving to the left
+        intersection.x = 0;
+        intersection.y = playerScreenY + slope * (0 - playerScreenX);
+    }
+
+    // If intersection.y is outside the screen height, adjust it
+    if (intersection.y < 0) {
+        intersection.y = 0;
+        intersection.x = playerScreenX + (0 - playerScreenY) / slope;
+    } else if (intersection.y > screenHeight) {
+        intersection.y = screenHeight;
+        intersection.x = playerScreenX + (screenHeight - playerScreenY) / slope;
+    }
+
+    // Push the intersection point to the hypotenuse distance
+    float dx = intersection.x - playerScreenX;
+    float dy = intersection.y - playerScreenY;
+    float distance = sqrt(dx * dx + dy * dy);
+    float scale = WIN_HEIGHT*2 / distance;
+
+    intersection.x = playerScreenX + dx * scale;
+    intersection.y = playerScreenY + dy * scale;
+
+    return intersection;
+}
+
 void drawUI() {
 
   adventureUIManager->dialogpointer->render(renderer, g_camera);
@@ -235,10 +270,10 @@ void ExplorationLoop() {
           adventureUIManager->showAm();
           adventureUIManager->amIndex = 0;
         }
-        //        else if(g_amState == amState::MAJOR) {
-        //          g_amState = amState::CLOSED;
-        //          adventureUIManager->hideAm();
-        //        }
+        else if(g_amState == amState::MAJOR) {
+          g_amState = amState::CLOSED;
+          adventureUIManager->hideAm();
+        }
       }
     }
 
@@ -2594,7 +2629,7 @@ for(auto &x : g_meshFloors) {
     SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, NULL, 0);
 
     //render shade
-    for(int i = 0; i < x->vertexExtraData.size(); i++) {
+    for(int i = 0; i < x->numVertices; i++) {
       v[i].tex_coord.x = x->vertexExtraData[i].first;
       v[i].tex_coord.y = x->vertexExtraData[i].second;
     }
@@ -2604,18 +2639,41 @@ for(auto &x : g_meshFloors) {
   }
 }
 
-for(auto &x : g_meshCollisions) {
-  if(x->visible) {
-    SDL_Vertex v[x->numVertices];
-    for(int i = 0; i < x->numVertices; i++) {
-      v[i] = x->vertex[i];
-      v[i].position.x += x->origin.x - g_camera.x;
-      v[i].position.y += x->origin.y - g_camera.y;
-    }
-  
-    SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, NULL, 0);
+for (auto &o : g_meshOccluders) {
+    SDL_Vertex v[o->numVertices];
+    for (int i = 0; i < o->numVertices; i++) {
+        v[i] = o->vertex[i];
+        v[i].position.x += o->origin.x - g_camera.x;
+        v[i].position.y += o->origin.y - g_camera.y;
 
+        // an occluder should have the "top" vertices of the belt have its first x texture coord less than 0.5
+        if (v[i].tex_coord.x < 0.5) {
+            float playerScreenX, playerScreenY;
+            transform3dPoint(protag->getOriginX(), protag->getOriginY(), protag->z, playerScreenX, playerScreenY);
+            // move this point to the edge of the screen
+            SDL_FPoint intersection = calculateIntersection(playerScreenX, playerScreenY, v[i].position.x, v[i].position.y, WIN_WIDTH, WIN_HEIGHT);
+            v[i].position.x = intersection.x;
+            v[i].position.y = intersection.y;
+        }
     }
+
+    SDL_RenderGeometry(renderer, blackbarTexture, v, o->numVertices, NULL, 0);
+}
+
+if(drawhitboxes) {
+  for(auto &x : g_meshCollisions) {
+    if(x->visible) {
+      SDL_Vertex v[x->numVertices];
+      for(int i = 0; i < x->numVertices; i++) {
+        v[i] = x->vertex[i];
+        v[i].position.x += x->origin.x - g_camera.x;
+        v[i].position.y += x->origin.y - g_camera.y;
+      }
+    
+      SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, NULL, 0);
+  
+      }
+  }
 }
 
 // sort
@@ -2634,8 +2692,11 @@ for (long long unsigned int i = 0; i < g_tiles.size(); i++)
 }
 B("After tiles");
 
+
 //render black bars
 if(!devMode) {
+//occluders
+
   SDL_Rect blackrect;
 
   blackrect = {
@@ -3761,24 +3822,13 @@ int WinMain()
   transitionDelta = transitionImageHeight;
   transition = 1;
 
-  //mesh* m = loadMeshFromPly("test/stage", {111065, 98846,0},  250, meshtype::FLOOR);
-  
 
-    mesh* m = loadMeshFromPly("test/stage", {99279, 99455,0}, 250, meshtype::FLOOR);
-    m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
-    D(m->vertexExtraData.size());
-    D(m->vertexExtraData[20].first);
-    D(m->vertexExtraData[20].second);
-//    for(int i = 0; i < m->vertexExtraData.size(); i++) {
-//      D(m->vertexExtraData[i].first);
-//      D(m->vertexExtraData[i].second);
-//    }
+  mesh* m = loadMeshFromPly("test/tunnel", {99279, 99455,0}, 250, meshtype::FLOOR);
+  m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
 
-  //mesh* mShade = loadMeshFromPly("test/stage-shade", {111065, 98846,0},  250, meshtype::LIGHTING);
-//  m->lighting = mShade;
-//
-  //mesh* w = loadMeshFromPly("test/stagewall", {114065, 98846,0}, 250, meshtype::COLLISION);
+  mesh* w = loadMeshFromPly("test/stage-collision", {99279, 99455,0}, 250, meshtype::COLLISION);
 
+  mesh* o = loadMeshFromPly("test/stage-occluder", {99279, 99455,0}, 250, meshtype::OCCLUDER);
 
 
   while (!quit)
@@ -3834,12 +3884,11 @@ int WinMain()
           switch (event.key.keysym.sym)
           {
             case SDLK_TAB:
-              g_holdingCTRL = 1;
+              //g_holdingCTRL = 1;
               // protag->getItem(a, 1);
               break;
             case SDLK_LALT:
-              M("Set tab");
-              g_holdingTAB = 1;
+              //g_holdingTAB = 1;
               break;
           }
           if(g_swallowAKey) {
@@ -4410,6 +4459,21 @@ void getExplorationInput(float &elapsed)
 
   //for portability, use the input[] array to drive controls
   //some actions are not bound, e.g. navigation of the settings menu
+  
+
+  if(devMode) {
+    if(keystate[SDL_SCANCODE_LALT]) { 
+      g_holdingTAB = 1;
+    } else {
+      g_holdingTAB = 0;
+    }
+  
+    if(keystate[SDL_SCANCODE_TAB]) { 
+      g_holdingCTRL = 1;
+    } else {
+      g_holdingCTRL = 0;
+    }
+  }
 
   //menu up 
   if(keystate[SDL_SCANCODE_UP] || keystate[SDL_SCANCODE_W])

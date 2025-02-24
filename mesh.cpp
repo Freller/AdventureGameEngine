@@ -7,15 +7,9 @@
 vec3::vec3(int fx = 0, int fy = 0, int fz = 0) :x(fx), y(fy), z(fz) {}
 
 mesh::mesh() {
-  M("");
-  M("mesh::mesh()");
-  M("");
 }
 
 mesh::~mesh() {
-  M("");
-  M("mesh::~mesh()");
-  M("");
   if(mtype == meshtype::FLOOR) {
     g_meshFloors.erase(remove(g_meshFloors.begin(), g_meshFloors.end(), this), g_meshFloors.end());
   } else {
@@ -23,7 +17,7 @@ mesh::~mesh() {
   }
 
   //add support for sharing textures later
-  if(mtype != meshtype::LIGHTING && texture != nullptr) {
+  if(texture != nullptr) {
     SDL_DestroyTexture(texture);
   }
 }
@@ -82,6 +76,7 @@ void setVertexColors(vector<vertex3d>& vertices, const vector<face>& faces, cons
     }
 }
 
+
 mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtype) {
     string address = "resources/static/meshes/" + faddress + ".ply";
     vector<vertex3d> vertices;
@@ -94,36 +89,11 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
         g_meshFloors.push_back(result);
     } else if (fmtype == meshtype::COLLISION) {
         g_meshCollisions.push_back(result);
-    } else if(fmtype == meshtype::LIGHTING) {
-
+    } else if(fmtype == meshtype::OCCLUDER) {
+        g_meshOccluders.push_back(result);
     }
 
     string binAddress = "";
-
-    if(fmtype == meshtype::FLOOR) {
-        string saddress = faddress + "-shade";
-        string fulladdress = "resources/static/meshes/" + saddress + ".ply";
-
-        binAddress = "resources/static/meshes/" + saddress + ".bin";
-        if (!PHYSFS_exists(binAddress.c_str())) {
-            M("No binary file exists, loading shade.ply");
-
-            // Load shade.ply and write binary file with texture coordinates
-            mesh* shadeMesh = loadMeshFromPly(saddress, forigin, scale, meshtype::LIGHTING);
-
-            ofstream binFile(binAddress, ios::binary);
-//            for (const auto& v : shadeMesh->vertices) {
-//                binFile.write(reinterpret_cast<const char*>(&v.u), sizeof(float));
-//                binFile.write(reinterpret_cast<const char*>(&v.v), sizeof(float));
-//            }
-            for (int i = 0; i < shadeMesh->numVertices; i++) {
-                binFile.write(reinterpret_cast<const char*>(&shadeMesh->vertex[i].tex_coord.x), sizeof(float));
-                binFile.write(reinterpret_cast<const char*>(&shadeMesh->vertex[i].tex_coord.y), sizeof(float));
-            }
-            binFile.close();
-            delete shadeMesh;
-        }
-    }
 
     if (PHYSFS_exists(address.c_str())) {
         PHYSFS_ErrorCode error = PHYSFS_getLastErrorCode();
@@ -150,14 +120,19 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
         vector<array<double, 3>> vertexData = plyIn.getVertexPositions();
         vector<array<unsigned char, 3>> vertexColors;
         vector<array<double, 2>> vertexUVs;
+        vector<array<double, 2>> vertexLUVs;
 
         // Check if the .ply file contains color and UV data
-        if (plyIn.hasElement("vertex") && plyIn.getElement("vertex").hasProperty("red")) {
-            vertexColors = plyIn.getVertexColors();
-        }
+//        if (plyIn.hasElement("vertex") && plyIn.getElement("vertex").hasProperty("red")) {
+//            vertexColors = plyIn.getVertexColors();
+//        }
 
         if (plyIn.hasElement("vertex") && plyIn.getElement("vertex").hasProperty("s")) {
             vertexUVs = plyIn.getVertexUVs();
+        }
+
+        if (plyIn.hasElement("vertex") && plyIn.getElement("vertex").hasProperty("u")) {
+            vertexLUVs = plyIn.getVertexLUVs();
         }
 
         // Convert to vertex3d
@@ -171,6 +146,10 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 v.u = static_cast<float>(vertexUVs[i][0]);
                 v.v = 1 - static_cast<float>(vertexUVs[i][1]);
             }
+            if( i < vertexLUVs.size()) {
+                v.lu = static_cast<float>(vertexLUVs[i][0]);
+                v.lv = 1 - static_cast<float>(vertexLUVs[i][1]);
+            }
 
             vertices.push_back(v);
         }
@@ -182,10 +161,12 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
         // Convert to face objects
         for (const auto& f : faceIndices) {
             if (f.size() == 3) { // Ensure it's a triangle
-                faces.push_back({f[0], f[1], f[2]});
+              faces.push_back({f[0], f[1], f[2]});
             } else {
                 E("");
                 E("Non triangular face in mesh");
+                D(f.size());
+                D(faces.size());
                 E("");
             }
         }
@@ -197,17 +178,7 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
         // Transform 3D coordinates to 2D and set up SDL_Vertex array
         result->numVertices = faces.size() * 3;
         result->vertex = new SDL_Vertex[result->numVertices];
-
-        if(fmtype == meshtype::FLOOR) {
-          M("We've gotta read the lighting file now");
-          ifstream binFile(binAddress, ios::binary);
-          for (int i = 0; i < result->numVertices; i++) {
-              std::pair<float, float> texCoord;
-              binFile.read(reinterpret_cast<char*>(&texCoord), sizeof(texCoord));
-              result->vertexExtraData[i] = texCoord;
-          }
-          binFile.close();
-        }
+        result->vertexExtraData = vector<pair<float, float>>(result->numVertices);
 
         int index = 0;
         float maxDistanceFromOrigin = 0;
@@ -216,13 +187,22 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 result->vertex[index].position.x = ((-v.x) * scale);
                 result->vertex[index].position.y = ((v.y * scale)) * XtoY;
                 float dist = Distance(result->vertex[index].position.x, result->vertex[index].position.y * XtoY, 0, 0);
-                result->vertex[index].position.y -= ((v.z * scale)) * XtoZ;
+                if(fmtype != meshtype::OCCLUDER) {
+                  result->vertex[index].position.y -= ((v.z * scale)) * XtoZ;
+                } else {
+                  result->vertex[index].tex_coord.y = v.z * scale;
+                  result->vertex[index].y = v.y * scale;
+                }
                 result->vertex[index].color = v.color;
                 result->vertex[index].tex_coord.x = v.u;
                 result->vertex[index].tex_coord.y = v.v;
+                result->vertexExtraData[index].first = v.lu;
+                result->vertexExtraData[index].second = v.lv;
+
                 if(dist > maxDistanceFromOrigin) {
                     maxDistanceFromOrigin = dist;
                 }
+
                 ++index;
             };
 
@@ -241,10 +221,6 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
         result->vertices = vertices;
     } else {
         cerr << "File does not exist: " << address << endl;
-    }
-    for(int i = 0; i < result->numVertices; i++) {
-      D(result->vertexExtraData[i].first);
-      D(result->vertexExtraData[i].second);
     }
 
     return result;

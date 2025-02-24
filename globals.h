@@ -302,6 +302,10 @@ extern vector<mesh*> g_meshFloors;
 
 extern vector<mesh*> g_meshCollisions;
 
+extern vector<mesh*> g_meshOccluders;
+
+extern vector<mesh*> g_meshDecorative;
+
 extern SDL_Texture* g_gradient_a;
 extern SDL_Texture* g_gradient_b;
 extern SDL_Texture* g_gradient_c;

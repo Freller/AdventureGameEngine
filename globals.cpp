@@ -144,6 +144,10 @@ vector<mesh*> g_meshFloors;
 
 vector<mesh*> g_meshCollisions;
 
+vector<mesh*> g_meshOccluders;
+
+vector<mesh*> g_meshDecorative;
+
 SDL_Texture* g_gradient_a = 0;
 SDL_Texture* g_gradient_b = 0;
 SDL_Texture* g_gradient_c = 0;
