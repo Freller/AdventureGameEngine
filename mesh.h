@@ -57,8 +57,6 @@ public:
 
   SDL_Vertex* vertex = NULL;
  
-  occlusionScreenTris
-
   vector<pair<float, float>> vertexExtraData;
   int numVertices = 0;
 

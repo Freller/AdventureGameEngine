@@ -123,9 +123,9 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
         vector<array<double, 2>> vertexLUVs;
 
         // Check if the .ply file contains color and UV data
-//        if (plyIn.hasElement("vertex") && plyIn.getElement("vertex").hasProperty("red")) {
-//            vertexColors = plyIn.getVertexColors();
-//        }
+        if (plyIn.hasElement("vertex") && plyIn.getElement("vertex").hasProperty("red")) {
+            vertexColors = plyIn.getVertexColors();
+        }
 
         if (plyIn.hasElement("vertex") && plyIn.getElement("vertex").hasProperty("s")) {
             vertexUVs = plyIn.getVertexUVs();
@@ -151,6 +151,12 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 v.lv = 1 - static_cast<float>(vertexLUVs[i][1]);
             }
 
+            if( i < vertexColors.size()) {
+              v.color.r = vertexColors[i][0];
+              v.color.g = vertexColors[i][1];
+              v.color.b = vertexColors[i][2];
+            }
+
             vertices.push_back(v);
         }
 
@@ -171,8 +177,10 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
             }
         }
 
-        if(fmtype != meshtype::OCCLUDER) {
-
+        if(
+            fmtype == meshtype::COLLISION ||
+            fmtype == meshtype::FLOOR
+            ) {
           const array<float, 3> lightDir = {0, -0.4472, -0.8944};
           setVertexColors(vertices, faces, lightDir);
         }
@@ -189,7 +197,7 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 result->vertex[index].position.x = ((-v.x) * scale);
                 result->vertex[index].position.y = ((v.y * scale)) * XtoY;
                 float dist = Distance(result->vertex[index].position.x, result->vertex[index].position.y * XtoY, 0, 0);
-                if(fmtype != meshtype::OCCLUDER) {
+                if(fmtype != meshtype::OCCLUDER || v.color.r < 128) {
                   result->vertex[index].position.y -= ((v.z * scale)) * XtoZ;
                   result->vertex[index].tex_coord.y = v.v;
                 } else {
@@ -200,6 +208,9 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 result->vertex[index].tex_coord.x = v.u;
                 result->vertexExtraData[index].first = v.lu;
                 result->vertexExtraData[index].second = v.lv;
+                result->vertex[index].color.r = v.color.r;
+                result->vertex[index].color.g = v.color.g;
+                result->vertex[index].color.b = v.color.b;
 
                 if(dist > maxDistanceFromOrigin) {
                     maxDistanceFromOrigin = dist;

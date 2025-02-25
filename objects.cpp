@@ -49,6 +49,75 @@ void resetTrivialData() {
 
 }
 
+bool isSegmentIntersecting(float startX, float startY, float endX, float endY, 
+                           float x1, float y1, float x2, float y2) {
+    // Helper function to determine the orientation of ordered triplet (px, py), (qx, qy), (rx, ry)
+    auto orientation = [](float px, float py, float qx, float qy, float rx, float ry) -> int {
+        float val = (qy - py) * (rx - qx) - (qx - px) * (ry - qy);
+        return (val > 0) ? 1 : 2; // 1 -> Clockwise, 2 -> Counterclockwise
+    };
+
+    int o1 = orientation(startX, startY, endX, endY, x1, y1);
+    int o2 = orientation(startX, startY, endX, endY, x2, y2);
+    int o3 = orientation(x1, y1, x2, y2, startX, startY);
+    int o4 = orientation(x1, y1, x2, y2, endX, endY);
+
+    // General case: if the orientations are different, the segments intersect
+    return (o1 != o2 && o3 != o4);
+}
+
+
+
+// Function to check if an occluder is between the start and end points with debug lines
+bool isOccluderBetween(float startX, float startY, float endX, float endY) {
+    for (const auto& mesh : g_meshOccluders) {
+        for (int i = 0; i < mesh->numVertices; i += 3) {
+            SDL_Vertex v1 = mesh->vertex[i];
+            SDL_Vertex v2 = mesh->vertex[i + 1];
+            SDL_Vertex v3 = mesh->vertex[i + 2];
+
+            float x1 = v1.position.x + mesh->origin.x;
+            float y1 = v1.position.y + mesh->origin.y;
+            float x2 = v2.position.x + mesh->origin.x;
+            float y2 = v2.position.y + mesh->origin.y;
+            float x3 = v3.position.x + mesh->origin.x;
+            float y3 = v3.position.y + mesh->origin.y;
+
+            if (v1.color.r > 128 && v2.color.r > 128) {
+                if (isSegmentIntersecting(startX, startY, endX, endY, x1, y1, x2, y2)) {
+                    // Draw the segments using SDL_RenderDrawLine for debugging
+//                    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
+//                    SDL_RenderDrawLine(renderer, static_cast<int>(startX - g_camera.x), static_cast<int>(startY- g_camera.y), static_cast<int>(endX- g_camera.x), static_cast<int>(endY- g_camera.y));
+//                    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
+//                    SDL_RenderDrawLine(renderer, static_cast<int>(x1-g_camera.x), static_cast<int>(y1-g_camera.y), static_cast<int>(x2-g_camera.x), static_cast<int>(y2-g_camera.y));
+                    return true;
+                }
+            } else if (v2.color.r > 128 && v3.color.r > 128) {
+                if (isSegmentIntersecting(startX, startY, endX, endY, x2, y2, x3, y3)) {
+                    // Draw the segments using SDL_RenderDrawLine for debugging
+//                    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
+//                    SDL_RenderDrawLine(renderer, static_cast<int>(startX - g_camera.x), static_cast<int>(startY- g_camera.y), static_cast<int>(endX- g_camera.x), static_cast<int>(endY- g_camera.y));
+//                    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
+//                    SDL_RenderDrawLine(renderer, static_cast<int>(x2-g_camera.x), static_cast<int>(y2-g_camera.y), static_cast<int>(x3-g_camera.x), static_cast<int>(y3-g_camera.y));
+                    return true;
+                }
+            } else if (v3.color.r > 128 && v1.color.r > 128) {
+                if (isSegmentIntersecting(startX, startY, endX, endY, x3, y3, x1, y1)) {
+                    // Draw the segments using SDL_RenderDrawLine for debugging
+//                    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
+//                    SDL_RenderDrawLine(renderer, static_cast<int>(startX - g_camera.x), static_cast<int>(startY- g_camera.y), static_cast<int>(endX- g_camera.x), static_cast<int>(endY- g_camera.y));
+//                    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
+//                    SDL_RenderDrawLine(renderer, static_cast<int>(x3)-g_camera.x, static_cast<int>(y3)-g_camera.y, static_cast<int>(x1-g_camera.x), static_cast<int>(y1-g_camera.y));
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+
+
 struct CollisionInfo {
     bool isColliding;
     std::array<float, 3> normal;
@@ -3919,6 +3988,19 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
 
 
   if(RectOverlap(obj, cam)) {
+
+    if(this != protag) {
+      if(isOccluderBetween(protag->getOriginX(), protag->getOriginY(), getOriginX(), getOriginY())) {
+        opacity -= 20;
+        if(opacity < 0) {opacity = 0;}
+      } else {
+        opacity += 20;
+        if(opacity > 255) {opacity = 255;}
+      }
+      shadow->alphamod = opacity;
+    }
+    //SDL_SetTextureColorMod(texture, darkenValue, darkenValue, darkenValue);
+
     if(directionUpdateCooldownMs < 0) {
 
       //set visual direction
@@ -3985,7 +4067,6 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
       SDL_Rect srcrect = {framespots[framePlusSpinOffset].x,framespots[framePlusSpinOffset].y, framewidth, frameheight};
       const SDL_FPoint center = {0 ,0};
 
-      SDL_SetTextureColorMod(texture, darkenValue, darkenValue, darkenValue);
 
       if(texture != NULL) {
         SDL_RenderCopyExF(renderer, texture, &srcrect, &dstrect, 0, &center, flip);
@@ -3993,20 +4074,6 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
     } else {
       if(flashingMS > 0) {
         SDL_SetTextureColorMod(texture, 255, 255 * (1 - ((float)flashingMS/g_flashtime)), 255 * (1-((float)flashingMS/g_flashtime)));
-      }
-
-      if(darkenMs > 0) {
-        SDL_SetTextureColorMod(texture, darkenValue, darkenValue, darkenValue);
-        darkenValue -= elapsed;
-        if(darkenValue <0) {darkenValue = 0;}
-      } else {
-        if(darkenValue < 255) {
-          darkenValue += 20;
-          if(darkenValue > 255) {darkenValue = 255;}
-          SDL_SetTextureColorMod(texture, darkenValue, darkenValue, darkenValue);
-        } else {
-          darkenValue = 255;
-        }
       }
 
       if(texture != NULL) {
@@ -4199,17 +4266,6 @@ door* entity::update(vector<door*> doors, float elapsed) {
     }
   }
 
-  if(name == "common/key") {
-//    if(isOccluderBetween(protag->getOriginX(), protag->getOriginY(), getOriginX(), getOriginY())) {
-//      M("Player can Not see key");
-//      darkenValue -= 20;
-//      if(darkenValue < 0) darkenValue = 0;
-//    } else {
-//      M("Player can see key");
-//      darkenValue += 20;
-//      if(darkenValue > 255) darkenValue = 255;
-//    }
-  }
 
   for(auto t : mobilesounds) {
     t->x = getOriginX();

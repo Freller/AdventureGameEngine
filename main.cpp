@@ -151,6 +151,10 @@ void updateWindowResolution() {
     WIN_WIDTH /= scalex;
     WIN_HEIGHT = WIN_WIDTH * 0.625;
   }
+
+  SDL_DestroyTexture(g_occluderTarget);
+  g_occluderTarget = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH*g_occluderResolutionRatio, WIN_HEIGHT*g_occluderResolutionRatio);
+  SDL_SetTextureBlendMode(g_occluderTarget, SDL_BLENDMODE_MOD);
 }
 
 void ExplorationLoop() {
@@ -2618,50 +2622,55 @@ for(auto &x : g_meshFloors) {
     }
     
     SDL_RenderGeometry(renderer, g_meshShadeTexture, v, x->numVertices, NULL, 0);
-    
+  
   }
 }
 
+{
+  //the render target will break the effect and it's additional overhead so w/e
+//  SDL_SetRenderTarget(renderer, g_occluderTarget);
+//  SDL_SetRenderDrawColor(renderer, 255,255,255,255);
+//  SDL_RenderClear(renderer);
+  for (auto &o : g_meshOccluders) {
+      SDL_Vertex v[o->numVertices];
+      for (int i = 0; i < o->numVertices; i++) {
+          v[i] = o->vertex[i];
+          v[i].position.x += o->origin.x;
+          v[i].position.y += o->origin.y;
+  
+          // (v[i].position.x, v[i].position.y, v[i].tex_coord.y)
+          // is the position in the world
+  
+          // an occluder should have the "top" vertices of the belt have its first x texture coord less than 0.5
+          if (v[i].color.r > 128) {
+              // move this point to the edge of the screen
+              SDL_FPoint intersection = calculateIntersection(protag->getOriginX(), protag->getOriginY(), protag->z, v[i].position.x, v[i].position.y, v[i].tex_coord.y);
+              //D(v[i].position.y);
+              v[i].position.x = intersection.x;
+              v[i].position.y = intersection.y;
+              v[i].position.y -= v[i].tex_coord.y * XtoZ;
+          }  
+          //now use coordinates for rendering
+          v[i].position.x += -g_camera.x;
+          v[i].position.y += -g_camera.y;
 
-//SDL_SetRenderTarget(renderer, g_occluderTarget);
-//SDL_SetRenderDrawColor(renderer, 255,255,255,255);
-//SDL_RenderClear(renderer);
-for (auto &o : g_meshOccluders) {
-    SDL_Vertex v[o->numVertices];
-    for (int i = 0; i < o->numVertices; i++) {
-        v[i] = o->vertex[i];
-        v[i].position.x += o->origin.x;
-        v[i].position.y += o->origin.y;
-
-        // (v[i].position.x, v[i].position.y, v[i].tex_coord.y)
-        // is the position in the world
-
-
-        // an occluder should have the "top" vertices of the belt have its first x texture coord less than 0.5
-        if (v[i].tex_coord.x < 0.5) { //!!! bad!
-            // move this point to the edge of the screen
-            SDL_FPoint intersection = calculateIntersection(protag->getOriginX(), protag->getOriginY(), protag->z, v[i].position.x, v[i].position.y, v[i].tex_coord.y);
-            v[i].position.x = intersection.x;
-            v[i].position.y = intersection.y;
-        }
-
-
-        //now use coordinates for rendering
-        v[i].position.x += -g_camera.x;
-        v[i].position.y += -g_camera.y;
-
-
-        v[i].position.y -= v[i].tex_coord.y * XtoZ;
-
-    }
-
-
-    SDL_RenderGeometry(renderer, NULL, v, o->numVertices, NULL, 0);
+          v[i].color.r = 0;
+          v[i].color.g = 0;
+          v[i].color.b = 0;
+  
+//          v[i].position.x *= g_occluderResolutionRatio;
+//          v[i].position.y *= g_occluderResolutionRatio;
+      }
+  
+  
+      SDL_RenderGeometry(renderer, NULL, v, o->numVertices, NULL, 0);
+  }
+  
+//  SDL_SetRenderTarget(renderer, nullptr);
+//  SDL_SetRenderDrawColor(renderer, 0,0,0,255);
+//  SDL_RenderCopy(renderer, g_occluderTarget, NULL, NULL);
+  
 }
-//SDL_SetRenderTarget(renderer, nullptr);
-//SDL_SetRenderDrawColor(renderer, 0,0,0,255);
-//SDL_RenderCopy(renderer, g_occluderTarget, NULL, NULL);
-
 if(drawhitboxes) {
   for(auto &x : g_meshCollisions) {
     if(x->visible) {
@@ -3225,7 +3234,6 @@ if (devMode)
 }
 B("After mapedit");
 
-
 SDL_RenderPresent(renderer);
 B("End of frame");
 }
@@ -3753,9 +3761,9 @@ int WinMain()
     g_itemsines.push_back( sin((g_elapsed_accumulator + 1020) / 300) * 10 + 30);
 
 
-//  g_occluderTarget = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH*2, WIN_HEIGHT*2);
-//  SDL_SetTextureBlendMode(g_occluderTarget, SDL_BLENDMODE_MOD);
-    
+  g_occluderTarget = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH*g_occluderResolutionRatio, WIN_HEIGHT *g_occluderResolutionRatio);
+
+  SDL_SetTextureBlendMode(g_occluderTarget, SDL_BLENDMODE_MOD);
 
   //light gradients to put near where maps transition
   g_gradient_a = loadTexture(renderer, "resources/engine/fade-a.qoi");
@@ -3828,12 +3836,12 @@ int WinMain()
   transition = 1;
 
 
-  mesh* m = loadMeshFromPly("test/tunnel", {99279, 99455,0}, 250, meshtype::FLOOR);
+  mesh* m = loadMeshFromPly("test/tunnel", {99279, 99455,0}, 100, meshtype::FLOOR);
   m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
 
-  mesh* w = loadMeshFromPly("test/stage-collision", {99279, 99455,0}, 250, meshtype::COLLISION);
+  mesh* w = loadMeshFromPly("test/stage-collision", {99279, 99455,0}, 100, meshtype::COLLISION);
 
-  mesh* o = loadMeshFromPly("test/stage-occluder", {99279, 99455,0}, 250, meshtype::OCCLUDER);
+  mesh* o = loadMeshFromPly("test/stage-occluder", {99279, 99455,0}, 100, meshtype::OCCLUDER);
 
 
   while (!quit)

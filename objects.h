@@ -31,6 +31,8 @@ using namespace std;
 
 void resetTrivialData();
 
+bool isOccluderBetween(float startX, float startY, float endX, float endY);
+
 void cyclePalette(SDL_Surface* source, SDL_Surface* destination, std::vector<Uint32>& palette);
 
 navNode* getNodeByPos(vector<navNode*> array, int x, int y);
