@@ -11,6 +11,9 @@
 #include <sstream>
 #include <array>
 #include <string>
+#include <map>
+#include <set>
+
 
 class vec3 {
 public:
@@ -43,11 +46,14 @@ public:
   unsigned int c = 0;
 };
 
+std::map<int, int> findQuadFaces(const std::vector<vertex3d>& vertices, const std::vector<face>& faces);
+
 enum meshtype {
   FLOOR,
+  V_WALL, //visual only, no collision
   COLLISION,
   OCCLUDER,
-  DECORATIVE,
+  DECORATIVE
 };
 
 class mesh {
@@ -63,6 +69,11 @@ public:
   float sleepRadius = 0;
 
   vector<face> faces; //for 3d data, for determining z of entities ontop.
+  
+  vector<SDL_Vertex> oGeo; //screenspace geo for occluders
+//  map<int, int> facePairing; //for finding quads in occluders
+//  map<int, tuple<int, int, int, int>> twinMap; //maps the first int of facePairing to twin coordinates for where to draw the rectangle blocking the wall
+
   vector<vertex3d> vertices;
 
   meshtype mtype = meshtype::FLOOR;

@@ -142,6 +142,8 @@ vector<gradient*> g_gradients;
 
 vector<mesh*> g_meshFloors;
 
+vector<mesh*> g_meshVWalls;
+
 vector<mesh*> g_meshCollisions;
 
 vector<mesh*> g_meshOccluders;

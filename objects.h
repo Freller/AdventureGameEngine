@@ -17,6 +17,7 @@
 #include <cctype> //tolower()
 #include <limits>
 #include <stdlib.h>
+#include <tuple>
 
 #include <filesystem> //checking if a usable dir exists
 
@@ -30,6 +31,10 @@
 using namespace std;
 
 void resetTrivialData();
+
+std::tuple<bool, float, float> getIntersection(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2);
+
+bool isSegmentIntersecting(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2);
 
 bool isOccluderBetween(float startX, float startY, float endX, float endY);
 

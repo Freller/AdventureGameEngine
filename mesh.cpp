@@ -4,6 +4,61 @@
 
 #include "mesh.h"
 
+
+//find which triangles  form quads if they are 90deg walls
+std::map<int, int> findQuadFaces(const std::vector<vertex3d>& vertices, const std::vector<face>& faces) {
+    // Map to hold pairs of face indices with matching vertices
+    std::map<int, int> quadFaces;
+
+    // Multimap to group faces by vertex indices
+    std::multimap<std::pair<float, float>, int> vertexMap;
+    
+    // Populate the vertexMap with face indices grouped by vertex x and y positions
+    for (size_t i = 0; i < faces.size(); ++i) {
+        const face& f = faces[i];
+        vertexMap.insert({{vertices[f.a].x, vertices[f.a].y}, static_cast<int>(i)});
+        vertexMap.insert({{vertices[f.b].x, vertices[f.b].y}, static_cast<int>(i)});
+        vertexMap.insert({{vertices[f.c].x, vertices[f.c].y}, static_cast<int>(i)});
+    }
+
+    // Iterate through the vertexMap and find pairs of faces forming quads
+    for (auto it = vertexMap.begin(); it != vertexMap.end(); ++it) {
+        auto range = vertexMap.equal_range(it->first);
+        std::set<int> faceSet;
+        for (auto itr = range.first; itr != range.second; ++itr) {
+            faceSet.insert(itr->second);
+        }
+
+        // Check for pairs of faces with two unique x and y positions
+        for (auto itr1 = faceSet.begin(); itr1 != faceSet.end(); ++itr1) {
+            for (auto itr2 = std::next(itr1); itr2 != faceSet.end(); ++itr2) {
+                int faceIdx1 = *itr1;
+                int faceIdx2 = *itr2;
+
+                // Extract vertices of both faces
+                const face& face1 = faces[faceIdx1];
+                const face& face2 = faces[faceIdx2];
+
+                std::set<std::tuple<float, float>> uniquePositions;
+                uniquePositions.insert({vertices[face1.a].x, vertices[face1.a].y});
+                uniquePositions.insert({vertices[face1.b].x, vertices[face1.b].y});
+                uniquePositions.insert({vertices[face1.c].x, vertices[face1.c].y});
+                uniquePositions.insert({vertices[face2.a].x, vertices[face2.a].y});
+                uniquePositions.insert({vertices[face2.b].x, vertices[face2.b].y});
+                uniquePositions.insert({vertices[face2.c].x, vertices[face2.c].y});
+
+                if (uniquePositions.size() == 2) {
+                    quadFaces[faceIdx1] = faceIdx2;
+                }
+            }
+        }
+    }
+
+    return quadFaces;
+}
+
+
+
 vec3::vec3(int fx = 0, int fy = 0, int fz = 0) :x(fx), y(fy), z(fz) {}
 
 mesh::mesh() {
@@ -12,8 +67,14 @@ mesh::mesh() {
 mesh::~mesh() {
   if(mtype == meshtype::FLOOR) {
     g_meshFloors.erase(remove(g_meshFloors.begin(), g_meshFloors.end(), this), g_meshFloors.end());
-  } else {
+  } else if(mtype == meshtype::V_WALL) {
+    g_meshVWalls.erase(remove(g_meshVWalls.begin(), g_meshVWalls.end(), this), g_meshVWalls.end());
+  } else if(mtype == meshtype::COLLISION) {
     g_meshCollisions.erase(remove(g_meshCollisions.begin(), g_meshCollisions.end(), this), g_meshCollisions.end());
+  } else if(mtype == meshtype::OCCLUDER) {
+    g_meshOccluders.erase(remove(g_meshOccluders.begin(), g_meshOccluders.end(), this), g_meshOccluders.end());
+  } else if(mtype == meshtype::DECORATIVE) {
+
   }
 
   //add support for sharing textures later
@@ -91,6 +152,10 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
         g_meshCollisions.push_back(result);
     } else if(fmtype == meshtype::OCCLUDER) {
         g_meshOccluders.push_back(result);
+    } else if(fmtype == meshtype::V_WALL) {
+      g_meshVWalls.push_back(result);
+    } else if(fmtype == meshtype::DECORATIVE) {
+      g_meshDecorative.push_back(result); 
     }
 
     string binAddress = "";

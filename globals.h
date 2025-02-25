@@ -300,6 +300,8 @@ extern vector<gradient*> g_gradients;
 
 extern vector<mesh*> g_meshFloors;
 
+extern vector<mesh*> g_meshVWalls;
+
 extern vector<mesh*> g_meshCollisions;
 
 extern vector<mesh*> g_meshOccluders;

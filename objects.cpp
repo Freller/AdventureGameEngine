@@ -27,6 +27,7 @@
 #include "main.h"
 
 #include <utility>
+#include <tuple>
 
 #define PI 3.14159265
 
@@ -49,8 +50,41 @@ void resetTrivialData() {
 
 }
 
-bool isSegmentIntersecting(float startX, float startY, float endX, float endY, 
-                           float x1, float y1, float x2, float y2) {
+std::tuple<bool, float, float> getIntersection(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2) {
+    // Helper function to determine the orientation of ordered triplet (px, py), (qx, qy), (rx, ry)
+    auto orientation = [](float px, float py, float qx, float qy, float rx, float ry) -> int {
+        float val = (qy - py) * (rx - qx) - (qx - px) * (ry - qy);
+        if (val == 0) return 0; // Collinear
+        return (val > 0) ? 1 : 2; // 1 -> Clockwise, 2 -> Counterclockwise
+    };
+
+    int o1 = orientation(startX, startY, endX, endY, x1, y1);
+    int o2 = orientation(startX, startY, endX, endY, x2, y2);
+    int o3 = orientation(x1, y1, x2, y2, startX, startY);
+    int o4 = orientation(x1, y1, x2, y2, endX, endY);
+
+    if (o1 != o2 && o3 != o4) {
+        // The segments intersect, compute the intersection point
+        float A1 = endY - startY;
+        float B1 = startX - endX;
+        float C1 = A1 * startX + B1 * startY;
+
+        float A2 = y2 - y1;
+        float B2 = x1 - x2;
+        float C2 = A2 * x1 + B2 * y1;
+
+        float det = A1 * B2 - A2 * B1;
+        if (det != 0) {
+            float intersectX = (B2 * C1 - B1 * C2) / det;
+            float intersectY = (A1 * C2 - A2 * C1) / det;
+            return {true, intersectX, intersectY};
+        }
+    }
+
+    return {false, 0, 0};
+}
+
+bool isSegmentIntersecting(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2) {
     // Helper function to determine the orientation of ordered triplet (px, py), (qx, qy), (rx, ry)
     auto orientation = [](float px, float py, float qx, float qy, float rx, float ry) -> int {
         float val = (qy - py) * (rx - qx) - (qx - px) * (ry - qy);
