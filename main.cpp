@@ -152,9 +152,9 @@ void updateWindowResolution() {
     WIN_HEIGHT = WIN_WIDTH * 0.625;
   }
 
-  SDL_DestroyTexture(g_occluderTarget);
-  g_occluderTarget = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH*g_occluderResolutionRatio, WIN_HEIGHT*g_occluderResolutionRatio);
-  SDL_SetTextureBlendMode(g_occluderTarget, SDL_BLENDMODE_MOD);
+//  SDL_DestroyTexture(g_occluderTarget);
+//  g_occluderTarget = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, WIN_WIDTH*g_occluderResolutionRatio, WIN_HEIGHT*g_occluderResolutionRatio);
+//  SDL_SetTextureBlendMode(g_occluderTarget, SDL_BLENDMODE_MOD);
 }
 
 void ExplorationLoop() {
@@ -2683,10 +2683,18 @@ for(auto &x : g_meshVWalls) {
       v[i] = x->vertex[i];
       v[i].position.x += x->origin.x - g_camera.x;
       v[i].position.y += x->origin.y - g_camera.y;
-      v[i].color.r = 255;
+      v[i].color.r = v[i].color.g;
     }
   
     SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, NULL, 0);
+
+    //render shade
+    for(int i = 0; i < x->numVertices; i++) {
+      v[i].tex_coord.x = x->vertexExtraData[i].first;
+      v[i].tex_coord.y = x->vertexExtraData[i].second;
+    }
+    
+    SDL_RenderGeometry(renderer, g_meshShadeTexture, v, x->numVertices, NULL, 0);
   }
 }
 
@@ -2699,6 +2707,10 @@ for(auto &x : g_meshVWalls) {
         for(int j = 0; j < w->numVertices; j+= 3) {
 
           //make the bottom loop of the wall have 0 red
+          //color wall teal at bottom
+          //bottom of wall red
+          //make wall red
+          //what color for wall
           //only check if we can find two teal verts
           SDL_Vertex d = w->vertex[j];
           SDL_Vertex e = w->vertex[j+1];
@@ -2714,6 +2726,9 @@ for(auto &x : g_meshVWalls) {
 
           SDL_Vertex* useA = nullptr;
           SDL_Vertex* useB = nullptr;
+
+          //int px = protag->getOriginX() - g_camera.x;
+          int py = protag->getOriginY() - g_camera.y;
 
           if(d.color.r < 128) {
             if( e.color.r < 128) {
@@ -2731,14 +2746,11 @@ for(auto &x : g_meshVWalls) {
           }
           if(useA == nullptr) {continue;}
 
-          SDL_Vertex protagPoint;
-          protagPoint.x = protag->getOriginX() - g_camera.x;
-          protagPoint.y = protag->getOriginY() - g_camera.y;
-
-          vector<SDL_Vertex> primaryPoints;
-          vector<SDL_Vertex> secondaryPoints;
-          
-  
+          vector<SDL_Vertex> primaryPoints; //always 2
+          vector<SDL_Vertex> secondaryPoints; //0-2
+          vector<SDL_Vertex> staticPoints; //1 or 2
+          int intersections = 0;
+ 
           SDL_Vertex a = o->oGeo[i];
           SDL_Vertex b = o->oGeo[i+1];
           SDL_Vertex c = o->oGeo[i+2];
@@ -2746,165 +2758,265 @@ for(auto &x : g_meshVWalls) {
           //check R-B lines
           if(a.color.r > 128) {
             if(b.color.r < 128) {
-              M("Check ab seg A");
+              //M("Check ab seg A");
               //check a-b seg
-              SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-              SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
-              SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-              SDL_RenderDrawLine(renderer, static_cast<int>(a.position.x), static_cast<int>(a.position.y), static_cast<int>(b.position.x), static_cast<int>(b.position.y));
+//              SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
+//              SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
+//              SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
+//              SDL_RenderDrawLine(renderer, static_cast<int>(a.position.x), static_cast<int>(a.position.y), static_cast<int>(b.position.x), static_cast<int>(b.position.y));
 
 
               auto [intersects, ix, iy] = getIntersection(useA->position.x, useA->position.y, useB->position.x, useB->position.y, a.position.x, a.position.y, b.position.x, b.position.y);
-              SDL_Rect dstrect = {ix, iy, 20, 20};
               if(intersects) {
                 primaryPoints.push_back({ix,iy});
-                secondaryPoints.push_back({ix,0});
+                if(iy < py) {
+                  intersections++;
+                  secondaryPoints.push_back({ix,0});
+                }
+                staticPoints.push_back(b);
               } else {
                 if(a.color.r > 128) {
                   SDL_Vertex vert; 
-                  vert.x = a.position.x;
-                  vert.y = a.position.y;
+                  vert.position.x = a.position.x;
+                  vert.position.y = a.position.y;
                   primaryPoints.push_back(vert);
+                  vert.position.y = 0;
+                  secondaryPoints.push_back(vert);
+                  staticPoints.push_back(b);
                 } else {
-                  SDL_Vertex vert; 
-                  vert.x = b.position.x;
-                  vert.y = b.position.y;
-                  primaryPoints.push_back(vert);
+                  M("Code shouldn't get here");
                 }
               }
-              SDL_RenderCopy(renderer, blackbarTexture, NULL, &dstrect);
             }
             if(c.color.r < 128) {
-              M("Check ac seg A");
+              //M("Check ac seg A");
               //check a-c seg
-              SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-              SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
-              SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-              SDL_RenderDrawLine(renderer, static_cast<int>(a.position.x), static_cast<int>(a.position.y), static_cast<int>(c.position.x), static_cast<int>(c.position.y));
+//              SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
+//              SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
+//              SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
+//              SDL_RenderDrawLine(renderer, static_cast<int>(a.position.x), static_cast<int>(a.position.y), static_cast<int>(c.position.x), static_cast<int>(c.position.y));
 
 
               auto [intersects, ix, iy] = getIntersection(useA->position.x, useA->position.y, useB->position.x, useB->position.y, a.position.x, a.position.y, c.position.x, c.position.y);
-              SDL_Rect dstrect = {ix, iy, 20, 20};
-              if(a.color.r > 128) {
-                SDL_Vertex vert; 
-                vert.x = a.position.x;
-                vert.y = a.position.y;
-                primaryPoints.push_back(vert);
+              if(intersects) {
+                primaryPoints.push_back({ix,iy});
+                if(iy < py) {
+                  intersections++;
+                  secondaryPoints.push_back({ix,0});
+                }
+                staticPoints.push_back(c);
               } else {
-                SDL_Vertex vert; 
-                vert.x = c.position.x;
-                vert.y = c.position.y;
-                primaryPoints.push_back(vert);
+                if(a.color.r > 128) {
+                  SDL_Vertex vert; 
+                  vert.position.x = a.position.x;
+                  vert.position.y = a.position.y;
+                  primaryPoints.push_back(vert);
+                  vert.position.y = 0;
+                  secondaryPoints.push_back(vert);
+                  staticPoints.push_back(c);
+                } else {
+                  M("Code shouldn't get here B");
+                }
               }
-              SDL_RenderCopy(renderer, blackbarTexture, NULL, &dstrect);
             }
           } else {
             if(b.color.r > 128) {
-              M("Check ab seg B");
+              //M("Check ab seg B");
               //check a-b seg
-              SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-              SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
-              SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-              SDL_RenderDrawLine(renderer, static_cast<int>(a.position.x), static_cast<int>(a.position.y), static_cast<int>(b.position.x), static_cast<int>(b.position.y));
+//              SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
+//              SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
+//              SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
+//              SDL_RenderDrawLine(renderer, static_cast<int>(a.position.x), static_cast<int>(a.position.y), static_cast<int>(b.position.x), static_cast<int>(b.position.y));
 
 
               auto [intersects, ix, iy] = getIntersection(useA->position.x, useA->position.y, useB->position.x, useB->position.y, a.position.x, a.position.y, b.position.x, b.position.y);
-              SDL_Rect dstrect = {ix, iy, 20, 20};
               if(intersects) {
                 primaryPoints.push_back({ix,iy});
-                secondaryPoints.push_back({ix,0});
+                if(iy < py) {
+                  intersections++;
+                  secondaryPoints.push_back({ix,0});
+                }
+                staticPoints.push_back(a);
               } else {
                 if(a.color.r > 128) {
-                  primaryPoints.push_back({a.position.x, a.position.y});
+                  M("Code shouldn't get here C");
                 } else {
-                  primaryPoints.push_back({b.position.x, b.position.y});
+                  SDL_Vertex vert; 
+                  vert.position.x = b.position.x;
+                  vert.position.y = b.position.y;
+                  primaryPoints.push_back(vert);
+                  vert.position.y = 0;
+                  secondaryPoints.push_back(vert);
+                  staticPoints.push_back(a);
                 }
               }
-              SDL_RenderCopy(renderer, blackbarTexture, NULL, &dstrect);
-
             }
             if(c.color.r > 128) {
-              M("Check ac seg B");
+              //M("Check ac seg B");
               //check a-c seg
-              SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-              SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
-              SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-              SDL_RenderDrawLine(renderer, static_cast<int>(a.position.x), static_cast<int>(a.position.y), static_cast<int>(c.position.x), static_cast<int>(c.position.y));
+//              SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
+//              SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
+//              SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
+//              SDL_RenderDrawLine(renderer, static_cast<int>(a.position.x), static_cast<int>(a.position.y), static_cast<int>(c.position.x), static_cast<int>(c.position.y));
 
 
               auto [intersects, ix, iy] = getIntersection(useA->position.x, useA->position.y, useB->position.x, useB->position.y, a.position.x, a.position.y, c.position.x, c.position.y);
-              SDL_Rect dstrect = {ix, iy, 20, 20};
               if(intersects) {
                 primaryPoints.push_back({ix,iy});
-                secondaryPoints.push_back({ix,0});
+                if(iy < py) {
+                  intersections++;
+                  secondaryPoints.push_back({ix,0});
+                }
+                staticPoints.push_back(a);
               } else {
                 if(a.color.r > 128) {
-                  primaryPoints.push_back({a.position.x, a.position.y});
+                  M("Code shouldn't get here D");
                 } else {
-                  primaryPoints.push_back({b.position.x, b.position.y});
+                  SDL_Vertex vert; 
+                  vert.position.x = c.position.x;
+                  vert.position.y = c.position.y;
+                  primaryPoints.push_back(vert);
+
+                  vert.position.y = 0;
+                  secondaryPoints.push_back(vert);
+                  staticPoints.push_back(a);
                 }
               }
-              SDL_RenderCopy(renderer, blackbarTexture, NULL, &dstrect);
             }
           }
           if(b.color.r > 128 && c.color.r < 128) {
-            M("Check bc seg");
+            //M("Check bc seg");
             //check b-c seg
-            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-            SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
-            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-            SDL_RenderDrawLine(renderer, static_cast<int>(b.position.x), static_cast<int>(b.position.y), static_cast<int>(c.position.x), static_cast<int>(c.position.y));
+//            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
+//            SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
+//            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
+//            SDL_RenderDrawLine(renderer, static_cast<int>(b.position.x), static_cast<int>(b.position.y), static_cast<int>(c.position.x), static_cast<int>(c.position.y));
 
 
             auto [intersects, ix, iy] = getIntersection(useA->position.x, useA->position.y, useB->position.x, useB->position.y, b.position.x, b.position.y, c.position.x, c.position.y);
-            SDL_Rect dstrect = {ix, iy, 20, 20};
-              if(intersects) {
-                primaryPoints.push_back({ix,iy});
+            if(intersects) {
+              primaryPoints.push_back({ix,iy});
+              if(iy < py) {
+                intersections++;
                 secondaryPoints.push_back({ix,0});
-              } else {
-                if(a.color.r > 128) {
-                  primaryPoints.push_back({a.position.x, a.position.y});
-                } else {
-                  primaryPoints.push_back({b.position.x, b.position.y});
-                }
               }
-            SDL_RenderCopy(renderer, blackbarTexture, NULL, &dstrect);
-    
+              staticPoints.push_back(c);
+            } else {
+              SDL_Vertex vert; 
+              vert.position.x = b.position.x;
+              vert.position.y = b.position.y;
+              primaryPoints.push_back(vert);
+              vert.position.y = 0;
+              secondaryPoints.push_back(vert);
+              staticPoints.push_back(c);
+            }
           } else if (b.color.r < 218 && c.color.r > 128) {
-            M("Check bc seg");
+            //M("Check bc seg");
             //check b-c seg
-            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-            SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
-            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-            SDL_RenderDrawLine(renderer, static_cast<int>(b.position.x), static_cast<int>(b.position.y), static_cast<int>(c.position.x), static_cast<int>(c.position.y));
+//            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
+//            SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
+//            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
+//            SDL_RenderDrawLine(renderer, static_cast<int>(b.position.x), static_cast<int>(b.position.y), static_cast<int>(c.position.x), static_cast<int>(c.position.y));
 
 
             auto [intersects, ix, iy] = getIntersection(useA->position.x, useA->position.y, useB->position.x, useB->position.y, b.position.x, b.position.y, c.position.x, c.position.y);
-            SDL_Rect dstrect = {ix, iy, 20, 20};
-              if(intersects) {
-                primaryPoints.push_back({ix,iy});
+            if(intersects) {
+              primaryPoints.push_back({ix,iy});
+              if(iy < py) {
+                intersections++;
                 secondaryPoints.push_back({ix,0});
-              } else {
-                if(a.color.r > 128) {
-                  primaryPoints.push_back({a.position.x, a.position.y});
-                } else {
-                  primaryPoints.push_back({b.position.x, b.position.y});
-                }
               }
-            SDL_RenderCopy(renderer, blackbarTexture, NULL, &dstrect);
-            
+              staticPoints.push_back(b);
+            } else {
+              SDL_Vertex vert; 
+              vert.position.x = c.position.x;
+              vert.position.y = c.position.y;
+              primaryPoints.push_back(vert);
+              vert.position.y = 0;
+              secondaryPoints.push_back(vert);
+              staticPoints.push_back(b);
+            }
           }
 
-          if(primaryPoints.size() == 2) { //should always be true
-            protagPoint;
-            primaryPoints[0];
-            primaryPoints[1];
+          if(primaryPoints.size() != 2) {E("Error 1 when wall occluding");}
+          if(staticPoints.size() == 0) {E("Error 2 when wall occluding");}
 
-            if(secondaryPoints
+          staticPoints[0].color.r = 0;
+          staticPoints[0].color.g = 0;
+          staticPoints[0].color.b = 0;
+          staticPoints[0].color.a = 255;
+          staticPoints[0].tex_coord.x = 0;
+          staticPoints[0].tex_coord.y = 0;
 
+          staticPoints[1].color.r = 0;
+          staticPoints[1].color.g = 0;
+          staticPoints[1].color.b = 0;
+          staticPoints[1].color.a = 255;
+          staticPoints[1].tex_coord.x = 0;
+          staticPoints[1].tex_coord.y = 0;
+
+          primaryPoints[0].color.r = 0;
+          primaryPoints[0].color.g = 0;
+          primaryPoints[0].color.b = 0;
+          primaryPoints[0].color.a = 255;
+          primaryPoints[0].tex_coord.x = 0;
+          primaryPoints[0].tex_coord.y = 0;
+
+          primaryPoints[1].color.r = 0;
+          primaryPoints[1].color.g = 0;
+          primaryPoints[1].color.b = 0;
+          primaryPoints[1].color.a = 255;
+          primaryPoints[1].tex_coord.x = 0;
+          primaryPoints[1].tex_coord.y = 0;
+
+
+          SDL_Vertex tris[6] = {
+            staticPoints[0], staticPoints[1], primaryPoints[0], 
+            staticPoints[1], primaryPoints[1], primaryPoints[0]
+          };
+//          for(int i = 0; i < 6; i++) {
+//            SDL_Rect dstrect = {tris[i].position.x-4, tris[i].position.y-4, 8, 8};
+//            SDL_RenderCopy(renderer, nodeDebug, NULL, &dstrect);
+//          }
+
+          SDL_RenderGeometry(renderer, blackbarTexture, tris, 6, nullptr, 0);
+
+          // Draw two triangles to form a four-sided shape
+          if( (primaryPoints[0].position.y < py || primaryPoints[1].position.y < py ) && intersections > 0) {
+            if(secondaryPoints.size() > 0) {
+              secondaryPoints[0].color.r = 0;
+              secondaryPoints[0].color.g = 0;
+              secondaryPoints[0].color.b = 0;
+              secondaryPoints[0].color.a = 255;
+              secondaryPoints[0].tex_coord.x = 0;
+              secondaryPoints[0].tex_coord.y = 0;
+              SDL_Vertex quadTriangles[3] = {
+                primaryPoints[0], primaryPoints[1], secondaryPoints[0], 
+              };
+              SDL_RenderGeometry(renderer, blackbarTexture, quadTriangles, 3, nullptr, 0);
+              if(secondaryPoints.size() > 1) {
+                secondaryPoints[1].color.r = 0;
+                secondaryPoints[1].color.g = 0;
+                secondaryPoints[1].color.b = 0;
+                secondaryPoints[1].color.a = 255;
+                secondaryPoints[1].tex_coord.x = 0;
+                secondaryPoints[1].tex_coord.y = 0;
+                SDL_Vertex quadTriangles[3] = {
+                  primaryPoints[1], secondaryPoints[0], secondaryPoints[1]
+                };
+                SDL_RenderGeometry(renderer, blackbarTexture, quadTriangles, 3, nullptr, 0);
+              }
+            }
           } else {
-            E("Error drawing occluder over wall");
+            //in the case where the player is close to a very long wall, it's possible that the two primary points hit nothing
+            //and are very far away from the protagonist, yet since the wall is so long and the player is so close, the foursider-shape
+            //formed by the static points and the primary points doesn't draw over the rest of the screen
+            //in that case, use an extention point far from the player in the direction normal to the wall
+            staticPoints[0].position.x;
+            staticPoints[1].position.x;
           }
+
+
         }
       }
 
@@ -4020,6 +4132,7 @@ int WinMain()
   g_gradient_j = loadTexture(renderer, "resources/engine/fade-j.qoi");
 
   blackbarTexture = loadTexture(renderer, "resources/engine/black-diffuse.qoi");
+  //blackbarTexture  = loadTexture(renderer, "resources/engine/grass-select.qoi");
   spotlightTexture = loadTexture(renderer, "resources/engine/spotlight.qoi");
 
 

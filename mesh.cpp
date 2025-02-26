@@ -106,7 +106,7 @@ array<float, 3> calculateNormal(const vertex3d& v0, const vertex3d& v1, const ve
 }
 
 // Function to calculate the vertex colors based on the light direction
-void setVertexColors(vector<vertex3d>& vertices, const vector<face>& faces, const array<float, 3>& lightDir) {
+void setVertexColors(vector<vertex3d>& vertices, const vector<face>& faces, const array<float, 3>& lightDir, meshtype mtype) {
     // Initialize vertex normals and counts
     for (auto& vertex : vertices) {
         vertex.normal = {0.0f, 0.0f, 0.0f};
@@ -133,7 +133,14 @@ void setVertexColors(vector<vertex3d>& vertices, const vector<face>& faces, cons
         float dotProduct = max(0.0f, vertex.normal[0] * lightDir[0] + vertex.normal[1] * lightDir[1] + vertex.normal[2] * lightDir[2]);
         //dotProduct = 0.2 + 0.8*dotProduct;
         Uint8 intensity = static_cast<Uint8>(255 * dotProduct);
-        vertex.color = {intensity, intensity, intensity, 255};
+        if(mtype == meshtype::V_WALL) {
+          //don't change red channel
+          vertex.color.g = intensity;
+          vertex.color.b = intensity;
+          vertex.color.a = 255;
+        } else {
+          vertex.color = {intensity, intensity, intensity, 255};
+        }
     }
 }
 
@@ -247,8 +254,12 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
             fmtype == meshtype::FLOOR
             ) {
           const array<float, 3> lightDir = {0, -0.4472, -0.8944};
-          setVertexColors(vertices, faces, lightDir);
+          setVertexColors(vertices, faces, lightDir, fmtype);
+        } else if(fmtype == meshtype::V_WALL) {
+          const array<float, 3> lightDir = {0, -0.707, -0.707};
+          setVertexColors(vertices, faces, lightDir, fmtype);
         }
+        
 
         // Transform 3D coordinates to 2D and set up SDL_Vertex array
         result->numVertices = faces.size() * 3;
