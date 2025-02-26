@@ -30,7 +30,10 @@
 
 using namespace std;
 
+
 void resetTrivialData();
+
+SDL_Point findG(SDL_Point A, SDL_Point B, SDL_Point P, double dist);
 
 std::tuple<bool, float, float> getIntersection(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2);
 

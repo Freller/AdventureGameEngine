@@ -2708,8 +2708,8 @@ for(auto &x : g_meshVWalls) {
 
           //make the bottom loop of the wall have 0 red
           //color wall teal at bottom
-          //bottom of wall red
-          //make wall red
+          //bottom of wall teal
+          //make wall red teal
           //what color for wall
           //only check if we can find two teal verts
           SDL_Vertex d = w->vertex[j];
@@ -2727,8 +2727,9 @@ for(auto &x : g_meshVWalls) {
           SDL_Vertex* useA = nullptr;
           SDL_Vertex* useB = nullptr;
 
-          //int px = protag->getOriginX() - g_camera.x;
-          int py = protag->getOriginY() - g_camera.y;
+          int px = protag->getOriginX() - g_camera.x;
+          int py = protag->getOriginY() - g_camera.y - (protag->z *XtoZ);
+
 
           if(d.color.r < 128) {
             if( e.color.r < 128) {
@@ -3012,8 +3013,36 @@ for(auto &x : g_meshVWalls) {
             //and are very far away from the protagonist, yet since the wall is so long and the player is so close, the foursider-shape
             //formed by the static points and the primary points doesn't draw over the rest of the screen
             //in that case, use an extention point far from the player in the direction normal to the wall
-            staticPoints[0].position.x;
-            staticPoints[1].position.x;
+
+            SDL_Point a;
+            a.x = primaryPoints[0].position.x;
+            a.y = primaryPoints[0].position.y;
+
+            SDL_Point b;
+            b.x = primaryPoints[1].position.x;
+            b.y = primaryPoints[1].position.y;
+
+
+            SDL_Point res = findG(a, b, {px, py}, WIN_WIDTH);
+            //SDL_Rect dr = {res.x-3, res.y-3, 6, 6};
+            //SDL_RenderCopy(renderer, nodeDebug, NULL, &dr);
+//            D(res.x);
+//            D(res.y);
+            
+  
+
+            SDL_Vertex ext;
+            ext.position.x = res.x;
+            ext.position.y = res.y;
+            ext.color.r = 255;
+            ext.color.g = 255;
+            ext.color.b = 255;
+            ext.color.a = 255;
+
+            SDL_Vertex tris[3] = {
+              primaryPoints[0], primaryPoints[1], ext
+            };
+            //SDL_RenderGeometry(renderer, nodeDebug, tris, 3, nullptr, 0);
           }
 
 
