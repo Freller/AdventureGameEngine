@@ -50,36 +50,6 @@ void resetTrivialData() {
 
 }
 
-// Function to find the perpendicular distance from point P to line AB
-double distancePointToLine(SDL_Point A, SDL_Point B, SDL_Point P) {
-    double num = std::abs((B.y - A.y) * P.x - (B.x - A.x) * P.y + B.x * A.y - B.y * A.x);
-    double den = std::sqrt((B.y - A.y) * (B.y - A.y) + (B.x - A.x) * (B.x - A.x));
-    return num / den;
-}
-
-// Function to find point G
-SDL_Point findG(SDL_Point A, SDL_Point B, SDL_Point P, double dist) {
-    // Compute the direction vector of the perpendicular line
-    double dx = B.y - A.y;
-    double dy = A.x - B.x;
-    
-    // Normalize direction vector
-    double length = std::sqrt(dx * dx + dy * dy);
-    if (length == 0) return A; // Prevent division by zero
-    dx /= length;
-    dy /= length;
-    
-    // Find foot of the perpendicular (H)
-    double t = ((P.x - A.x) * (B.x - A.x) + (P.y - A.y) * (B.y - A.y)) /
-               ((B.x - A.x) * (B.x - A.x) + (B.y - A.y) * (B.y - A.y));
-    SDL_Point H = {static_cast<int>(A.x + t * (B.x - A.x)), static_cast<int>(A.y + t * (B.y - A.y))};
-    
-    // Find point G at the given distance from P along the perpendicular direction
-    SDL_Point G = {static_cast<int>(H.x + dist * dx), static_cast<int>(H.y + dist * dy)};
-    
-    return G;
-}
-
 std::tuple<bool, float, float> getIntersection(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2) {
     // Helper function to determine the orientation of ordered triplet (px, py), (qx, qy), (rx, ry)
     auto orientation = [](float px, float py, float qx, float qy, float rx, float ry) -> int {

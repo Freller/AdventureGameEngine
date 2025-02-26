@@ -2667,7 +2667,9 @@ for(auto &x : g_meshFloors) {
       }
   
   
-      SDL_RenderGeometry(renderer, NULL, v, o->numVertices, NULL, 0);
+      //we might still need this
+      //uncomment later if in dout
+      //SDL_RenderGeometry(renderer, NULL, v, o->numVertices, NULL, 0);
   }
 //  SDL_SetRenderTarget(renderer, nullptr);
 //  SDL_SetRenderDrawColor(renderer, 0,0,0,255);
@@ -3014,37 +3016,47 @@ for(auto &x : g_meshVWalls) {
             //formed by the static points and the primary points doesn't draw over the rest of the screen
             //in that case, use an extention point far from the player in the direction normal to the wall
 
-            SDL_Point a;
-            a.x = primaryPoints[0].position.x;
-            a.y = primaryPoints[0].position.y;
-
-            SDL_Point b;
-            b.x = primaryPoints[1].position.x;
-            b.y = primaryPoints[1].position.y;
-
-
-            SDL_Point res = findG(a, b, {px, py}, WIN_WIDTH);
-            //SDL_Rect dr = {res.x-3, res.y-3, 6, 6};
-            //SDL_RenderCopy(renderer, nodeDebug, NULL, &dr);
-//            D(res.x);
-//            D(res.y);
-            
-  
-
-            SDL_Vertex ext;
-            ext.position.x = res.x;
-            ext.position.y = res.y;
-            ext.color.r = 255;
-            ext.color.g = 255;
-            ext.color.b = 255;
-            ext.color.a = 255;
-
-            SDL_Vertex tris[3] = {
-              primaryPoints[0], primaryPoints[1], ext
-            };
-            //SDL_RenderGeometry(renderer, nodeDebug, tris, 3, nullptr, 0);
-          }
-
+              float dist = WIN_WIDTH/2;
+          
+              // Extract A and B
+              float ax = primaryPoints[0].position.x;
+              float ay = primaryPoints[0].position.y;
+              float bx = primaryPoints[1].position.x;
+              float by = primaryPoints[1].position.y;
+          
+              // Compute direction vector AB
+              float dx = bx - ax;
+              float dy = by - ay;
+          
+              // Compute perpendicular vector (normalized)
+              float length = std::sqrt(dx * dx + dy * dy);
+              float perpX = -dy / length;
+              float perpY = dx / length;
+          
+              // Determine the correct perpendicular direction
+              float midX = (ax + bx) / 2;
+              float midY = (ay + by) / 2;
+              float toPlayerX = px - midX;
+              float toPlayerY = py - midY;
+          
+              // Flip perpendicular vector if pointing towards the player
+              if (toPlayerX * perpX + toPlayerY * perpY > 0) {
+                  perpX = -perpX;
+                  perpY = -perpY;
+              }
+          
+              // Compute points C and D
+              SDL_Vertex c = {{ax + perpX * dist, ay + perpY * dist}, {0, 0, 0, 255}, {0, 0}};
+              SDL_Vertex d = {{bx + perpX * dist, by + perpY * dist}, {0, 0, 0, 255}, {0, 0}};
+    
+                SDL_Vertex tris[6] = {
+                  primaryPoints[0], primaryPoints[1], c,
+                  c, d, primaryPoints[1]
+                   
+                };
+                SDL_RenderGeometry(renderer, blackbarTexture, tris, 6, nullptr, 0);
+              }
+    
 
         }
       }
