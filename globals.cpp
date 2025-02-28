@@ -150,6 +150,10 @@ vector<mesh*> g_meshOccluders;
 
 vector<mesh*> g_meshDecorative;
 
+vector<pair<SDL_Vertex, SDL_Vertex>> g_wEdges;
+
+vector<pair<SDL_Vertex, SDL_Vertex>> g_oEdges;
+
 SDL_Texture* g_occluderTarget;
 float g_occluderResolutionRatio = 1;
 

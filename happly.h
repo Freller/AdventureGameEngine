@@ -1464,6 +1464,19 @@ public:
     return result;
   }
 
+  std::vector<std::array<int, 2>> getEdges(const std::string& edgeElementName = "edge") {
+    std::vector<int> v1 = getElement(edgeElementName).getProperty<int>("vertex1");
+    std::vector<int> v2 = getElement(edgeElementName).getProperty<int>("vertex2");
+
+    std::vector<std::array<int, 2>> result(v1.size());
+    for (size_t i = 0; i < result.size(); i++) {
+      result[i][0] = v1[i];
+      result[i][1] = v2[i];
+    }
+
+    return result;
+  }
+
   std::vector<std::array<double, 2>> getVertexUVs(const std::string& vertexElementName = "vertex") {
 
     std::vector<double> uPos = getElement(vertexElementName).getProperty<double>("s");
@@ -1536,7 +1549,6 @@ public:
     }
     throw std::runtime_error("PLY parser: could not find face vertex indices attribute under any common name.");
   }
-
 
   /**
    * @brief Common-case helper set mesh vertex positons. Creates vertex element, if necessary.

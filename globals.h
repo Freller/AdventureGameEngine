@@ -308,6 +308,10 @@ extern vector<mesh*> g_meshOccluders;
 
 extern vector<mesh*> g_meshDecorative;
 
+extern vector<pair<SDL_Vertex, SDL_Vertex>> g_wEdges;
+
+extern vector<pair<SDL_Vertex, SDL_Vertex>> g_oEdges;
+
 extern SDL_Texture* g_occluderTarget;
 extern float g_occluderResolutionRatio;
 

@@ -39,6 +39,8 @@ std::tuple<bool, float, float> getIntersection(float startX, float startY, float
 
 bool isSegmentIntersecting(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2);
 
+void updateEdges(std::vector<std::pair<SDL_Vertex, SDL_Vertex>>& sourceEdges, std::vector<std::pair<SDL_Vertex, SDL_Vertex>>& targetEdges);
+
 bool isOccluderBetween(float startX, float startY, float endX, float endY);
 
 void cyclePalette(SDL_Surface* source, SDL_Surface* destination, std::vector<Uint32>& palette);

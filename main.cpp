@@ -4,6 +4,7 @@
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_mixer.h>
+#include <SDL2/SDL_gpu.h>
 #include <stdlib.h>
 #include <chrono>
 #include <thread>
@@ -2627,55 +2628,86 @@ for(auto &x : g_meshFloors) {
 }
 
 
-{
-  //the render target will break the effect and it's additional overhead so w/e
-//  SDL_SetRenderTarget(renderer, g_occluderTarget);
-//  SDL_SetRenderDrawColor(renderer, 255,255,255,255);
-//  SDL_RenderClear(renderer);
-  for (auto &o : g_meshOccluders) {
-      SDL_Vertex v[o->numVertices];
-      o->oGeo.clear();
-      for (int i = 0; i < o->numVertices; i++) {
-          v[i] = o->vertex[i];
-          v[i].position.x += o->origin.x;
-          v[i].position.y += o->origin.y;
-  
-          // (v[i].position.x, v[i].position.y, v[i].tex_coord.y)
-          // is the position in the world
-  
-          // an occluder should have the "top" vertices of the belt have its first x texture coord less than 0.5
-          if (v[i].color.r > 128) {
-              // move this point to the edge of the screen
-              SDL_FPoint intersection = calculateIntersection(protag->getOriginX(), protag->getOriginY(), protag->z, v[i].position.x, v[i].position.y, v[i].tex_coord.y);
-              //D(v[i].position.y);
-              v[i].position.x = intersection.x;
-              v[i].position.y = intersection.y;
-              v[i].position.y -= v[i].tex_coord.y * XtoZ;
-          }  
-          //now use coordinates for rendering
-          v[i].position.x += -g_camera.x;
-          v[i].position.y += -g_camera.y;
-          o->oGeo.push_back(v[i]);
-          //o->oGeo[o->oGeo.size()-1].color.r = 120;
 
-          v[i].color.r = 0;
-          v[i].color.g = 0;
-          v[i].color.b = 0;
-  
-//          v[i].position.x *= g_occluderResolutionRatio;
-//          v[i].position.y *= g_occluderResolutionRatio;
-      }
-  
-  
-      //we might still need this
-      //uncomment later if in dout
-      //SDL_RenderGeometry(renderer, NULL, v, o->numVertices, NULL, 0);
-  }
-//  SDL_SetRenderTarget(renderer, nullptr);
-//  SDL_SetRenderDrawColor(renderer, 0,0,0,255);
-//  SDL_RenderCopy(renderer, g_occluderTarget, NULL, NULL);
-  
+vector<pair<SDL_Vertex, SDL_Vertex>> g_wsEdges;
+vector<pair<SDL_Vertex, SDL_Vertex>> g_osEdges;
+{
+  updateEdges(g_wEdges, g_wsEdges);
+  updateEdges(g_oEdges, g_osEdges);
 }
+
+int px = protag->getOriginX() - g_camera.x;
+int py = protag->getOriginY() - g_camera.y;
+
+//use g_wsEdges and g_osEdges to render shadows
+{
+    std::vector<SDL_Vertex> vertices;
+    const float EXTEND_DISTANCE = 2 * WIN_WIDTH;
+
+    for (const auto& edge : g_osEdges) {
+      float dx = edge.first.position.x - px;
+      float dy = edge.first.position.y - py;
+      float len = pow(dx*dx + dy*dy, 0.5);
+      if(len > 0) {
+        float nx = dx/len * WIN_WIDTH;
+        float ny = dy/len * WIN_WIDTH;
+        nx += px;
+        ny += py;
+
+        dx = edge.second.position.x - px;
+        dy = edge.second.position.y - py;
+        len = pow(dx*dx + dy*dy, 0.5);
+        if(len > 0) {
+          float nx2 = dx/len * WIN_WIDTH;
+          float ny2 = dy/len * WIN_WIDTH;
+          nx2 += px;
+          ny2 += py;
+
+          SDL_Vertex newA = {{nx, ny}, {255,255,255,255}, {0,0}};
+          SDL_Vertex newB = {{nx2, ny2}, {255,255,255,255}, {0,0}};
+
+          
+          //push quad back to draw
+          vertices.push_back(edge.first);
+          vertices.push_back(edge.second);
+          vertices.push_back(newA);
+          
+          vertices.push_back(newB);
+          vertices.push_back(edge.second);
+          vertices.push_back(newA);
+
+          
+          // Calculate the perpendicular direction
+          float pdx = ny2 - ny;
+          float pdy = nx - nx2;
+          len = pow(pdx*pdx + pdy*pdy, 0.5);
+          pdx = pdx / len * WIN_WIDTH;
+          pdy = pdy / len * WIN_WIDTH;
+
+          // Check which side of the line px, py is on and flip if needed
+          float side = (px - nx) * (ny2 - ny) - (py - ny) * (nx2 - nx);
+          if (side > 0) {
+            pdx = -pdx;
+            pdy = -pdy;
+          }
+          
+          SDL_Vertex newC = {{nx + pdx, ny + pdy}, {255,255,255,255}, {0,0}};
+          SDL_Vertex newD = {{nx2 + pdx, ny2 + pdy}, {255,255,255,255}, {0,0}};
+
+          vertices.push_back(newA);
+          vertices.push_back(newB);
+          vertices.push_back(newC);
+          
+          vertices.push_back(newD);
+          vertices.push_back(newB);
+          vertices.push_back(newC);
+        }
+      }
+    }
+
+    SDL_RenderGeometry(renderer, blackbarTexture, vertices.data(), vertices.size(), nullptr, 0);
+}
+
 
 //visual walls
 for(auto &x : g_meshVWalls) {
@@ -2700,369 +2732,106 @@ for(auto &x : g_meshVWalls) {
   }
 }
 
-//render occlude on visual walls
+/*
+g_osEdges is a vector<pair<SDL_Vertex, SDL_Vertex>>. Each pair is a segment of vertices with position.x and position.y in screen coordinates. That segment represents an occluder, which casts a shadow. g_wsEdges is a vector<pair<SDL_Vertex, SDL_Vertex>>. Each pair is a segment of vertices with position.x and position.y in screen coordinates. That segment represents an wall, which catches a shadow. Let's walk through drawing a shadow. Say we have a pair from g_osEdges, and we call that pair Opair. Let's call the two vertices of Opair A and B. We will find point A2 from point A and point B2 from B. We'll do this by using std::tuple<bool, float, float> getIntersection(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2) to find an intersection on the segment from A to a point WIN_WIDTH away in the direction of the vector from (px,py) to point A. Do the same to find B2. These are intersections with any element of g_wsEdges There might not be an intersection, and in that case, put A2 and B2 at the end of the raycast, WIN_WIDTH away from A and B, respectively. If there's no intersection, don't push back any triangles to draw, since they won't matter. If both lines intersect a wall segment, prepare to draw the quad A B A2 B2 (B2 or A2 maybe be at the end of the raycast, offscreen in that case). If A's raycast intersected a wall, AND A2's y coordinate is lower than py we need to find the point A3 which is at y=0 and A2's x. That's also true for B's raycast and a point B3. If we found A3 and B3, draw a quad A2 B2 A3 B3. If not, draw the traingle A2 B2 A3 or A2 B2 B3. Good?
+*/
+
+//render occluding on visual walls
 {
-  for(auto o : g_meshOccluders) {
-    for(int i = 0; i < o->oGeo.size(); i+=3) {
+    std::vector<SDL_Vertex> vertices;
 
-      for(auto w : g_meshVWalls) {
-        for(int j = 0; j < w->numVertices; j+= 3) {
+    for (const auto& edge : g_osEdges) {
+        SDL_Vertex A = edge.first;
+        SDL_Vertex B = edge.second;
 
-          //make the bottom loop of the wall have 0 red
-          //color wall teal at bottom
-          //bottom of wall teal
-          //make wall red teal
-          //what color for wall
-          //only check if we can find two teal verts
-          SDL_Vertex d = w->vertex[j];
-          SDL_Vertex e = w->vertex[j+1];
-          SDL_Vertex f = w->vertex[j+2];
-          d.position.x += w->origin.x - g_camera.x;
-          d.position.y += w->origin.y - g_camera.y;
+        float dx = A.position.x - px;
+        float dy = A.position.y - py;
+        float len = sqrt(dx * dx + dy * dy);
 
-          e.position.x += w->origin.x - g_camera.x;
-          e.position.y += w->origin.y - g_camera.y;
+        float Ax2 = A.position.x + dx / len * WIN_WIDTH;
+        float Ay2 = A.position.y + dy / len * WIN_WIDTH;
 
-          f.position.x += w->origin.x - g_camera.x;
-          f.position.y += w->origin.y - g_camera.y;
-
-          SDL_Vertex* useA = nullptr;
-          SDL_Vertex* useB = nullptr;
-
-          int px = protag->getOriginX() - g_camera.x;
-          int py = protag->getOriginY() - g_camera.y - (protag->z *XtoZ);
-
-
-          if(d.color.r < 128) {
-            if( e.color.r < 128) {
-              useA = &d;
-              useB = &e;
-            } else if(f.color.r < 128) {
-              useA = &d;
-              useB = &f;
+        std::tuple<bool, float, float> AIntersect = std::make_tuple(false, Ax2, Ay2);
+        for (const auto& wall : g_wsEdges) {
+            auto [intersects, ix, iy] = getIntersection(A.position.x, A.position.y, Ax2, Ay2, wall.first.position.x, wall.first.position.y, wall.second.position.x, wall.second.position.y);
+            if (intersects && iy <= A.position.y) {
+                AIntersect = std::make_tuple(true, ix, iy);
+                break;
             }
-          } else if (e.color.r < 128) {
-            if( f.color.r < 128) {
-              useA = &e;
-              useB = &f;
-            }
-          }
-          if(useA == nullptr) {continue;}
-
-          vector<SDL_Vertex> primaryPoints; //always 2
-          vector<SDL_Vertex> secondaryPoints; //0-2
-          vector<SDL_Vertex> staticPoints; //1 or 2
-          int intersections = 0;
- 
-          SDL_Vertex a = o->oGeo[i];
-          SDL_Vertex b = o->oGeo[i+1];
-          SDL_Vertex c = o->oGeo[i+2];
-
-          //check R-B lines
-          if(a.color.r > 128) {
-            if(b.color.r < 128) {
-              //M("Check ab seg A");
-              //check a-b seg
-//              SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-//              SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
-//              SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-//              SDL_RenderDrawLine(renderer, static_cast<int>(a.position.x), static_cast<int>(a.position.y), static_cast<int>(b.position.x), static_cast<int>(b.position.y));
-
-
-              auto [intersects, ix, iy] = getIntersection(useA->position.x, useA->position.y, useB->position.x, useB->position.y, a.position.x, a.position.y, b.position.x, b.position.y);
-              if(intersects) {
-                primaryPoints.push_back({ix,iy});
-                if(iy < py) {
-                  intersections++;
-                  secondaryPoints.push_back({ix,0});
-                }
-                staticPoints.push_back(b);
-              } else {
-                if(a.color.r > 128) {
-                  SDL_Vertex vert; 
-                  vert.position.x = a.position.x;
-                  vert.position.y = a.position.y;
-                  primaryPoints.push_back(vert);
-                  vert.position.y = 0;
-                  secondaryPoints.push_back(vert);
-                  staticPoints.push_back(b);
-                } else {
-                  M("Code shouldn't get here");
-                }
-              }
-            }
-            if(c.color.r < 128) {
-              //M("Check ac seg A");
-              //check a-c seg
-//              SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-//              SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
-//              SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-//              SDL_RenderDrawLine(renderer, static_cast<int>(a.position.x), static_cast<int>(a.position.y), static_cast<int>(c.position.x), static_cast<int>(c.position.y));
-
-
-              auto [intersects, ix, iy] = getIntersection(useA->position.x, useA->position.y, useB->position.x, useB->position.y, a.position.x, a.position.y, c.position.x, c.position.y);
-              if(intersects) {
-                primaryPoints.push_back({ix,iy});
-                if(iy < py) {
-                  intersections++;
-                  secondaryPoints.push_back({ix,0});
-                }
-                staticPoints.push_back(c);
-              } else {
-                if(a.color.r > 128) {
-                  SDL_Vertex vert; 
-                  vert.position.x = a.position.x;
-                  vert.position.y = a.position.y;
-                  primaryPoints.push_back(vert);
-                  vert.position.y = 0;
-                  secondaryPoints.push_back(vert);
-                  staticPoints.push_back(c);
-                } else {
-                  M("Code shouldn't get here B");
-                }
-              }
-            }
-          } else {
-            if(b.color.r > 128) {
-              //M("Check ab seg B");
-              //check a-b seg
-//              SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-//              SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
-//              SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-//              SDL_RenderDrawLine(renderer, static_cast<int>(a.position.x), static_cast<int>(a.position.y), static_cast<int>(b.position.x), static_cast<int>(b.position.y));
-
-
-              auto [intersects, ix, iy] = getIntersection(useA->position.x, useA->position.y, useB->position.x, useB->position.y, a.position.x, a.position.y, b.position.x, b.position.y);
-              if(intersects) {
-                primaryPoints.push_back({ix,iy});
-                if(iy < py) {
-                  intersections++;
-                  secondaryPoints.push_back({ix,0});
-                }
-                staticPoints.push_back(a);
-              } else {
-                if(a.color.r > 128) {
-                  M("Code shouldn't get here C");
-                } else {
-                  SDL_Vertex vert; 
-                  vert.position.x = b.position.x;
-                  vert.position.y = b.position.y;
-                  primaryPoints.push_back(vert);
-                  vert.position.y = 0;
-                  secondaryPoints.push_back(vert);
-                  staticPoints.push_back(a);
-                }
-              }
-            }
-            if(c.color.r > 128) {
-              //M("Check ac seg B");
-              //check a-c seg
-//              SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-//              SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
-//              SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-//              SDL_RenderDrawLine(renderer, static_cast<int>(a.position.x), static_cast<int>(a.position.y), static_cast<int>(c.position.x), static_cast<int>(c.position.y));
-
-
-              auto [intersects, ix, iy] = getIntersection(useA->position.x, useA->position.y, useB->position.x, useB->position.y, a.position.x, a.position.y, c.position.x, c.position.y);
-              if(intersects) {
-                primaryPoints.push_back({ix,iy});
-                if(iy < py) {
-                  intersections++;
-                  secondaryPoints.push_back({ix,0});
-                }
-                staticPoints.push_back(a);
-              } else {
-                if(a.color.r > 128) {
-                  M("Code shouldn't get here D");
-                } else {
-                  SDL_Vertex vert; 
-                  vert.position.x = c.position.x;
-                  vert.position.y = c.position.y;
-                  primaryPoints.push_back(vert);
-
-                  vert.position.y = 0;
-                  secondaryPoints.push_back(vert);
-                  staticPoints.push_back(a);
-                }
-              }
-            }
-          }
-          if(b.color.r > 128 && c.color.r < 128) {
-            //M("Check bc seg");
-            //check b-c seg
-//            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-//            SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
-//            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-//            SDL_RenderDrawLine(renderer, static_cast<int>(b.position.x), static_cast<int>(b.position.y), static_cast<int>(c.position.x), static_cast<int>(c.position.y));
-
-
-            auto [intersects, ix, iy] = getIntersection(useA->position.x, useA->position.y, useB->position.x, useB->position.y, b.position.x, b.position.y, c.position.x, c.position.y);
-            if(intersects) {
-              primaryPoints.push_back({ix,iy});
-              if(iy < py) {
-                intersections++;
-                secondaryPoints.push_back({ix,0});
-              }
-              staticPoints.push_back(c);
-            } else {
-              SDL_Vertex vert; 
-              vert.position.x = b.position.x;
-              vert.position.y = b.position.y;
-              primaryPoints.push_back(vert);
-              vert.position.y = 0;
-              secondaryPoints.push_back(vert);
-              staticPoints.push_back(c);
-            }
-          } else if (b.color.r < 218 && c.color.r > 128) {
-            //M("Check bc seg");
-            //check b-c seg
-//            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-//            SDL_RenderDrawLine(renderer, static_cast<int>(useA->position.x), static_cast<int>(useA->position.y), static_cast<int>(useB->position.x), static_cast<int>(useB->position.y));
-//            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-//            SDL_RenderDrawLine(renderer, static_cast<int>(b.position.x), static_cast<int>(b.position.y), static_cast<int>(c.position.x), static_cast<int>(c.position.y));
-
-
-            auto [intersects, ix, iy] = getIntersection(useA->position.x, useA->position.y, useB->position.x, useB->position.y, b.position.x, b.position.y, c.position.x, c.position.y);
-            if(intersects) {
-              primaryPoints.push_back({ix,iy});
-              if(iy < py) {
-                intersections++;
-                secondaryPoints.push_back({ix,0});
-              }
-              staticPoints.push_back(b);
-            } else {
-              SDL_Vertex vert; 
-              vert.position.x = c.position.x;
-              vert.position.y = c.position.y;
-              primaryPoints.push_back(vert);
-              vert.position.y = 0;
-              secondaryPoints.push_back(vert);
-              staticPoints.push_back(b);
-            }
-          }
-
-          if(primaryPoints.size() != 2) {E("Error 1 when wall occluding");}
-          if(staticPoints.size() == 0) {E("Error 2 when wall occluding");}
-
-          staticPoints[0].color.r = 0;
-          staticPoints[0].color.g = 0;
-          staticPoints[0].color.b = 0;
-          staticPoints[0].color.a = 255;
-          staticPoints[0].tex_coord.x = 0;
-          staticPoints[0].tex_coord.y = 0;
-
-          staticPoints[1].color.r = 0;
-          staticPoints[1].color.g = 0;
-          staticPoints[1].color.b = 0;
-          staticPoints[1].color.a = 255;
-          staticPoints[1].tex_coord.x = 0;
-          staticPoints[1].tex_coord.y = 0;
-
-          primaryPoints[0].color.r = 0;
-          primaryPoints[0].color.g = 0;
-          primaryPoints[0].color.b = 0;
-          primaryPoints[0].color.a = 255;
-          primaryPoints[0].tex_coord.x = 0;
-          primaryPoints[0].tex_coord.y = 0;
-
-          primaryPoints[1].color.r = 0;
-          primaryPoints[1].color.g = 0;
-          primaryPoints[1].color.b = 0;
-          primaryPoints[1].color.a = 255;
-          primaryPoints[1].tex_coord.x = 0;
-          primaryPoints[1].tex_coord.y = 0;
-
-
-          SDL_Vertex tris[6] = {
-            staticPoints[0], staticPoints[1], primaryPoints[0], 
-            staticPoints[1], primaryPoints[1], primaryPoints[0]
-          };
-//          for(int i = 0; i < 6; i++) {
-//            SDL_Rect dstrect = {tris[i].position.x-4, tris[i].position.y-4, 8, 8};
-//            SDL_RenderCopy(renderer, nodeDebug, NULL, &dstrect);
-//          }
-
-          SDL_RenderGeometry(renderer, blackbarTexture, tris, 6, nullptr, 0);
-
-          // Draw two triangles to form a four-sided shape
-          if( (primaryPoints[0].position.y < py || primaryPoints[1].position.y < py ) && intersections > 0) {
-            if(secondaryPoints.size() > 0) {
-              secondaryPoints[0].color.r = 0;
-              secondaryPoints[0].color.g = 0;
-              secondaryPoints[0].color.b = 0;
-              secondaryPoints[0].color.a = 255;
-              secondaryPoints[0].tex_coord.x = 0;
-              secondaryPoints[0].tex_coord.y = 0;
-              SDL_Vertex quadTriangles[3] = {
-                primaryPoints[0], primaryPoints[1], secondaryPoints[0], 
-              };
-              SDL_RenderGeometry(renderer, blackbarTexture, quadTriangles, 3, nullptr, 0);
-              if(secondaryPoints.size() > 1) {
-                secondaryPoints[1].color.r = 0;
-                secondaryPoints[1].color.g = 0;
-                secondaryPoints[1].color.b = 0;
-                secondaryPoints[1].color.a = 255;
-                secondaryPoints[1].tex_coord.x = 0;
-                secondaryPoints[1].tex_coord.y = 0;
-                SDL_Vertex quadTriangles[3] = {
-                  primaryPoints[1], secondaryPoints[0], secondaryPoints[1]
-                };
-                SDL_RenderGeometry(renderer, blackbarTexture, quadTriangles, 3, nullptr, 0);
-              }
-            }
-          } else {
-            //in the case where the player is close to a very long wall, it's possible that the two primary points hit nothing
-            //and are very far away from the protagonist, yet since the wall is so long and the player is so close, the foursider-shape
-            //formed by the static points and the primary points doesn't draw over the rest of the screen
-            //in that case, use an extention point far from the player in the direction normal to the wall
-
-              float dist = WIN_WIDTH/2;
-          
-              // Extract A and B
-              float ax = primaryPoints[0].position.x;
-              float ay = primaryPoints[0].position.y;
-              float bx = primaryPoints[1].position.x;
-              float by = primaryPoints[1].position.y;
-          
-              // Compute direction vector AB
-              float dx = bx - ax;
-              float dy = by - ay;
-          
-              // Compute perpendicular vector (normalized)
-              float length = std::sqrt(dx * dx + dy * dy);
-              float perpX = -dy / length;
-              float perpY = dx / length;
-          
-              // Determine the correct perpendicular direction
-              float midX = (ax + bx) / 2;
-              float midY = (ay + by) / 2;
-              float toPlayerX = px - midX;
-              float toPlayerY = py - midY;
-          
-              // Flip perpendicular vector if pointing towards the player
-              if (toPlayerX * perpX + toPlayerY * perpY > 0) {
-                  perpX = -perpX;
-                  perpY = -perpY;
-              }
-          
-              // Compute points C and D
-              SDL_Vertex c = {{ax + perpX * dist, ay + perpY * dist}, {0, 0, 0, 255}, {0, 0}};
-              SDL_Vertex d = {{bx + perpX * dist, by + perpY * dist}, {0, 0, 0, 255}, {0, 0}};
-    
-                SDL_Vertex tris[6] = {
-                  primaryPoints[0], primaryPoints[1], c,
-                  c, d, primaryPoints[1]
-                   
-                };
-                SDL_RenderGeometry(renderer, blackbarTexture, tris, 6, nullptr, 0);
-              }
-    
-
         }
-      }
+        
+        // Repeat for B
+        dx = B.position.x - px;
+        dy = B.position.y - py;
+        len = sqrt(dx * dx + dy * dy);
 
+        float Bx2 = B.position.x + dx / len * WIN_WIDTH;
+        float By2 = B.position.y + dy / len * WIN_WIDTH;
+
+        std::tuple<bool, float, float> BIntersect = std::make_tuple(false, Bx2, By2);
+        for (const auto& wall : g_wsEdges) {
+            auto [intersects, ix, iy] = getIntersection(B.position.x, B.position.y, Bx2, By2, wall.first.position.x, wall.first.position.y, wall.second.position.x, wall.second.position.y);
+            if (intersects && iy <= B.position.y) {
+                BIntersect = std::make_tuple(true, ix, iy);
+                break;
+            }
+        }
+
+        auto [AIntersects, Ax3, Ay3] = AIntersect;
+        auto [BIntersects, Bx3, By3] = BIntersect;
+
+        SDL_Vertex A2 = {{Ax3, Ay3}, {255, 255, 255, 255}, {0, 0}};
+        SDL_Vertex B2 = {{Bx3, By3}, {255, 255, 255, 255}, {0, 0}};
+
+        // Handle case where there's no intersection
+        if (!AIntersects) {
+            A2 = {{Ax2, Ay2}, {255, 255, 255, 255}, {0, 0}};
+        }
+        if (!BIntersects) {
+            B2 = {{Bx2, By2}, {255, 255, 255, 255}, {0, 0}};
+        }
+
+        vertices.push_back(A);
+        vertices.push_back(B);
+        vertices.push_back(A2);
+        vertices.push_back(A2);
+        vertices.push_back(B);
+        vertices.push_back(B2);
+
+        // Check for additional intersections with walls at lower y-coordinate
+        if(AIntersects && BIntersects && Ay3 < py && By3 < py) {
+          if (AIntersects && Ay3 < py) {
+              SDL_Vertex A3 = {{Ax3, 0}, {255, 255, 255, 255}, {0, 0}};
+              SDL_Vertex B3 = {{Bx3, 0}, {255, 255, 255, 255}, {0, 0}};
+
+              vertices.push_back(A2);
+              vertices.push_back(A3);
+              vertices.push_back(B2);
+
+              vertices.push_back(B2);
+              vertices.push_back(A3);
+              vertices.push_back(B3);
+          }
+
+        } else {
+  
+          if (AIntersects && Ay3 < py) {
+              SDL_Vertex A3 = {{Ax3, 0}, {255, 255, 255, 255}, {0, 0}};
+              vertices.push_back(A2);
+              vertices.push_back(A3);
+              vertices.push_back(B2);
+          }
+  
+          if (BIntersects && By3 < py) {
+              SDL_Vertex B3 = {{Bx3, 0}, {255, 255, 255, 255}, {0, 0}};
+              vertices.push_back(B2);
+              vertices.push_back(A2);
+              vertices.push_back(B3);
+          }
+        }
     }
-  }
+
+    SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
 }
 
 
@@ -3088,16 +2857,6 @@ for (long long unsigned int i = 0; i < g_actors.size(); i++)
 {
   g_actors[i]->render(renderer, g_camera);
 }
-
-for (long long unsigned int i = 0; i < g_tiles.size(); i++)
-{
-  if (g_tiles[i]->z == 2)
-  {
-    g_tiles[i]->render(renderer, g_camera);
-  }
-}
-B("After tiles");
-
 
 //render black bars
 if(!devMode) {
@@ -4232,15 +3991,16 @@ int WinMain()
   transition = 1;
 
 
-  mesh* m = loadMeshFromPly("test/tunnel", {99279, 99455,0}, 100, meshtype::FLOOR);
-  m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
+//  mesh* m = loadMeshFromPly("stest/tunnel", {99279, 99455,0}, 100, meshtype::FLOOR);
+//  m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
+ 
+  mesh* vw = loadMeshFromPly("stest/wall", {99279, 99455,0}, 100, meshtype::V_WALL);
+  mesh* bw = loadMeshFromPly("stest/wall", {99379, 99855,0}, 100, meshtype::V_WALL);
+  //vw->texture = m->texture;
 
-  mesh* vw = loadMeshFromPly("test/wall", {99279, 99455,0}, 100, meshtype::V_WALL);
-  vw->texture = m->texture;
-
-  mesh* w = loadMeshFromPly("test/stage-collision", {99279, 99455,0}, 100, meshtype::COLLISION);
-
-  mesh* o = loadMeshFromPly("test/stage-occluder", {99279, 99455,0}, 100, meshtype::OCCLUDER);
+//  mesh* c = loadMeshFromPly("stest/stage-collision", {99279, 99455,0}, 100, meshtype::COLLISION);
+//
+  mesh* o = loadMeshFromPly("stest/stage-occluder", {99279, 99455,0}, 100, meshtype::OCCLUDER);
 
 
   while (!quit)

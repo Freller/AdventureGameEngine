@@ -234,7 +234,10 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
 
 
         // Get face data
-        vector<vector<size_t>> faceIndices = plyIn.getFaceIndices<size_t>();
+        vector<vector<size_t>> faceIndices;
+        if(fmtype != meshtype::OCCLUDER) { //occluders have edges and no faces
+          faceIndices = plyIn.getFaceIndices<size_t>();
+        }
 
         // Convert to face objects
         for (const auto& f : faceIndices) {
@@ -259,6 +262,7 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
           const array<float, 3> lightDir = {0, -0.707, -0.707};
           setVertexColors(vertices, faces, lightDir, fmtype);
         }
+
         
 
         // Transform 3D coordinates to 2D and set up SDL_Vertex array
@@ -273,13 +277,8 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 result->vertex[index].position.x = ((-v.x) * scale);
                 result->vertex[index].position.y = ((v.y * scale)) * XtoY;
                 float dist = Distance(result->vertex[index].position.x, result->vertex[index].position.y * XtoY, 0, 0);
-                if(fmtype != meshtype::OCCLUDER || v.color.r < 128) {
-                  result->vertex[index].position.y -= ((v.z * scale)) * XtoZ;
-                  result->vertex[index].tex_coord.y = v.v;
-                } else {
-                  result->vertex[index].tex_coord.y = v.z * scale;
-                  result->vertex[index].position.y = v.y * scale * XtoY;
-                }
+                result->vertex[index].position.y -= ((v.z * scale)) * XtoZ;
+                result->vertex[index].tex_coord.y = v.v;
                 result->vertex[index].color = v.color;
                 result->vertex[index].tex_coord.x = v.u;
                 result->vertexExtraData[index].first = v.lu;
@@ -288,6 +287,7 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 result->vertex[index].color.g = v.color.g;
                 result->vertex[index].color.b = v.color.b;
 
+
                 if(dist > maxDistanceFromOrigin) {
                     maxDistanceFromOrigin = dist;
                 }
@@ -295,10 +295,128 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 ++index;
             };
 
+            int fail = 0;
+
+            if( fmtype == meshtype::V_WALL) {
+              if(vertices[f.a].color.r < 128 && vertices[f.b].color.r < 128) {
+                vertex3d first = vertices[f.a];
+                vertex3d second = vertices[f.b];
+                SDL_Vertex A;
+                
+                A.position.x = ((-first.x) * scale);
+                A.position.y = ((first.y * scale)) * XtoY - ((first.z * scale)) * XtoZ;
+    
+                SDL_Vertex B;
+    
+                B.position.x = ((-second.x) * scale);
+                B.position.y = ((second.y * scale)) * XtoY - ((second.z * scale)) * XtoZ;
+
+                A.position.x += forigin.x;
+                A.position.y += forigin.y;
+                B.position.x += forigin.x;
+                B.position.y += forigin.y;
+
+                pair<SDL_Vertex, SDL_Vertex> myPair;
+                myPair.first = A;
+                myPair.second = B;
+                g_wEdges.emplace_back(myPair);
+                fail++;
+              }
+
+              if(vertices[f.a].color.r < 128 && vertices[f.c].color.r < 128) {
+                if(fail) {E("Bad V_WALL, make sure only the bottom verts have 0 red"); abort();}
+                vertex3d first = vertices[f.a];
+                vertex3d second = vertices[f.c];
+                SDL_Vertex A;
+                
+                A.position.x = ((-first.x) * scale);
+                A.position.y = ((first.y * scale)) * XtoY - ((first.z * scale)) * XtoZ;
+    
+                SDL_Vertex B;
+    
+                B.position.x = ((-second.x) * scale);
+                B.position.y = ((second.y * scale)) * XtoY - ((second.z * scale)) * XtoZ;
+
+                A.position.x += forigin.x;
+                A.position.y += forigin.y;
+                B.position.x += forigin.x;
+                B.position.y += forigin.y;
+
+                pair<SDL_Vertex, SDL_Vertex> myPair;
+                myPair.first = A;
+                myPair.second = B;
+                g_wEdges.emplace_back(myPair);
+                fail++;
+              }
+
+              if(vertices[f.c].color.r < 128 && vertices[f.b].color.r < 128) {
+                if(fail) {E("Bad V_WALL, make sure only the bottom verts have 0 red"); abort();}
+                vertex3d first = vertices[f.c];
+                vertex3d second = vertices[f.b];
+                SDL_Vertex A;
+                
+                A.position.x = ((-first.x) * scale);
+                A.position.y = ((first.y * scale)) * XtoY - ((first.z * scale)) * XtoZ;
+    
+                SDL_Vertex B;
+    
+                B.position.x = ((-second.x) * scale);
+                B.position.y = ((second.y * scale)) * XtoY - ((second.z * scale)) * XtoZ;
+
+                A.position.x += forigin.x;
+                A.position.y += forigin.y;
+                B.position.x += forigin.x;
+                B.position.y += forigin.y;
+
+                pair<SDL_Vertex, SDL_Vertex> myPair;
+                myPair.first = A;
+                myPair.second = B;
+                g_wEdges.emplace_back(myPair);
+              }
+            }
+
             convertVertex(vertices[f.a]);
             convertVertex(vertices[f.b]);
             convertVertex(vertices[f.c]);
         }
+
+        if(fmtype == meshtype::OCCLUDER) {
+          vector<array<int, 2>> edgeData = plyIn.getEdges();
+          for(array<int,2> n : edgeData) {
+            vertex3d first = vertices[n[0]];
+            vertex3d second = vertices[n[1]];
+
+            SDL_Vertex A;
+            
+            A.position.x = ((-first.x) * scale);
+            A.position.y = ((first.y * scale)) * XtoY - ((first.z * scale)) * XtoZ;
+            A.position.x += forigin.x;
+            A.position.y += forigin.y;
+            A.color.r = 255;
+            A.color.g = 255;
+            A.color.b = 255;
+            A.color.a = 255;
+
+            SDL_Vertex B;
+
+            B.position.x = ((-second.x) * scale);
+            B.position.y = ((second.y * scale)) * XtoY - ((second.z * scale)) * XtoZ;
+
+            B.position.x += forigin.x;
+            B.position.y += forigin.y;
+            B.color.r = 255;
+            B.color.g = 255;
+            B.color.b = 255;
+            B.color.a = 255;
+
+            pair<SDL_Vertex, SDL_Vertex> myPair;
+            myPair.first = A;
+            myPair.second = B;
+            g_oEdges.emplace_back(myPair);
+          }
+        }
+
+
 
         result->sleepRadius = maxDistanceFromOrigin;
         result->faces = faces;

@@ -14,6 +14,13 @@
 #include <map>
 #include <set>
 
+class vec2 {
+public:
+  float x = 0;
+  float y = 0;
+  float z = 0;
+  vec3(int fx, int fy, int fz);
+};
 
 class vec3 {
 public:

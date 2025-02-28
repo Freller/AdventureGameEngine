@@ -100,54 +100,41 @@ bool isSegmentIntersecting(float startX, float startY, float endX, float endY, f
     return (o1 != o2 && o3 != o4);
 }
 
+void updateEdges(std::vector<std::pair<SDL_Vertex, SDL_Vertex>>& sourceEdges, std::vector<std::pair<SDL_Vertex, SDL_Vertex>>& targetEdges) {
+    auto isPointVisible = [](const SDL_Vertex& v) {
+        return (0 < v.position.x && v.position.x  < WIN_WIDTH) && (0 < v.position.y  && v.position.y  < WIN_HEIGHT);
+    };
 
+    for (const auto& edge : sourceEdges) {
+        extern camera g_camera;
+
+        SDL_Vertex v1 = edge.first;
+        v1.position.x -= g_camera.x;
+        v1.position.y -= g_camera.y;
+
+        SDL_Vertex v2 = edge.second;
+        v2.position.x -= g_camera.x;
+        v2.position.y -= g_camera.y;
+
+        pair<SDL_Vertex, SDL_Vertex> newV;
+        newV.first = v1;
+        newV.second = v2;
+
+
+        // Check if either vertex is visible
+        if (isPointVisible(v1) || isPointVisible(v2) || 
+            isSegmentIntersecting(v1.position.x , v1.position.y , v2.position.x , v2.position.y , 0, 0, WIN_WIDTH, 0) ||       // Top boundary
+            isSegmentIntersecting(v1.position.x , v1.position.y , v2.position.x , v2.position.y , 0, 0, 0, WIN_HEIGHT) ||     // Left boundary
+            isSegmentIntersecting(v1.position.x , v1.position.y , v2.position.x , v2.position.y , WIN_WIDTH, 0, WIN_WIDTH, WIN_HEIGHT) || // Right boundary
+            isSegmentIntersecting(v1.position.x , v1.position.y , v2.position.x , v2.position.y , 0, WIN_HEIGHT, WIN_WIDTH, WIN_HEIGHT)) {  // Bottom boundary
+          targetEdges.push_back(newV);
+        }
+    }
+}
 
 // Function to check if an occluder is between the start and end points with debug lines
 bool isOccluderBetween(float startX, float startY, float endX, float endY) {
-    for (const auto& mesh : g_meshOccluders) {
-        for (int i = 0; i < mesh->numVertices; i += 3) {
-            SDL_Vertex v1 = mesh->vertex[i];
-            SDL_Vertex v2 = mesh->vertex[i + 1];
-            SDL_Vertex v3 = mesh->vertex[i + 2];
-
-            float x1 = v1.position.x + mesh->origin.x;
-            float y1 = v1.position.y + mesh->origin.y;
-            float x2 = v2.position.x + mesh->origin.x;
-            float y2 = v2.position.y + mesh->origin.y;
-            float x3 = v3.position.x + mesh->origin.x;
-            float y3 = v3.position.y + mesh->origin.y;
-
-            if (v1.color.r > 128 && v2.color.r > 128) {
-                if (isSegmentIntersecting(startX, startY, endX, endY, x1, y1, x2, y2)) {
-                    // Draw the segments using SDL_RenderDrawLine for debugging
-//                    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-//                    SDL_RenderDrawLine(renderer, static_cast<int>(startX - g_camera.x), static_cast<int>(startY- g_camera.y), static_cast<int>(endX- g_camera.x), static_cast<int>(endY- g_camera.y));
-//                    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-//                    SDL_RenderDrawLine(renderer, static_cast<int>(x1-g_camera.x), static_cast<int>(y1-g_camera.y), static_cast<int>(x2-g_camera.x), static_cast<int>(y2-g_camera.y));
-                    return true;
-                }
-            } else if (v2.color.r > 128 && v3.color.r > 128) {
-                if (isSegmentIntersecting(startX, startY, endX, endY, x2, y2, x3, y3)) {
-                    // Draw the segments using SDL_RenderDrawLine for debugging
-//                    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-//                    SDL_RenderDrawLine(renderer, static_cast<int>(startX - g_camera.x), static_cast<int>(startY- g_camera.y), static_cast<int>(endX- g_camera.x), static_cast<int>(endY- g_camera.y));
-//                    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-//                    SDL_RenderDrawLine(renderer, static_cast<int>(x2-g_camera.x), static_cast<int>(y2-g_camera.y), static_cast<int>(x3-g_camera.x), static_cast<int>(y3-g_camera.y));
-                    return true;
-                }
-            } else if (v3.color.r > 128 && v1.color.r > 128) {
-                if (isSegmentIntersecting(startX, startY, endX, endY, x3, y3, x1, y1)) {
-                    // Draw the segments using SDL_RenderDrawLine for debugging
-//                    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for intersecting segment
-//                    SDL_RenderDrawLine(renderer, static_cast<int>(startX - g_camera.x), static_cast<int>(startY- g_camera.y), static_cast<int>(endX- g_camera.x), static_cast<int>(endY- g_camera.y));
-//                    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the intersected segment
-//                    SDL_RenderDrawLine(renderer, static_cast<int>(x3)-g_camera.x, static_cast<int>(y3)-g_camera.y, static_cast<int>(x1-g_camera.x), static_cast<int>(y1-g_camera.y));
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
+  return 0;
 }
 
 
@@ -4024,6 +4011,7 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
   if(RectOverlap(obj, cam)) {
 
     if(this != protag) {
+      //optimize this with g_osEdges
       if(isOccluderBetween(protag->getOriginX(), protag->getOriginY(), getOriginX(), getOriginY())) {
         opacity -= 20;
         if(opacity < 0) {opacity = 0;}
