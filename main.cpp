@@ -2636,8 +2636,8 @@ vector<pair<SDL_Vertex, SDL_Vertex>> g_osEdges;
   updateEdges(g_oEdges, g_osEdges);
 }
 
-int px = protag->getOriginX() - g_camera.x;
-int py = protag->getOriginY() - g_camera.y;
+float px = protag->getOriginX() - g_camera.x;
+float py = protag->getOriginY() - g_camera.y - protag->z * XtoZ;
 
 //use g_wsEdges and g_osEdges to render shadows
 {
@@ -2827,29 +2827,30 @@ std::vector<SDL_Vertex> vertices;
               //this is to fix cases where the distance between the player and the wall
               //is so much less than the distance between points A and B that
               //the drawn shadow doesn't reach the end of the screen.
+
               //draw E A3 B2, E comes from A3
-//              float edx = B2.position.y - A3.position.y;  // Perpendicular vector to A3 → B2
-//              float edy = A3.position.x - B2.position.x;
-//
-//              float elen = sqrt(edx * edx + edy * edy);  // Correct normalization
-//              if (elen != 0) {  // Avoid division by zero
-//                edx = edx / elen * WIN_WIDTH;
-//                edy = edy / elen * WIN_WIDTH;
-//              }
-//
-//              // Check which side (px, py) is on relative to A3 → B2 and flip if needed
-//              float eside = (px - A3.position.x) * (B2.position.y - A3.position.y) - 
-//                (py - A3.position.y) * (B2.position.x - A3.position.x);
-//              if (eside > 0) {  // Flip direction if needed
-//                edx = -edx;
-//                edy = -edy;
-//              }
-//
-//              SDL_Vertex E = {{A3.position.x + edx, A3.position.y + edy}, {255, 255, 255, 255}, {0,0}};
-//              vertices.push_back(E);
-//              vertices.push_back(A3);
-//              vertices.push_back(B2);
-//
+              float edx = B2.position.y - A3.position.y;  // Perpendicular vector to A3 → B2
+              float edy = A3.position.x - B2.position.x;
+
+              float elen = sqrt(edx * edx + edy * edy);  // Correct normalization
+              if (elen != 0) {  // Avoid division by zero
+                edx = edx / elen * WIN_WIDTH;
+                edy = edy / elen * WIN_WIDTH;
+              }
+
+              // Check which side (px, py) is on relative to A3 → B2 and flip if needed
+              float eside = (px - A3.position.x) * (B2.position.y - A3.position.y) - 
+                (py - A3.position.y) * (B2.position.x - A3.position.x);
+              if (eside > 0) {  // Flip direction if needed
+                edx = -edx;
+                edy = -edy;
+              }
+
+              SDL_Vertex E = {{A3.position.x + edx, A3.position.y + edy}, {0, 0, 0, 0}, {0,0}};
+              vertices.push_back(E);
+              vertices.push_back(A3);
+              vertices.push_back(B2);
+
               //draw E2 E B2, E2 comes from B2
 
 
@@ -2878,7 +2879,7 @@ std::vector<SDL_Vertex> vertices;
                 edy = -edy;
               }
 
-              SDL_Vertex E = {{B3.position.x + edx, B3.position.y + edy}, {255, 255, 255, 255}, {0,0}};
+              SDL_Vertex E = {{B3.position.x + edx, B3.position.y + edy}, {0, 0, 0, 0}, {0,0}};
               vertices.push_back(E);
               vertices.push_back(B3);
               vertices.push_back(A2);
@@ -4046,15 +4047,14 @@ int WinMain()
   transition = 1;
 
 
-//  mesh* m = loadMeshFromPly("stest/tunnel", {99279, 99455,0}, 100, meshtype::FLOOR);
-//  m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
+  mesh* m = loadMeshFromPly("stest/tunnel", {99279, 99455,0}, 100, meshtype::FLOOR);
+  m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
  
   mesh* vw = loadMeshFromPly("stest/wall", {99279, 99455,0}, 100, meshtype::V_WALL);
-  mesh* bw = loadMeshFromPly("stest/wall", {99379, 99855,0}, 100, meshtype::V_WALL);
-  //vw->texture = m->texture;
+  vw->texture = m->texture;
 
-//  mesh* c = loadMeshFromPly("stest/stage-collision", {99279, 99455,0}, 100, meshtype::COLLISION);
-//
+  mesh* c = loadMeshFromPly("stest/stage-collision", {99279, 99455,0}, 100, meshtype::COLLISION);
+
   mesh* o = loadMeshFromPly("stest/stage-occluder", {99279, 99455,0}, 100, meshtype::OCCLUDER);
 
 
