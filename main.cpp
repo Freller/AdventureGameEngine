@@ -2738,7 +2738,7 @@ g_osEdges is a vector<pair<SDL_Vertex, SDL_Vertex>>. Each pair is a segment of v
 
 //render occluding on visual walls
 {
-    std::vector<SDL_Vertex> vertices;
+std::vector<SDL_Vertex> vertices;
 
     for (const auto& edge : g_osEdges) {
         SDL_Vertex A = edge.first;
@@ -2780,15 +2780,15 @@ g_osEdges is a vector<pair<SDL_Vertex, SDL_Vertex>>. Each pair is a segment of v
         auto [AIntersects, Ax3, Ay3] = AIntersect;
         auto [BIntersects, Bx3, By3] = BIntersect;
 
-        SDL_Vertex A2 = {{Ax3, Ay3}, {255, 255, 255, 255}, {0, 0}};
-        SDL_Vertex B2 = {{Bx3, By3}, {255, 255, 255, 255}, {0, 0}};
+        SDL_Vertex A2 = {{Ax3, Ay3}, {0, 0, 0, 255}, {0, 0}};
+        SDL_Vertex B2 = {{Bx3, By3}, {0, 0, 0, 255}, {0, 0}};
 
         // Handle case where there's no intersection
         if (!AIntersects) {
-            A2 = {{Ax2, Ay2}, {255, 255, 255, 255}, {0, 0}};
+            A2 = {{Ax2, Ay2}, {0, 0, 0, 255}, {0, 0}};
         }
         if (!BIntersects) {
-            B2 = {{Bx2, By2}, {255, 255, 255, 255}, {0, 0}};
+            B2 = {{Bx2, By2}, {0, 0, 0, 255}, {0, 0}};
         }
 
         vertices.push_back(A);
@@ -2800,33 +2800,88 @@ g_osEdges is a vector<pair<SDL_Vertex, SDL_Vertex>>. Each pair is a segment of v
 
         // Check for additional intersections with walls at lower y-coordinate
         if(AIntersects && BIntersects && Ay3 < py && By3 < py) {
-          if (AIntersects && Ay3 < py) {
-              SDL_Vertex A3 = {{Ax3, 0}, {255, 255, 255, 255}, {0, 0}};
-              SDL_Vertex B3 = {{Bx3, 0}, {255, 255, 255, 255}, {0, 0}};
+          SDL_Vertex A3 = {{Ax3, 0}, {0, 0, 0, 255}, {0, 0}};
+          SDL_Vertex B3 = {{Bx3, 0}, {0, 0, 0, 255}, {0, 0}};
 
-              vertices.push_back(A2);
-              vertices.push_back(A3);
-              vertices.push_back(B2);
+          vertices.push_back(A2);
+          vertices.push_back(A3);
+          vertices.push_back(B2);
 
-              vertices.push_back(B2);
-              vertices.push_back(A3);
-              vertices.push_back(B3);
-          }
+          vertices.push_back(B2);
+          vertices.push_back(A3);
+          vertices.push_back(B3);
+
+          
 
         } else {
   
           if (AIntersects && Ay3 < py) {
-              SDL_Vertex A3 = {{Ax3, 0}, {255, 255, 255, 255}, {0, 0}};
+              SDL_Vertex A3 = {{Ax3, 0}, {0, 0, 0, 255}, {0, 0}};
               vertices.push_back(A2);
               vertices.push_back(A3);
               vertices.push_back(B2);
-          }
-  
-          if (BIntersects && By3 < py) {
-              SDL_Vertex B3 = {{Bx3, 0}, {255, 255, 255, 255}, {0, 0}};
+              
+              //if you ever want to be able to subdivide walls less, 
+              //use this code
+              //It might not need to be implemented
+              //this is to fix cases where the distance between the player and the wall
+              //is so much less than the distance between points A and B that
+              //the drawn shadow doesn't reach the end of the screen.
+              //draw E A3 B2, E comes from A3
+//              float edx = B2.position.y - A3.position.y;  // Perpendicular vector to A3 → B2
+//              float edy = A3.position.x - B2.position.x;
+//
+//              float elen = sqrt(edx * edx + edy * edy);  // Correct normalization
+//              if (elen != 0) {  // Avoid division by zero
+//                edx = edx / elen * WIN_WIDTH;
+//                edy = edy / elen * WIN_WIDTH;
+//              }
+//
+//              // Check which side (px, py) is on relative to A3 → B2 and flip if needed
+//              float eside = (px - A3.position.x) * (B2.position.y - A3.position.y) - 
+//                (py - A3.position.y) * (B2.position.x - A3.position.x);
+//              if (eside > 0) {  // Flip direction if needed
+//                edx = -edx;
+//                edy = -edy;
+//              }
+//
+//              SDL_Vertex E = {{A3.position.x + edx, A3.position.y + edy}, {255, 255, 255, 255}, {0,0}};
+//              vertices.push_back(E);
+//              vertices.push_back(A3);
+//              vertices.push_back(B2);
+//
+              //draw E2 E B2, E2 comes from B2
+
+
+
+          } else if (BIntersects && By3 < py) {
+              SDL_Vertex B3 = {{Bx3, 0}, {0, 0, 0, 255}, {0, 0}};
               vertices.push_back(B2);
               vertices.push_back(A2);
               vertices.push_back(B3);
+
+              //draw E A2 B3, E comes from B3
+              float edx = A2.position.y - B3.position.y;  // Perpendicular vector to A3 → B2
+              float edy = B3.position.x - A2.position.x;
+
+              float elen = sqrt(edx * edx + edy * edy);  // Correct normalization
+              if (elen != 0) {  // Avoid division by zero
+                edx = edx / elen * WIN_WIDTH;
+                edy = edy / elen * WIN_WIDTH;
+              }
+
+              // Check which side (px, py) is on relative to B3 → A2 and flip if needed
+              float eside = (px - B3.position.x) * (A2.position.y - B3.position.y) - 
+                (py - B3.position.y) * (A2.position.x - B3.position.x);
+              if (eside > 0) {  // Flip direction if needed
+                edx = -edx;
+                edy = -edy;
+              }
+
+              SDL_Vertex E = {{B3.position.x + edx, B3.position.y + edy}, {255, 255, 255, 255}, {0,0}};
+              vertices.push_back(E);
+              vertices.push_back(B3);
+              vertices.push_back(A2);
           }
         }
     }
