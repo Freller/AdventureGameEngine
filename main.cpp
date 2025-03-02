@@ -40,11 +40,10 @@ void dungeonFlash();
 
 void sortEdges(std::vector<edgeInfo>& edges, float px, float py) {
     auto edgeComparator = [&](const edgeInfo& a, const edgeInfo& b) {
-        float minDistA = std::min(Distance(a.first.position.x, a.first.position.y, px, py),
-                                  Distance(a.second.position.x, a.second.position.y, px, py));
-        float minDistB = std::min(Distance(b.first.position.x, b.first.position.y, px, py),
-                                  Distance(b.second.position.x, b.second.position.y, px, py));
-        return minDistA < minDistB;
+
+        float minDistA = Distance( (a.first.position.x + a.second.position.x) / 2, (a.first.position.y + a.second.position.y)/2, px, py);
+        float minDistB = Distance( (b.first.position.x + b.second.position.x) / 2, (b.first.position.y + b.second.position.y)/2, px, py);
+        return minDistA > minDistB;
     };
 
     // Remove edges where both vertices' y-coordinates are greater than py
@@ -2671,9 +2670,27 @@ g_osEdges.clear();
   updateEdges(g_oEdges, g_osEdges);
 }
 
-//sort g_wsEdges and g_osEdges
 float px = protag->getOriginX() - g_camera.x;
 float py = protag->getOriginY() - g_camera.y - protag->z * XtoZ;
+
+//remove any entries on g_wEdges which are facing away from the player
+//(kinda like backface-culling)
+D(g_wsEdges.size());
+g_wsEdges.erase(
+        std::remove_if(g_wsEdges.begin(), g_wsEdges.end(), [px, py](const edgeInfo& edge) {
+            // Equation of the line passing through the two points (y - y1) = m(x - x1)
+            // m = (y2 - y1) / (x2 - x1)
+            float m = (edge.second.position.y - edge.first.position.y) / (edge.second.position.x - edge.first.position.x);
+            // y = m * (px - x1) + y1
+            float y_at_px = m * (px - edge.first.position.x) + edge.first.position.y;
+            // If point (px, py) is above the line, return true to remove
+            return py < y_at_px;
+        }), 
+        g_wsEdges.end()
+    );
+
+D(g_wsEdges.size());
+
 
 //use g_wsEdges and g_osEdges to render floor occlusion
 if(1){
@@ -2744,6 +2761,7 @@ if(1){
     SDL_RenderGeometry(renderer, blackbarTexture, vertices.data(), vertices.size(), nullptr, 0);
 }
 
+//sort g_wsEdges and g_osEdges
 sortEdges(g_wsEdges, px, py);
 sortEdges(g_osEdges, px, py);
 
@@ -4090,15 +4108,15 @@ int WinMain()
   transition = 1;
 
 
-  mesh* f = loadMeshFromPly("test/floor", {99279, 99455,0}, 2, meshtype::FLOOR);
+  mesh* f = loadMeshFromPly("test/floor", {99279, 99455,0}, 60, meshtype::FLOOR);
   f->texture = loadTexture(renderer, "resources/static/meshes/test/floor.qoi");
  
-  mesh* w = loadMeshFromPly("test/wall", {99279, 99455,0}, 2, meshtype::V_WALL);
+  mesh* w = loadMeshFromPly("test/wall", {99279, 99455,0}, 60, meshtype::V_WALL);
   w->texture = f->texture;
 
   //mesh* c = loadMeshFromPly("test/stage-collision", {99279, 99455,0}, 2, meshtype::COLLISION);
 
-  mesh* o = loadMeshFromPly("test/occluder", {99279, 99455,0}, 2, meshtype::OCCLUDER);
+  mesh* o = loadMeshFromPly("test/occluder", {99279, 99455,0}, 60, meshtype::OCCLUDER);
 
   while (!quit)
   {

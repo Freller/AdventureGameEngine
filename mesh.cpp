@@ -329,6 +329,9 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 edgeInfo ei;
                 ei.first = A;
                 ei.second = B;
+                if(ei.first.position.x > ei.second.position.x) {
+                  swap(ei.first, ei.second);
+                }
                 g_wEdges.emplace_back(ei);
                 fail++;
               }
