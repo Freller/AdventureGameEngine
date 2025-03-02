@@ -33,13 +33,13 @@ using namespace std;
 
 void resetTrivialData();
 
-SDL_Point findG(SDL_Point A, SDL_Point B, SDL_Point P, double dist);
+int orientation(float px, float py, float qx, float qy, float rx, float ry);
 
 std::tuple<bool, float, float> getIntersection(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2);
 
 bool isSegmentIntersecting(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2);
 
-void updateEdges(std::vector<std::pair<SDL_Vertex, SDL_Vertex>>& sourceEdges, std::vector<std::pair<SDL_Vertex, SDL_Vertex>>& targetEdges);
+void updateEdges(std::vector<edgeInfo>& sourceEdges, std::vector<edgeInfo>& targetEdges);
 
 bool isOccluderBetween(float startX, float startY, float endX, float endY);
 

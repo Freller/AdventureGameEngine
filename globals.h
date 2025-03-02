@@ -308,9 +308,24 @@ extern vector<mesh*> g_meshOccluders;
 
 extern vector<mesh*> g_meshDecorative;
 
-extern vector<pair<SDL_Vertex, SDL_Vertex>> g_wEdges;
+struct edgeInfo {
+  SDL_Vertex first;
+  SDL_Vertex second;
 
-extern vector<pair<SDL_Vertex, SDL_Vertex>> g_oEdges;
+  //for O-edges (not W-edges) drawing the wall portion
+  //if the o-edge isn't in the same place as a w-edge
+  //this will be empty
+  mesh* wallMesh = nullptr;
+  vector<int> indices; //the indices of wallMesh to 
+                       //render the faces which generate this 
+                       //occluding
+};
+
+extern vector<edgeInfo> g_wEdges;
+extern vector<edgeInfo> g_oEdges;
+
+extern vector<edgeInfo> g_wsEdges;
+extern vector<edgeInfo> g_osEdges;
 
 extern SDL_Texture* g_occluderTarget;
 extern float g_occluderResolutionRatio;
@@ -996,7 +1011,8 @@ extern string textureDirectory;
 extern float mapeditorNavNodeCullRadius;
 extern float mapeditorNavNodeTraceRadius;
 
-extern SDL_Texture* g_meshShadeTexture;
+extern SDL_Texture* g_floorShadeTexture;
+extern SDL_Texture* g_wallShadeTexture;
 
 extern vector<string> consolehistory;
 extern int consolehistoryindex;

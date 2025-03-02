@@ -38,6 +38,25 @@ void protagMakesNoise();
 
 void dungeonFlash();
 
+void sortEdges(std::vector<edgeInfo>& edges, float px, float py) {
+    auto edgeComparator = [&](const edgeInfo& a, const edgeInfo& b) {
+        float minDistA = std::min(Distance(a.first.position.x, a.first.position.y, px, py),
+                                  Distance(a.second.position.x, a.second.position.y, px, py));
+        float minDistB = std::min(Distance(b.first.position.x, b.first.position.y, px, py),
+                                  Distance(b.second.position.x, b.second.position.y, px, py));
+        return minDistA < minDistB;
+    };
+
+    // Remove edges where both vertices' y-coordinates are greater than py
+    edges.erase(std::remove_if(edges.begin(), edges.end(),
+        [py](const edgeInfo& e) {
+            return e.first.position.y > py && e.second.position.y > py;
+        }), edges.end());
+
+    // Sort the remaining edges based on their minimum distance to (px, py)
+    std::sort(edges.begin(), edges.end(), edgeComparator);
+}
+
 SDL_FPoint calculateIntersection(float x1, float y1, float z1, float x2, float y2, float z2) {
     // Compute direction vector
     float dx = x2 - x1;
@@ -53,6 +72,24 @@ SDL_FPoint calculateIntersection(float x1, float y1, float z1, float x2, float y
     intersection.y = y1 + dy * scaleFactor;
 
     return intersection;
+}
+
+bool segmentsSharePoint(edgeInfo seg1, edgeInfo seg2, float tolerance = 1) {
+    auto isClose = [&](float a, float b) {
+        return std::fabs(a - b) < tolerance;
+    };
+
+    auto pointsClose = [&](SDL_Vertex a, SDL_Vertex b) {
+        return isClose(a.position.x, b.position.x) && isClose(a.position.y, b.position.y);
+    };
+
+
+    auto p1 = seg1.first;
+    auto q1 = seg1.second;
+    auto p2 = seg2.first;
+    auto q2 = seg2.second;
+
+    return pointsClose(p1, q1) || pointsClose(p1, q2) || pointsClose(p2, q1) || pointsClose(p2, q2);
 }
 
 
@@ -2613,8 +2650,8 @@ for(auto &x : g_meshFloors) {
       v[i].position.x += x->origin.x - g_camera.x;
       v[i].position.y += x->origin.y - g_camera.y;
     }
-  
-    SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, NULL, 0);
+
+    SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, x->indices, x->numIndices);
 
     //render shade
     for(int i = 0; i < x->numVertices; i++) {
@@ -2622,25 +2659,24 @@ for(auto &x : g_meshFloors) {
       v[i].tex_coord.y = x->vertexExtraData[i].second;
     }
     
-    SDL_RenderGeometry(renderer, g_meshShadeTexture, v, x->numVertices, NULL, 0);
+    SDL_RenderGeometry(renderer, g_floorShadeTexture, v, x->numVertices, x->indices, x->numIndices);
   
   }
 }
 
-
-
-vector<pair<SDL_Vertex, SDL_Vertex>> g_wsEdges;
-vector<pair<SDL_Vertex, SDL_Vertex>> g_osEdges;
+g_wsEdges.clear();
+g_osEdges.clear();
 {
   updateEdges(g_wEdges, g_wsEdges);
   updateEdges(g_oEdges, g_osEdges);
 }
 
+//sort g_wsEdges and g_osEdges
 float px = protag->getOriginX() - g_camera.x;
 float py = protag->getOriginY() - g_camera.y - protag->z * XtoZ;
 
-//use g_wsEdges and g_osEdges to render shadows
-{
+//use g_wsEdges and g_osEdges to render floor occlusion
+if(1){
     std::vector<SDL_Vertex> vertices;
     const float EXTEND_DISTANCE = 2 * WIN_WIDTH;
 
@@ -2708,188 +2744,194 @@ float py = protag->getOriginY() - g_camera.y - protag->z * XtoZ;
     SDL_RenderGeometry(renderer, blackbarTexture, vertices.data(), vertices.size(), nullptr, 0);
 }
 
+sortEdges(g_wsEdges, px, py);
+sortEdges(g_osEdges, px, py);
 
 //visual walls
-for(auto &x : g_meshVWalls) {
-  if(x->visible) {
-    SDL_Vertex v[x->numVertices];
-    for(int i = 0; i < x->numVertices; i++) {
-      v[i] = x->vertex[i];
-      v[i].position.x += x->origin.x - g_camera.x;
-      v[i].position.y += x->origin.y - g_camera.y;
-      v[i].color.r = v[i].color.g;
-    }
-  
-    SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, NULL, 0);
-
-    //render shade
-    for(int i = 0; i < x->numVertices; i++) {
-      v[i].tex_coord.x = x->vertexExtraData[i].first;
-      v[i].tex_coord.y = x->vertexExtraData[i].second;
-    }
+if(1) {
+  for(auto &x : g_meshVWalls) {
+    if(x->visible) {
+      SDL_Vertex v[x->numVertices];
+      for(int i = 0; i < x->numVertices; i++) {
+        v[i] = x->vertex[i];
+        v[i].position.x += x->origin.x - g_camera.x;
+        v[i].position.y += x->origin.y - g_camera.y;
+        v[i].color.r = v[i].color.g;
+      }
     
-    SDL_RenderGeometry(renderer, g_meshShadeTexture, v, x->numVertices, NULL, 0);
+      SDL_RenderGeometry(renderer, x->texture, v, x->numVertices, x->indices, x->numIndices);
+  
+      //render shade
+      for(int i = 0; i < x->numVertices; i++) {
+        v[i].tex_coord.x = x->vertexExtraData[i].first;
+        v[i].tex_coord.y = x->vertexExtraData[i].second;
+      }
+      
+      SDL_RenderGeometry(renderer, g_wallShadeTexture, v, x->numVertices, x->indices, x->numIndices);
+    }
   }
 }
 
 /*
-g_osEdges is a vector<pair<SDL_Vertex, SDL_Vertex>>. Each pair is a segment of vertices with position.x and position.y in screen coordinates. That segment represents an occluder, which casts a shadow. g_wsEdges is a vector<pair<SDL_Vertex, SDL_Vertex>>. Each pair is a segment of vertices with position.x and position.y in screen coordinates. That segment represents an wall, which catches a shadow. Let's walk through drawing a shadow. Say we have a pair from g_osEdges, and we call that pair Opair. Let's call the two vertices of Opair A and B. We will find point A2 from point A and point B2 from B. We'll do this by using std::tuple<bool, float, float> getIntersection(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2) to find an intersection on the segment from A to a point WIN_WIDTH away in the direction of the vector from (px,py) to point A. Do the same to find B2. These are intersections with any element of g_wsEdges There might not be an intersection, and in that case, put A2 and B2 at the end of the raycast, WIN_WIDTH away from A and B, respectively. If there's no intersection, don't push back any triangles to draw, since they won't matter. If both lines intersect a wall segment, prepare to draw the quad A B A2 B2 (B2 or A2 maybe be at the end of the raycast, offscreen in that case). If A's raycast intersected a wall, AND A2's y coordinate is lower than py we need to find the point A3 which is at y=0 and A2's x. That's also true for B's raycast and a point B3. If we found A3 and B3, draw a quad A2 B2 A3 B3. If not, draw the traingle A2 B2 A3 or A2 B2 B3. Good?
+g_osEdges is a vector<pair<SDL_Vertex, SDL_Vertex>>. Each pair is a segment of vertices with position.x and position.y in screen coordinates. 
+That segment represents an occluder, which casts a shadow. g_wsEdges is a vector<pair<SDL_Vertex, SDL_Vertex>>. Each pair is a segment of vertices with position.x and position.y in screen coordinates. 
+That segment represents an wall, which catches a shadow. Let's walk through drawing a shadow. 
+Say we have a pair from g_osEdges, and we call that pair Opair. Let's call the two vertices of Opair A and B. 
+We will find point A2 from point A and point B2 from B. 
+We'll do this by using std::tuple<bool, float, float> getIntersection(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2) to find an intersection on the segment from A to a point WIN_WIDTH away in the direction of the vector from (px,py) to point A. 
+Do the same to find B2. These are intersections with any element of g_wsEdges There might not be an intersection, and in that case, put A2 and B2 at the end of the raycast, WIN_WIDTH away from A and B, respectively. 
+If both lines intersect a wall segment, prepare to draw the quad A B A2 B2 (B2 or A2 maybe be at the end of the raycast, offscreen in that case). 
+If A's raycast intersected a wall, AND A2's y coordinate is lower than py we need to find the point A3 which is at y=0 and A2's x. 
+That's also true for B's raycast and a point B3. If we found A3 and B3, draw a quad A2 B2 A3 B3. If not, draw the traingle A2 B2 A3 or A2 B2 B3. Good?
 */
 
 //render occluding on visual walls
-{
-std::vector<SDL_Vertex> vertices;
+if (1){
+  for (const auto& edge : g_osEdges) {
+    std::vector<SDL_Vertex> vertices;
+    SDL_Vertex A = edge.first;
+    SDL_Vertex B = edge.second;
 
-    for (const auto& edge : g_osEdges) {
-        SDL_Vertex A = edge.first;
-        SDL_Vertex B = edge.second;
+    float dx = A.position.x - px;
+    float dy = A.position.y - py;
+    float len = sqrt(dx * dx + dy * dy);
 
-        float dx = A.position.x - px;
-        float dy = A.position.y - py;
-        float len = sqrt(dx * dx + dy * dy);
+    float Ax2 = A.position.x + dx / len * WIN_WIDTH;
+    float Ay2 = A.position.y + dy / len * WIN_WIDTH;
 
-        float Ax2 = A.position.x + dx / len * WIN_WIDTH;
-        float Ay2 = A.position.y + dy / len * WIN_WIDTH;
+    std::tuple<bool, float, float> AIntersect = std::make_tuple(false, Ax2, Ay2);
+    for (const auto& wall : g_wsEdges) {
+      if(segmentsSharePoint(wall, edge)) {
+        continue;
+      }
 
-        std::tuple<bool, float, float> AIntersect = std::make_tuple(false, Ax2, Ay2);
-        for (const auto& wall : g_wsEdges) {
-            auto [intersects, ix, iy] = getIntersection(A.position.x, A.position.y, Ax2, Ay2, wall.first.position.x, wall.first.position.y, wall.second.position.x, wall.second.position.y);
-            if (intersects && iy <= A.position.y) {
-                AIntersect = std::make_tuple(true, ix, iy);
-                break;
-            }
-        }
-        
-        // Repeat for B
-        dx = B.position.x - px;
-        dy = B.position.y - py;
-        len = sqrt(dx * dx + dy * dy);
-
-        float Bx2 = B.position.x + dx / len * WIN_WIDTH;
-        float By2 = B.position.y + dy / len * WIN_WIDTH;
-
-        std::tuple<bool, float, float> BIntersect = std::make_tuple(false, Bx2, By2);
-        for (const auto& wall : g_wsEdges) {
-            auto [intersects, ix, iy] = getIntersection(B.position.x, B.position.y, Bx2, By2, wall.first.position.x, wall.first.position.y, wall.second.position.x, wall.second.position.y);
-            if (intersects && iy <= B.position.y) {
-                BIntersect = std::make_tuple(true, ix, iy);
-                break;
-            }
-        }
-
-        auto [AIntersects, Ax3, Ay3] = AIntersect;
-        auto [BIntersects, Bx3, By3] = BIntersect;
-
-        SDL_Vertex A2 = {{Ax3, Ay3}, {0, 0, 0, 255}, {0, 0}};
-        SDL_Vertex B2 = {{Bx3, By3}, {0, 0, 0, 255}, {0, 0}};
-
-        // Handle case where there's no intersection
-        if (!AIntersects) {
-            A2 = {{Ax2, Ay2}, {0, 0, 0, 255}, {0, 0}};
-        }
-        if (!BIntersects) {
-            B2 = {{Bx2, By2}, {0, 0, 0, 255}, {0, 0}};
-        }
-
-        vertices.push_back(A);
-        vertices.push_back(B);
-        vertices.push_back(A2);
-        vertices.push_back(A2);
-        vertices.push_back(B);
-        vertices.push_back(B2);
-
-        // Check for additional intersections with walls at lower y-coordinate
-        if(AIntersects && BIntersects && Ay3 < py && By3 < py) {
-          SDL_Vertex A3 = {{Ax3, 0}, {0, 0, 0, 255}, {0, 0}};
-          SDL_Vertex B3 = {{Bx3, 0}, {0, 0, 0, 255}, {0, 0}};
-
-          vertices.push_back(A2);
-          vertices.push_back(A3);
-          vertices.push_back(B2);
-
-          vertices.push_back(B2);
-          vertices.push_back(A3);
-          vertices.push_back(B3);
-
-          
-
-        } else {
-  
-          if (AIntersects && Ay3 < py) {
-              SDL_Vertex A3 = {{Ax3, 0}, {0, 0, 0, 255}, {0, 0}};
-              vertices.push_back(A2);
-              vertices.push_back(A3);
-              vertices.push_back(B2);
-              
-              //if you ever want to be able to subdivide walls less, 
-              //use this code
-              //It might not need to be implemented
-              //this is to fix cases where the distance between the player and the wall
-              //is so much less than the distance between points A and B that
-              //the drawn shadow doesn't reach the end of the screen.
-
-              //draw E A3 B2, E comes from A3
-              float edx = B2.position.y - A3.position.y;  // Perpendicular vector to A3 → B2
-              float edy = A3.position.x - B2.position.x;
-
-              float elen = sqrt(edx * edx + edy * edy);  // Correct normalization
-              if (elen != 0) {  // Avoid division by zero
-                edx = edx / elen * WIN_WIDTH;
-                edy = edy / elen * WIN_WIDTH;
-              }
-
-              // Check which side (px, py) is on relative to A3 → B2 and flip if needed
-              float eside = (px - A3.position.x) * (B2.position.y - A3.position.y) - 
-                (py - A3.position.y) * (B2.position.x - A3.position.x);
-              if (eside > 0) {  // Flip direction if needed
-                edx = -edx;
-                edy = -edy;
-              }
-
-              SDL_Vertex E = {{A3.position.x + edx, A3.position.y + edy}, {0, 0, 0, 0}, {0,0}};
-              vertices.push_back(E);
-              vertices.push_back(A3);
-              vertices.push_back(B2);
-
-              //draw E2 E B2, E2 comes from B2
-
-
-
-          } else if (BIntersects && By3 < py) {
-              SDL_Vertex B3 = {{Bx3, 0}, {0, 0, 0, 255}, {0, 0}};
-              vertices.push_back(B2);
-              vertices.push_back(A2);
-              vertices.push_back(B3);
-
-              //draw E A2 B3, E comes from B3
-              float edx = A2.position.y - B3.position.y;  // Perpendicular vector to A3 → B2
-              float edy = B3.position.x - A2.position.x;
-
-              float elen = sqrt(edx * edx + edy * edy);  // Correct normalization
-              if (elen != 0) {  // Avoid division by zero
-                edx = edx / elen * WIN_WIDTH;
-                edy = edy / elen * WIN_WIDTH;
-              }
-
-              // Check which side (px, py) is on relative to B3 → A2 and flip if needed
-              float eside = (px - B3.position.x) * (A2.position.y - B3.position.y) - 
-                (py - B3.position.y) * (A2.position.x - B3.position.x);
-              if (eside > 0) {  // Flip direction if needed
-                edx = -edx;
-                edy = -edy;
-              }
-
-              SDL_Vertex E = {{B3.position.x + edx, B3.position.y + edy}, {0, 0, 0, 0}, {0,0}};
-              vertices.push_back(E);
-              vertices.push_back(B3);
-              vertices.push_back(A2);
-          }
-        }
+      auto [intersects, ix, iy] = getIntersection(A.position.x, A.position.y, Ax2, Ay2, wall.first.position.x, wall.first.position.y, wall.second.position.x, wall.second.position.y);
+      if (intersects && iy < A.position.y) {
+        AIntersect = std::make_tuple(true, ix, iy);
+        break;
+      }
     }
 
-    SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
-}
+    // Repeat for B
+    dx = B.position.x - px;
+    dy = B.position.y - py;
+    len = sqrt(dx * dx + dy * dy);
 
+    float Bx2 = B.position.x + dx / len * WIN_WIDTH;
+    float By2 = B.position.y + dy / len * WIN_WIDTH;
+
+    std::tuple<bool, float, float> BIntersect = std::make_tuple(false, Bx2, By2);
+    for (const auto& wall : g_wsEdges) {
+      if(segmentsSharePoint(wall, edge)) {
+        continue;
+      }
+      auto [intersects, ix, iy] = getIntersection(B.position.x, B.position.y, Bx2, By2, wall.first.position.x, wall.first.position.y, wall.second.position.x, wall.second.position.y);
+      if (intersects && iy < B.position.y) {
+        BIntersect = std::make_tuple(true, ix, iy);
+        break;
+      }
+    }
+
+    auto [AIntersects, Ax3, Ay3] = AIntersect;
+    auto [BIntersects, Bx3, By3] = BIntersect;
+
+    SDL_Vertex A2 = {{Ax3, Ay3}, {0, 0, 0, 255}, {0, 0}};
+    SDL_Vertex B2 = {{Bx3, By3}, {0, 0, 0, 255}, {0, 0}};
+
+    // Handle case where there's no intersection
+    if (!AIntersects) {
+      A2 = {{Ax2, Ay2}, {0, 0, 0, 255}, {0, 0}};
+    }
+    if (!BIntersects) {
+      B2 = {{Bx2, By2}, {0, 0, 0, 255}, {0, 0}};
+    }
+
+
+    // Create A3
+    SDL_Vertex A3;
+    if (AIntersects && Ay3 < py) {
+      A3 = {{Ax3, 0}, {0, 0, 0, 255}, {0, 0}};
+    } else {
+      float p_dx = B2.position.y - A2.position.y;
+      float p_dy = A2.position.x - B2.position.x;
+      len = sqrt(p_dx * p_dx + p_dy * p_dy);
+      p_dx = p_dx / len * WIN_WIDTH;
+      p_dy = p_dy / len * WIN_WIDTH;
+
+      float side = (px - A2.position.x) * (B2.position.y - A2.position.y) - (py - A2.position.y) * (B2.position.x - A2.position.x);
+      if (side > 0) { //does this need to be flipped?
+        p_dx = -p_dx;
+        p_dy = -p_dy;
+      }
+
+      A3 = {{A2.position.x + p_dx, A2.position.y + p_dy}, {0, 0, 0, 255}, {0, 0}};
+      //temp
+      //A3 = {{A2.position.x, A2.position.y}, {0, 0, 0, 255}, {0, 0}};
+    }
+
+    // Create B3
+    SDL_Vertex B3;
+    if (BIntersects && By3 < py) {
+      B3 = {{Bx3, 0}, {0, 0, 0, 255}, {0, 0}};
+    } else {
+      float p_dx = B2.position.y - A2.position.y;
+      float p_dy = A2.position.x - B2.position.x;
+      len = sqrt(p_dx * p_dx + p_dy * p_dy);
+      p_dx = p_dx / len * WIN_WIDTH;
+      p_dy = p_dy / len * WIN_WIDTH;
+
+      float side = (px - B2.position.x) * (A2.position.y - B2.position.y) - (py - B2.position.y) * (A2.position.x - B2.position.x);
+      if (side < 0) {
+        p_dx = -p_dx;
+        p_dy = -p_dy;
+      }
+
+      B3 = {{B2.position.x + p_dx, B2.position.y + p_dy}, {0, 0, 0, 255}, {0, 0}};
+      //temp
+      //B3 = {{B2.position.x, B2.position.y}, {0, 0, 0, 255}, {0, 0}};
+    }
+
+    vertices.push_back(A);
+    vertices.push_back(B);
+    vertices.push_back(A2);
+    vertices.push_back(A2);
+    vertices.push_back(B);
+    vertices.push_back(B2);
+
+    vertices.push_back(B2);
+    vertices.push_back(B3);
+    vertices.push_back(A2);
+    vertices.push_back(A2);
+    vertices.push_back(B3);
+    vertices.push_back(A3);
+    SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
+
+    if(edge.wallMesh != nullptr) {
+      SDL_Vertex v[4];
+      int index = 0;
+      for(auto x : edge.indices) {
+        v[index] = edge.wallMesh->vertex[x];
+        v[index].position.x += edge.wallMesh->origin.x - g_camera.x;
+        v[index].position.y += edge.wallMesh->origin.y - g_camera.y;
+        index++;
+      }
+
+      vector<int> indices = {0, 1, 2, 0, 2, 3};
+
+      SDL_RenderGeometry(renderer, edge.wallMesh->texture, v, 4, indices.data(), 6);
+
+      for(int i = 0; i < 6; i++) {
+        v[i].tex_coord.x = edge.wallMesh->vertexExtraData[i].first;
+        v[i].tex_coord.y = edge.wallMesh->vertexExtraData[i].second;
+      }
+
+      SDL_RenderGeometry(renderer, g_wallShadeTexture, v, 4, indices.data(), 6);
+      
+    }
+  }
+
+  //SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
+}
 
 if(drawhitboxes) {
   for(auto &x : g_meshCollisions) {
@@ -3657,7 +3699,8 @@ int WinMain()
   SDL_SetWindowBrightness(window, g_brightness/100.0 );
   SDL_SetTextureAlphaMod(g_shade, 0);
 
-  g_meshShadeTexture = loadTexture(renderer, "resources/engine/mesh-shade.qoi");
+  g_floorShadeTexture = loadTexture(renderer, "resources/engine/floor-shade.qoi");
+  g_wallShadeTexture = loadTexture(renderer, "resources/engine/wall-shade.qoi");
 
   switch (g_graphicsquality)
   {
@@ -4047,16 +4090,15 @@ int WinMain()
   transition = 1;
 
 
-  mesh* m = loadMeshFromPly("stest/tunnel", {99279, 99455,0}, 100, meshtype::FLOOR);
-  m->texture = loadTexture(renderer, "resources/static/meshes/test/stage.qoi");
+  mesh* f = loadMeshFromPly("test/floor", {99279, 99455,0}, 2, meshtype::FLOOR);
+  f->texture = loadTexture(renderer, "resources/static/meshes/test/floor.qoi");
  
-  mesh* vw = loadMeshFromPly("stest/wall", {99279, 99455,0}, 100, meshtype::V_WALL);
-  vw->texture = m->texture;
+  mesh* w = loadMeshFromPly("test/wall", {99279, 99455,0}, 2, meshtype::V_WALL);
+  w->texture = f->texture;
 
-  mesh* c = loadMeshFromPly("stest/stage-collision", {99279, 99455,0}, 100, meshtype::COLLISION);
+  //mesh* c = loadMeshFromPly("test/stage-collision", {99279, 99455,0}, 2, meshtype::COLLISION);
 
-  mesh* o = loadMeshFromPly("stest/stage-occluder", {99279, 99455,0}, 100, meshtype::OCCLUDER);
-
+  mesh* o = loadMeshFromPly("test/occluder", {99279, 99455,0}, 2, meshtype::OCCLUDER);
 
   while (!quit)
   {

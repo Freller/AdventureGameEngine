@@ -50,6 +50,15 @@ void resetTrivialData() {
 
 }
 
+// for checking if lines are colliear
+int orientation(float px, float py, float qx, float qy, float rx, float ry) {
+    float val = (qy - py) * (rx - qx) - (qx - px) * (ry - qy);
+    //5 might be too big
+    if (abs(val) < 10) return 0;  // collinear
+    D(abs(val));
+    return (val > 0) ? 1 : 2; // clock or counterclockwise
+}
+
 std::tuple<bool, float, float> getIntersection(float startX, float startY, float endX, float endY, float x1, float y1, float x2, float y2) {
     // Helper function to determine the orientation of ordered triplet (px, py), (qx, qy), (rx, ry)
     auto orientation = [](float px, float py, float qx, float qy, float rx, float ry) -> int {
@@ -100,7 +109,7 @@ bool isSegmentIntersecting(float startX, float startY, float endX, float endY, f
     return (o1 != o2 && o3 != o4);
 }
 
-void updateEdges(std::vector<std::pair<SDL_Vertex, SDL_Vertex>>& sourceEdges, std::vector<std::pair<SDL_Vertex, SDL_Vertex>>& targetEdges) {
+void updateEdges(std::vector<edgeInfo>& sourceEdges, std::vector<edgeInfo>& targetEdges) {
     auto isPointVisible = [](const SDL_Vertex& v) {
         return (0 < v.position.x && v.position.x  < WIN_WIDTH) && (0 < v.position.y  && v.position.y  < WIN_HEIGHT);
     };
@@ -116,9 +125,12 @@ void updateEdges(std::vector<std::pair<SDL_Vertex, SDL_Vertex>>& sourceEdges, st
         v2.position.x -= g_camera.x;
         v2.position.y -= g_camera.y;
 
-        pair<SDL_Vertex, SDL_Vertex> newV;
+        edgeInfo newV;
         newV.first = v1;
         newV.second = v2;
+
+        newV.wallMesh = edge.wallMesh;
+        newV.indices = edge.indices;
 
 
         // Check if either vertex is visible
@@ -134,6 +146,17 @@ void updateEdges(std::vector<std::pair<SDL_Vertex, SDL_Vertex>>& sourceEdges, st
 
 // Function to check if an occluder is between the start and end points with debug lines
 bool isOccluderBetween(float startX, float startY, float endX, float endY) {
+  for (const auto& edge : g_osEdges) {
+    auto [intersects, ix, iy] = getIntersection(
+        startX, startY, endX, endY,
+        edge.first.position.x, edge.first.position.y,
+        edge.second.position.x, edge.second.position.y
+        );
+
+    if (intersects) {
+      return true;
+    }
+  }
   return 0;
 }
 
@@ -4012,7 +4035,7 @@ void entity::render(SDL_Renderer * renderer, camera fcamera) {
 
     if(this != protag) {
       //optimize this with g_osEdges
-      if(isOccluderBetween(protag->getOriginX(), protag->getOriginY(), getOriginX(), getOriginY())) {
+      if(isOccluderBetween(protag->getOriginX() -g_camera.x, protag->getOriginY() - g_camera.y - protag->z * XtoZ, getOriginX() - g_camera.x, getOriginY() - g_camera.y - z * XtoZ)) {
         opacity -= 20;
         if(opacity < 0) {opacity = 0;}
       } else {

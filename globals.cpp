@@ -150,9 +150,11 @@ vector<mesh*> g_meshOccluders;
 
 vector<mesh*> g_meshDecorative;
 
-vector<pair<SDL_Vertex, SDL_Vertex>> g_wEdges;
+vector<edgeInfo> g_wEdges;
+vector<edgeInfo> g_oEdges;
 
-vector<pair<SDL_Vertex, SDL_Vertex>> g_oEdges;
+vector<edgeInfo> g_wsEdges;
+vector<edgeInfo> g_osEdges;
 
 SDL_Texture* g_occluderTarget;
 float g_occluderResolutionRatio = 1;
@@ -926,7 +928,8 @@ float mapeditorNavNodeCullRadius = 96;
 float mapeditorNavNodeTraceRadius = 150;        // for choosing the radius of the traces between navNodes when creating them in the editor. Should be the radius of the biggest entity
 // in the level, so that he does not get stuck on corners
 
-SDL_Texture* g_meshShadeTexture = 0;
+SDL_Texture* g_floorShadeTexture = 0;
+SDL_Texture* g_wallShadeTexture = 0;
 
 // for checking old console commands
 vector<string> consolehistory;

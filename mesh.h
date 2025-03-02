@@ -51,6 +51,7 @@ public:
   unsigned int a = 0;
   unsigned int b = 0;
   unsigned int c = 0;
+  unsigned int d = 100;
 };
 
 std::map<int, int> findQuadFaces(const std::vector<vertex3d>& vertices, const std::vector<face>& faces);
@@ -69,9 +70,11 @@ public:
   SDL_Texture* texture = NULL;
 
   SDL_Vertex* vertex = NULL;
+  int* indices = NULL;
  
   vector<pair<float, float>> vertexExtraData;
   int numVertices = 0;
+  int numIndices = 0;
 
   float sleepRadius = 0;
 
@@ -81,11 +84,11 @@ public:
 //  map<int, int> facePairing; //for finding quads in occluders
 //  map<int, tuple<int, int, int, int>> twinMap; //maps the first int of facePairing to twin coordinates for where to draw the rectangle blocking the wall
 
-  vector<vertex3d> vertices;
-
   meshtype mtype = meshtype::FLOOR;
 
   bool visible = 1;
+
+  vector<vertex3d> vertices;
 
   mesh();
 

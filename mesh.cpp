@@ -3,63 +3,81 @@
 #include "happly.h"
 
 #include "mesh.h"
-
-
-//find which triangles  form quads if they are 90deg walls
-std::map<int, int> findQuadFaces(const std::vector<vertex3d>& vertices, const std::vector<face>& faces) {
-    // Map to hold pairs of face indices with matching vertices
-    std::map<int, int> quadFaces;
-
-    // Multimap to group faces by vertex indices
-    std::multimap<std::pair<float, float>, int> vertexMap;
-    
-    // Populate the vertexMap with face indices grouped by vertex x and y positions
-    for (size_t i = 0; i < faces.size(); ++i) {
-        const face& f = faces[i];
-        vertexMap.insert({{vertices[f.a].x, vertices[f.a].y}, static_cast<int>(i)});
-        vertexMap.insert({{vertices[f.b].x, vertices[f.b].y}, static_cast<int>(i)});
-        vertexMap.insert({{vertices[f.c].x, vertices[f.c].y}, static_cast<int>(i)});
-    }
-
-    // Iterate through the vertexMap and find pairs of faces forming quads
-    for (auto it = vertexMap.begin(); it != vertexMap.end(); ++it) {
-        auto range = vertexMap.equal_range(it->first);
-        std::set<int> faceSet;
-        for (auto itr = range.first; itr != range.second; ++itr) {
-            faceSet.insert(itr->second);
+void checkAndSetEdgeInfo(edgeInfo& ei, mesh* m) {
+    struct VertexComparator {
+        bool operator()(const SDL_Vertex& lhs, const SDL_Vertex& rhs) const {
+            return std::tie(lhs.position.x, lhs.position.y) < std::tie(rhs.position.x, rhs.position.y);
         }
+    };
 
-        // Check for pairs of faces with two unique x and y positions
-        for (auto itr1 = faceSet.begin(); itr1 != faceSet.end(); ++itr1) {
-            for (auto itr2 = std::next(itr1); itr2 != faceSet.end(); ++itr2) {
-                int faceIdx1 = *itr1;
-                int faceIdx2 = *itr2;
+    const float tolerance = 3.0f;
 
-                // Extract vertices of both faces
-                const face& face1 = faces[faceIdx1];
-                const face& face2 = faces[faceIdx2];
-
-                std::set<std::tuple<float, float>> uniquePositions;
-                uniquePositions.insert({vertices[face1.a].x, vertices[face1.a].y});
-                uniquePositions.insert({vertices[face1.b].x, vertices[face1.b].y});
-                uniquePositions.insert({vertices[face1.c].x, vertices[face1.c].y});
-                uniquePositions.insert({vertices[face2.a].x, vertices[face2.a].y});
-                uniquePositions.insert({vertices[face2.b].x, vertices[face2.b].y});
-                uniquePositions.insert({vertices[face2.c].x, vertices[face2.c].y});
-
-                if (uniquePositions.size() == 2) {
-                    quadFaces[faceIdx1] = faceIdx2;
-                }
+    auto addVertexToSet = [&](std::set<SDL_Vertex, VertexComparator>& vertexSet, const SDL_Vertex& vertex) {
+        for (const auto& v : vertexSet) {
+            if (std::fabs(v.position.x - vertex.position.x) < tolerance &&
+                std::fabs(v.position.y - vertex.position.y) < tolerance) {
+                return;
             }
         }
-    }
+        vertexSet.insert(vertex);
+    };
 
-    return quadFaces;
+    for (const auto& f : m->faces) {
+        SDL_Vertex va = m->vertex[f.a];
+        SDL_Vertex vb = m->vertex[f.b];
+        SDL_Vertex vc = m->vertex[f.c];
+        SDL_Vertex vd = m->vertex[f.d];
+
+        va.position.x += m->origin.x;
+        va.position.y += m->origin.y;
+
+        vb.position.x += m->origin.x;
+        vb.position.y += m->origin.y;
+
+        vc.position.x += m->origin.x;
+        vc.position.y += m->origin.y;
+
+        vd.position.x += m->origin.x;
+        vd.position.y += m->origin.y;
+
+        std::set<SDL_Vertex, VertexComparator> vertexSet;
+        addVertexToSet(vertexSet, va);
+        addVertexToSet(vertexSet, vb);
+        addVertexToSet(vertexSet, vc);
+        addVertexToSet(vertexSet, vd);
+        addVertexToSet(vertexSet, ei.first);
+        addVertexToSet(vertexSet, ei.second);
+
+        if (vertexSet.size() <= 4) {
+            ei.wallMesh = m;
+            ei.indices = {f.a, f.b, f.c, f.d};
+            return; // Exit the loop once a match is found
+        }
+    }
 }
 
+int main() {
+    // Example usage
+    mesh m;
+    // Initialize m.faces and m.vertex with sample data...
 
+    edgeInfo ei;
+    // Initialize ei.first and ei.second with edge vertices...
 
-vec3::vec3(int fx = 0, int fy = 0, int fz = 0) :x(fx), y(fy), z(fz) {}
+    checkAndSetEdgeInfo(ei, &m);
+
+    if (ei.wallMesh != nullptr) {
+        std::cout << "Match found! Indices: ";
+        for (int index : ei.indices) {
+            std::cout << index << " ";
+        }
+        std::cout << std::endl;
+    } else {
+        std::cout << "No match found." << std::endl;
+    }
+
+    return 0;
+}vec3::vec3(int fx = 0, int fy = 0, int fz = 0) :x(fx), y(fy), z(fz) {}
 
 mesh::mesh() {
 }
@@ -114,13 +132,23 @@ void setVertexColors(vector<vertex3d>& vertices, const vector<face>& faces, cons
 
     // Accumulate normals for each vertex
     for (const auto& f : faces) {
+      if(f.d < 100) {
+        array<float, 3> normal = calculateNormal(vertices[f.a], vertices[f.b], vertices[f.c]);
+        vertex3d* verticesArray[4] = {&vertices[f.a], &vertices[f.b], &vertices[f.c], &vertices[f.d]};
+        for (int i = 0; i < 4; ++i) {
+          verticesArray[i]->normal[0] += normal[0];
+          verticesArray[i]->normal[1] += normal[1];
+          verticesArray[i]->normal[2] += normal[2];
+        }
+      } else {
         array<float, 3> normal = calculateNormal(vertices[f.a], vertices[f.b], vertices[f.c]);
         vertex3d* verticesArray[3] = {&vertices[f.a], &vertices[f.b], &vertices[f.c]};
         for (int i = 0; i < 3; ++i) {
-            verticesArray[i]->normal[0] += normal[0];
-            verticesArray[i]->normal[1] += normal[1];
-            verticesArray[i]->normal[2] += normal[2];
+          verticesArray[i]->normal[0] += normal[0];
+          verticesArray[i]->normal[1] += normal[1];
+          verticesArray[i]->normal[2] += normal[2];
         }
+      }
     }
 
     // Normalize and set vertex colors
@@ -241,11 +269,18 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
 
         // Convert to face objects
         for (const auto& f : faceIndices) {
-            if (f.size() == 3) { // Ensure it's a triangle
-              faces.push_back({f[0], f[1], f[2]});
+            if (f.size() == 4) { // Ensure it's a triangle
+              faces.push_back({f[0], f[1], f[2], f[3]});
+            } else if (f.size() == 3 && fmtype == meshtype::FLOOR) {
+              face n;
+              n.a = f[0];
+              n.b = f[1];
+              n.c = f[2];
+              n.d = 100;
+              faces.push_back(n);
             } else {
                 E("");
-                E("Non triangular face in mesh");
+                E("Floors can have quads or tris, walls and collisions must have quads, and occluders can have edges.");
                 D(f.size());
                 D(faces.size());
                 E("");
@@ -259,42 +294,17 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
           const array<float, 3> lightDir = {0, -0.4472, -0.8944};
           setVertexColors(vertices, faces, lightDir, fmtype);
         } else if(fmtype == meshtype::V_WALL) {
-          const array<float, 3> lightDir = {0, -0.707, -0.707};
-          setVertexColors(vertices, faces, lightDir, fmtype);
+//          const array<float, 3> lightDir = {0, -0.707, -0.707};
+//          setVertexColors(vertices, faces, lightDir, fmtype);
         }
 
         
 
         // Transform 3D coordinates to 2D and set up SDL_Vertex array
-        result->numVertices = faces.size() * 3;
-        result->vertex = new SDL_Vertex[result->numVertices];
-        result->vertexExtraData = vector<pair<float, float>>(result->numVertices);
+        result->vertex = new SDL_Vertex[vertices.size()];
+        result->vertexExtraData = vector<pair<float, float>>(vertices.size());
 
-        int index = 0;
-        float maxDistanceFromOrigin = 0;
         for (const auto& f : faces) {
-            auto convertVertex = [&](const vertex3d& v) {
-                result->vertex[index].position.x = ((-v.x) * scale);
-                result->vertex[index].position.y = ((v.y * scale)) * XtoY;
-                float dist = Distance(result->vertex[index].position.x, result->vertex[index].position.y * XtoY, 0, 0);
-                result->vertex[index].position.y -= ((v.z * scale)) * XtoZ;
-                result->vertex[index].tex_coord.y = v.v;
-                result->vertex[index].color = v.color;
-                result->vertex[index].tex_coord.x = v.u;
-                result->vertexExtraData[index].first = v.lu;
-                result->vertexExtraData[index].second = v.lv;
-                result->vertex[index].color.r = v.color.r;
-                result->vertex[index].color.g = v.color.g;
-                result->vertex[index].color.b = v.color.b;
-
-
-                if(dist > maxDistanceFromOrigin) {
-                    maxDistanceFromOrigin = dist;
-                }
-
-                ++index;
-            };
-
             int fail = 0;
 
             if( fmtype == meshtype::V_WALL) {
@@ -316,10 +326,10 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 B.position.x += forigin.x;
                 B.position.y += forigin.y;
 
-                pair<SDL_Vertex, SDL_Vertex> myPair;
-                myPair.first = A;
-                myPair.second = B;
-                g_wEdges.emplace_back(myPair);
+                edgeInfo ei;
+                ei.first = A;
+                ei.second = B;
+                g_wEdges.emplace_back(ei);
                 fail++;
               }
 
@@ -342,10 +352,10 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 B.position.x += forigin.x;
                 B.position.y += forigin.y;
 
-                pair<SDL_Vertex, SDL_Vertex> myPair;
-                myPair.first = A;
-                myPair.second = B;
-                g_wEdges.emplace_back(myPair);
+                edgeInfo ei;
+                ei.first = A;
+                ei.second = B;
+                g_wEdges.emplace_back(ei);
                 fail++;
               }
 
@@ -368,16 +378,71 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
                 B.position.x += forigin.x;
                 B.position.y += forigin.y;
 
-                pair<SDL_Vertex, SDL_Vertex> myPair;
-                myPair.first = A;
-                myPair.second = B;
-                g_wEdges.emplace_back(myPair);
+                edgeInfo ei;
+                ei.first = A;
+                ei.second = B;
+                g_wEdges.emplace_back(ei);
               }
             }
 
-            convertVertex(vertices[f.a]);
-            convertVertex(vertices[f.b]);
-            convertVertex(vertices[f.c]);
+        }
+       
+
+
+        int index = 0;
+        float maxDistanceFromOrigin = 0;
+        for( auto v : vertices) {
+            result->vertex[index].position.x = ((-v.x) * scale);
+            result->vertex[index].position.y = ((v.y * scale)) * XtoY;
+            float dist = Distance(result->vertex[index].position.x, result->vertex[index].position.y * XtoY, 0, 0);
+            result->vertex[index].position.y -= ((v.z * scale)) * XtoZ;
+            result->vertex[index].tex_coord.y = v.v;
+            result->vertex[index].color = v.color;
+            result->vertex[index].tex_coord.x = v.u;
+            result->vertexExtraData[index].first = v.lu;
+            result->vertexExtraData[index].second = v.lv;
+//            result->vertex[index].color.r = v.color.r;
+//            result->vertex[index].color.g = v.color.g;
+//            result->vertex[index].color.b = v.color.b;
+            result->vertex[index].color.r = 255;
+            result->vertex[index].color.g = 255;
+            result->vertex[index].color.b = 255;
+
+
+            if(dist > maxDistanceFromOrigin) {
+              maxDistanceFromOrigin = dist;
+            }
+
+            ++index;
+        }
+
+        result->numVertices = vertices.size();
+        
+        result->indices = new int[faces.size() * 6];
+        result->numIndices = 0;
+        for (const auto& f : faces) {
+          if(f.d < 100) {
+            result->indices[result->numIndices] = f.a;
+            result->numIndices++;
+            result->indices[result->numIndices] = f.b;
+            result->numIndices++;
+            result->indices[result->numIndices] = f.c;
+            result->numIndices++;
+  
+            result->indices[result->numIndices] = f.a;
+            result->numIndices++;
+            result->indices[result->numIndices] = f.c;
+            result->numIndices++;
+            result->indices[result->numIndices] = f.d;
+            result->numIndices++;
+          } else {
+            result->indices[result->numIndices] = f.a;
+            result->numIndices++;
+            result->indices[result->numIndices] = f.b;
+            result->numIndices++;
+            result->indices[result->numIndices] = f.c;
+            result->numIndices++;
+          }
         }
 
         if(fmtype == meshtype::OCCLUDER) {
@@ -392,9 +457,9 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
             A.position.y = ((first.y * scale)) * XtoY - ((first.z * scale)) * XtoZ;
             A.position.x += forigin.x;
             A.position.y += forigin.y;
-            A.color.r = 255;
-            A.color.g = 255;
-            A.color.b = 255;
+            A.color.r = 0;
+            A.color.g = 0;
+            A.color.b = 0;
             A.color.a = 255;
 
             SDL_Vertex B;
@@ -404,15 +469,18 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
 
             B.position.x += forigin.x;
             B.position.y += forigin.y;
-            B.color.r = 255;
-            B.color.g = 255;
-            B.color.b = 255;
+            B.color.r = 0;
+            B.color.g = 0;
+            B.color.b = 0;
             B.color.a = 255;
 
-            pair<SDL_Vertex, SDL_Vertex> myPair;
-            myPair.first = A;
-            myPair.second = B;
-            g_oEdges.emplace_back(myPair);
+            edgeInfo ei;
+            ei.first = A;
+            ei.second = B;
+ 
+            checkAndSetEdgeInfo(ei, g_meshVWalls[0]);
+
+            g_oEdges.emplace_back(ei);
           }
         }
 
@@ -425,7 +493,13 @@ mesh* loadMeshFromPly(string faddress, vec3 forigin, float scale, meshtype fmtyp
             x.y *= scale * XtoY;
             x.z *= scale;
         }
-        result->vertices = vertices;
+
+        //needed for collisions and floors
+        if(fmtype == meshtype::COLLISION ||
+            fmtype == meshtype::FLOOR ||
+            fmtype == meshtype::V_WALL) {
+          result->vertices = vertices;
+        }
     } else {
         cerr << "File does not exist: " << address << endl;
     }
